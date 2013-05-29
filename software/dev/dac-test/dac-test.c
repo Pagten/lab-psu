@@ -4,14 +4,23 @@
  * Copyright 2013 Pieter Agten
  */
 
+#include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
 #include "pins.h"
+#include "rotary.h"
 
-static uint16 dac0_value;
-static uint16 dac1_value;
-
+/*
+ * Fuses:
+ *
+ *  L: 0xF7
+ *  H: 0xD9
+ *  E: 0x07
+ *
+ *  avrdude:
+ *   -U lfuse:w:0xf7:m -U hfuse:w:0xd9:m -U efuse:w:0x07:m
+ */
 
 void main(void) __attribute__((noreturn));
 
@@ -20,61 +29,80 @@ void main(void) __attribute__((noreturn));
  */
 static inline void initialize_pins(void)
 {
-  SET_INPUT(ROT0A_PIN);
-  SET_INPUT(ROT0B_PIN);
-  SET_INPUT(ROT1A_PIN);
-  SET_INPUT(ROT1B_PIN);
+  DEBUG(DDR) = OUTPUT;
 
-  SET_OUTPUT(OC1A);
-  SET_OUTPUT(OC1B);
+  ROT0A(DDR) = INPUT;
+  ROT0B(DDR) = INPUT;
+  ROT1A(DDR) = INPUT;
+  ROT1B(DDR) = INPUT;
+
+  DAC0(DDR) = OUTPUT;
+  DAC1(DDR) = OUTPUT;
 }
+
+#define DAC_TOP 0x0FFF //12-bit
 
 /**
  * Initializes Timer1 for Fast PWM mode.
  */
 static inline void initialize_pwm(void)
 {
-  // Set initial value to 0 (pins will be high because of output is inverted)
-  OCR1A = 0;
-  OCR1B = 0;
+  // Set initial value to 0
+  DAC0_REG = 0;
+  DAC1_REG = 0;
 
-  // 16-bit period
-  ICR1 = 0xFFFF;
+  // Set period
+  ICR1 = DAC_TOP;
 
   // Enable Fast PWM mode
-  TCCR1A = _BV(COM1A1) | _BV(COM1A0) | _BV(COM1B1) | _BV(COM1B0) | _BV(WGM11);
+  TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS10);
 }
 
 
-#define STEP_SIZE = 16
+#define STEP_SIZE 64
 
 /**
  * Pin change interrupt for port C.
  */
 ISR(PCINT1_vect)
 {
-  static uint8 rot0_state;
-  static uint8 rot1_state;
-  uint8 rot0_pins = (PINB & (_BV(ROT0A_PIN) | _BV(ROT0B_PIN))) >> ROT0B_PIN;
-  uint8 rot1_pins = (PINB & (_BV(ROT1A_PIN) | _BV(ROT1B_PIN))) >> ROT1B_PIN;
+  static uint8_t rot0_state;
+  //static uint8_t rot1_state;
+  uint8_t rot0_pins = (ROT0A(READ) << 1) | ROT0B(READ);
+  //uint8_t rot1_pins = (ROT1A(READ) << 1) | ROT1B(READ);
   rot0_state = rotary_process_step(rot0_state, rot0_pins);
-  rot1_state = rotary_process_step(rot1_state, rot1_pins);
+  //rot1_state = rotary_process_step(rot1_state, rot1_pins);
 
-  if (rot0_state & DIR_CW && dac0_value <= (0xFFFF - STEP_SIZE)) {
-    dac0_value += STEP_SIZE;
-    DAC0_REG = dac0_value;
-  } else if (rot0_state & DIR_CCW && dac0_value >= STEP_SIZE) {
-    dac0_value -= STEP_SIZE;
-    DAC0_REG = dac0_value;
+  //Toggle pin (TODO: use proper pin name!):
+  //PORTC |= _BV(PC5);
+
+  if (rot0_state & DIR_CW) {
+    if (DAC0_REG < DAC_TOP - STEP_SIZE) {
+      DAC0_REG += STEP_SIZE;
+    } else {
+      DAC0_REG = DAC_TOP + 1;
+    }
+  } else if (rot0_state & DIR_CCW) {
+    if (DAC0_REG > STEP_SIZE) {
+      DAC0_REG -= STEP_SIZE;
+    } else {
+      DAC0_REG = 0x0000;
+    }
   }
-  if (rot1_state & DIR_CW && dac1_value <= (0xFFFF - STEP_SIZE)) {
-    dac1_value += STEP_SIZE;
-    DAC1_REG = dac1_value;
-  } else if (rot1_state & DIR_CCW && dac1_value > STEP_SIZE) {
-    dac1_value -= STEP_SIZE;
-    DAC1_REG = dac1_value;
-  }
+  /*if (rot1_state & DIR_CW) {
+    if (DAC1_REG < 0xFFFF - STEP_SIZE) {
+      DAC1_REG += STEP_SIZE;
+    } else {
+      DAC0_REG = 0xFFFF;
+    }
+  } else if (rot1_state & DIR_CCW) {
+    if (DAC1_REG > STEP_SIZE) {
+      DAC1_REG -= STEP_SIZE;
+    } else {
+      DAC1_REG = 0x0000;
+    }
+    }*/
 }
 
 
@@ -82,5 +110,10 @@ void main(void)
 {
   initialize_pins();
   initialize_pwm();
+
+  PCICR = _BV(PCIE1); // Enable Pin Change Interrupt 1
+  PCMSK1 = _BV(PCINT8) | _BV(PCINT9) | _BV(PCINT10) | _BV(PCINT11);
+  sei(); // Enable interrupts
+
   while(1);
 }
