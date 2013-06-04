@@ -2,6 +2,7 @@
  * This code is based on http://www.buxtronix.net/2011/10/rotary-encoders-done-properly.html
  */
 
+#include "config.h"
 #include "rotary.h"
 
 #define R_START 0x0
@@ -12,22 +13,22 @@
 #define R_CCW_BEGIN_M 0x5
 
 //TODO: place in program memory
-// Remember: the pin values are inverted, because they are pulled low on a pulse
-// 11                    10                01              00
+// 00                    01                10              11
 static const uint8_t ttable[6][4] = {
   // R_START (00)
-  {R_START_M,            R_CW_BEGIN,       R_CCW_BEGIN,    R_START},
+  {R_START,              R_CCW_BEGIN,      R_CW_BEGIN,     R_START_M},
   // R_CCW_BEGIN
-  {R_START_M | DIR_CCW,  R_START,          R_CCW_BEGIN,    R_START},
+  {R_START,              R_CCW_BEGIN,      R_START,        R_START_M | DIR_CCW},
   // R_CW_BEGIN
-  {R_START_M | DIR_CW,   R_CW_BEGIN,       R_START,        R_START},
+  {R_START,              R_START,          R_CW_BEGIN,     R_START_M | DIR_CW},
   // R_START_M (11)
-  {R_START_M,            R_CCW_BEGIN_M,    R_CW_BEGIN_M,   R_START},
+  {R_START,              R_CW_BEGIN_M,     R_CCW_BEGIN_M,  R_START_M},
   // R_CW_BEGIN_M
-  {R_START_M,            R_START_M,        R_CW_BEGIN_M,   R_START | DIR_CW},
+  {R_START | DIR_CW,     R_CW_BEGIN_M,     R_START_M,      R_START_M},
   // R_CCW_BEGIN_M
-  {R_START_M,            R_CCW_BEGIN_M,    R_START_M,      R_START | DIR_CCW},
+  {R_START | DIR_CCW,    R_START_M,        R_CCW_BEGIN_M,  R_START_M},
 };
+
 
 uint8_t rotary_process_step(uint8_t prev_state, uint8_t pins_state)
 {
