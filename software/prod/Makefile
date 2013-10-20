@@ -3,7 +3,7 @@ GCC_DEVICE_TYPE = atmega328
 
 CC = gcc
 INCLUDES = $(TESTINCLUDES) -Isrc
-CFLAGS = -std=c99
+CFLAGS = -g -std=c99
 LIBS =
 LDFLAGS =
 
