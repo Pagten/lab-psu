@@ -209,4 +209,5 @@ static inline void ready_queue_put(struct task_node* node)
     ready_tail->next = node;
     ready_tail = node;
   }
+  node->next = 0;
 }
