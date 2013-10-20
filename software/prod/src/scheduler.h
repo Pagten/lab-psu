@@ -41,7 +41,7 @@ typedef enum
 /**
  * The number of timer ticks per millisecond.
  */
-#define SCHED_TICKS_MS  ()  
+#define SCHED_TICKS_MS  (1) //TODO: fill in!
 
 /**
  * Type of a task that can be scheduled.

@@ -47,12 +47,13 @@
  */
 
 #include <stdbool.h>
+
 #include <util/atomic.h>
+#include <hal/timer2.h>
 
 #include "utils/math.h"
 #include "utils/log.h"
 
-#include "hal/timer2.h"
 #include "scheduler.h"
 
 #ifndef SCHED_TASKS_MAX
@@ -172,8 +173,9 @@ TMR2_OCA_INTERRUPT_vect
 
 void sched_start(void) {
   while (true) {
+    struct task_node* first;
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-      struct task_node* first = ready_head;
+      first = ready_head;
     }
     if (first != 0) { 
       ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
