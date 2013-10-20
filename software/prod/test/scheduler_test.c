@@ -62,15 +62,48 @@ static void task_schedule_immediately1(void* data)
 }
 
 
-START_TEST (test_schedule_immediately0)
+START_TEST(test_schedule_immediately0)
 {
+  sched_exec_status_t task_executed;
   unsigned int data = 42;
   sched_schedule(0, task_schedule_immediately0, (void*)data);
-  sched_schedule(1, task_schedule_immediately1, NULL);
+  sched_schedule(0, task_schedule_immediately1, NULL);
   ck_assert(task_schedule_immediately0_ran == false);
   ck_assert(task_schedule_immediately1_ran == false);
-  sched_start();
-  ck_abort_msg("sched_start shouldn't return");
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_immediately0_ran == true);
+  ck_assert(task_schedule_immediately1_ran == false);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_immediately0_ran == true);
+  ck_assert(task_schedule_immediately1_ran == true);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+}
+END_TEST
+
+
+
+static bool task_schedule_delayed0_ran = false;
+static void task_schedule_delayed0(void* data)
+{
+  task_schedule_delayed0_ran = true;
+  ck_assert_uint_eq((unsigned int)data, 88);
+}
+
+
+START_TEST(test_schedule_delayed0)
+{
+  sched_exec_status_t task_executed;
+  unsigned int data = 88;
+  sched_schedule(0, task_schedule_delayed0, (void*)data);
+  ck_assert(task_schedule_immediately0_ran == false);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_immediately0_ran == true);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
 }
 END_TEST
 

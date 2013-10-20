@@ -7,14 +7,16 @@ CFLAGS = -std=c99
 LIBS =
 LDFLAGS =
 
+BUILD_DIR = build
 SRC = src/scheduler.c
 
 all: test
 
-%.o: %.c
+$(BUILD_DIR)/%.o: %.c
+	mkdir -p `dirname $@`
 	$(CC) -c $(CFLAGS) $(INCLUDES) $< -o $@
 
 clean:
-	$(RM) *.o
+	$(RM) -r $(BUILD_DIR)/*
 
 -include test/Makefile.inc

@@ -60,6 +60,7 @@
 #define SCHED_TASKS_MAX  8
 #endif
 
+
 struct task_node
 {
   uint16_t tick; // Time at which the task must be executed
@@ -70,12 +71,13 @@ struct task_node
 
 static struct task_node tasks[SCHED_TASKS_MAX];
 static struct task_node* free_head;
-static struct task_node* volatile waiting_head;
+static struct task_node* waiting_head;
 static struct task_node* volatile ready_head;
-static struct task_node* volatile ready_tail;
+static struct task_node* ready_tail;
 
 static volatile uint16_t next_interrupt_tick;
 
+static bool scheduler_must_stop;
 
 // Prototypes:
 static inline void ready_queue_put(struct task_node* node);
@@ -98,7 +100,7 @@ void sched_init(void)
 }
 
 
-sched_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* data)
+sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* data)
 {
   if (free_head == 0) {
     LOG_WARN("no free task slots in scheduler");
@@ -171,29 +173,30 @@ TMR2_OCA_INTERRUPT_vect
 }
 
 
-void sched_start(void) {
-  while (true) {
-    struct task_node* first;
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-      first = ready_head;
-    }
-    if (first != 0) { 
-      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        // Remove first task from ready queue
-        ready_head = first->next;
-        if (ready_head == 0) ready_tail = 0;
-      }
-
-      // Execute the task
-      first->task(first->data);
-      
-      // Add it back to the free list
-      first->next = free_head;
-      free_head = first;
-    } else {
-      // System is idle, sleep until timer 2 interrupt?
-    }
+sched_exec_status_t sched_exec(void)
+{
+  struct task_node* first;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    first = ready_head;
   }
+  if (first != 0) { 
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      // Remove first task from ready queue
+      ready_head = first->next;
+      if (ready_head == 0) ready_tail = 0;
+    }
+
+    // Execute the task
+    first->task(first->data);
+      
+    // Add it back to the free list
+    first->next = free_head;
+    free_head = first;
+    return SCHED_TASK_EXECUTED;
+  }
+  
+  // System is idle
+  return SCHED_IDLE; 
 }
 
 
