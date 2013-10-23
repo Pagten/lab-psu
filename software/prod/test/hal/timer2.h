@@ -1,31 +1,39 @@
 #ifndef TIMER2_H
 #define TIMER2_H
 
+#include <stdbool.h>
 #include <stdint.h>
+#include "hal/timers.h"
+
 
 struct tmr2 {
   uint8_t OCR2A;
   uint8_t TCNT2;
+  bool oca_interrupt_enabled;
 };
 
-extern struct tmr2 timer2;
+extern struct tmr2 timer2_mock;
 
-void timer2_set_oca_disconnected(void);
-void timer2_enable_oca_interrupt(void);
-void timer2_set_clock_ps1024(void);
-void timer2_set_clock_disabled(void);
+void timer2_mock_set_oca_disconnected(void);
+void timer2_mock_enable_oca_interrupt(void);
+void timer2_mock_set_clock_ps1024(void);
+void timer2_mock_set_clock_disabled(void);
+void timer2_mock_oca_interrupt_vect(void);
 
-void timer2_oca_interrupt_vect(void);
+void timer2_mock_init(void);
+void timer2_mock_tick(void);
+void timer2_mock_ffw_to_oca(void);
 
+#define timer2_oca_SET_DISCONNECTED timer2_mock_set_oca_disconnected()
+#define timer2_oca_SET_ENABLED      timer2_mock_enable_oca_interrupt()
+#define timer2_SET_CLOCK_ps_1024    timer2_mock_set_clock_ps1024()
+#define timer2_SET_CLOCK_disabled   timer2_mock_set_clock_disabled()
 
-#define TMR2_SET_OCA_DISCONNECTED  timer2_set_oca_disconnected()
-#define TMR2_ENABLE_OCA_INTERRUPT  timer2_enable_oca_interrupt()
-#define TMR2_SET_CLOCK_PS1024      timer2_set_clock_ps1024()
-#define TMR2_SET_CLOCK_DISABLED    timer2_set_clock_disabled()
+#define timer2_oca_REG      timer2_mock.OCR2A
+#define timer2_oca_REG_MAX  255
+#define timer2_cntr_REG     timer2_mock.TCNT2
+#define timer2_cntr_REG_MAX 255
 
-#define TMR2_OCRA  timer2.OCR2A
-#define TMR2_CNTR  timer2.TCNT2
-
-#define TMR2_OCA_INTERRUPT_vect void timer2_oca_interrupt_vect(void)
+#define timer2_oca_INTERRUPT_VECT void timer2_mock_oca_interrupt_vect(void)
 
 #endif

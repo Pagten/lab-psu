@@ -32,12 +32,14 @@
 #include <stdlib.h>
 #include <check.h>
 
+#include <hal/timer2.h>
 #include "scheduler.h"
 
 
 static void setup(void)
 {
   sched_init();
+  timer2_mock_ffw_to_oca();
 }
 
 static void teardown(void)
@@ -97,13 +99,37 @@ START_TEST(test_schedule_delayed0)
 {
   sched_exec_status_t task_executed;
   unsigned int data = 88;
-  sched_schedule(0, task_schedule_delayed0, (void*)data);
-  ck_assert(task_schedule_immediately0_ran == false);
-  task_executed = sched_exec();
-  ck_assert(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(task_schedule_immediately0_ran == true);
+  sched_schedule(3, task_schedule_delayed0, (void*)data);
+  ck_assert(task_schedule_delayed0_ran == false);
+  
+  // TCNT2 = 0
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_delayed0_ran == false);
+  timer2_mock_tick();
+  
+  // TCNT2 = 1
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_delayed0_ran == false);
+  timer2_mock_tick();
+  
+  // TCNT2 = 2
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_delayed0_ran == false);
+  timer2_mock_tick();
+  
+  // TCNT2 = 3
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_delayed0_ran == true);
+  timer2_mock_tick();
+  
+  // TCNT2 = 4
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_delayed0_ran == true);
 }
 END_TEST
 
@@ -125,14 +151,19 @@ START_TEST(test_schedule_task0_immediately)
   ck_abort_msg("sched_start shouldn't return");
   }*/
 
-Suite *schedule_immediately_suite(void)
+Suite *schedule_suite(void)
 {
-  Suite *s = suite_create("Schedule immediately");
+  Suite *s = suite_create("Schedule function");
 
   TCase *tc_sched_immediately0 = tcase_create("Schedule immediately 0");
   tcase_add_checked_fixture(tc_sched_immediately0, setup, teardown);
   tcase_add_test(tc_sched_immediately0, test_schedule_immediately0);
   suite_add_tcase(s, tc_sched_immediately0);
+
+  TCase *tc_sched_delayed0 = tcase_create("Schedule delayed 0");
+  tcase_add_checked_fixture(tc_sched_delayed0, setup, teardown);
+  tcase_add_test(tc_sched_delayed0, test_schedule_delayed0);
+  suite_add_tcase(s, tc_sched_delayed0);
 
   return s;
 }
@@ -140,7 +171,7 @@ Suite *schedule_immediately_suite(void)
 int main(void)
 {
   int number_failed;
-  Suite *s = schedule_immediately_suite();
+  Suite *s = schedule_suite();
   SRunner *sr = srunner_create(s);
   srunner_run_all(sr, CK_NORMAL);
   number_failed = srunner_ntests_failed(sr);

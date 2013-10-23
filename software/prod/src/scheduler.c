@@ -27,23 +27,25 @@
  *
  * The scheduler uses three lists to schedule tasks:
  *  1) free list - contains unused task slots
- *  2) waiting list - contains tasks that have been scheduled to execute at a later time
+ *  2) waiting list - contains tasks that have been scheduled to execute at a 
+ *     later time
  *  3) ready queue - contains tasks that should be executed as soon as possible
  * The waiting and ready queue are sorted according to task execution time.
  * 
- * When the scheduler is asked to schedule a task some time in the future, a new
- * task slot is populated from the free list and placed in the correct position in the
- * waiting list. Timer 2 is used to trigger an interrupt when the first task in the
- * waiting list needs to be executed. When this interrupt occurs, the first task in the
- * waiting list (and any other tasks in the waiting list that are to be executed at the
- * same time) is moved to the back of the ready queue and the next interrupt is set
- * to occur when the new head of the waiting list needs to be executed (if any). The
- * main thread is constantly inspecting the ready queue, executing (and removing)
- * tasks from the head of this queue as soon as possible. The system is 'idle' when
- * the ready queue is empty.
+ * When the scheduler is asked to schedule a task some time in the future, a 
+ * new task slot is populated from the free list and placed in the correct 
+ * position in the waiting list. Timer 2 is used to trigger an interrupt when
+ * the first task in the waiting list needs to be executed. When this interrupt
+ * occurs, the first task in the waiting list (and any other tasks in the
+ * waiting list that are to be executed at the same time) is moved to the back
+ * of the ready queue and the next interrupt is set to occur when the new head
+ * of the waiting list needs to be executed (if any). The main thread is 
+ * constantly inspecting the ready queue, executing (and removing) tasks from
+ * the head of this queue as soon as possible. The system is 'idle' when the 
+ * ready queue is empty.
  *
- * If the scheduler is asked to schedule a task immediately, the task is placed at the
- * back of the ready queue immediately.
+ * If the scheduler is asked to schedule a task immediately, the task is placed
+ * at the back of the ready queue immediately.
  */
 
 #include <stdbool.h>
@@ -60,6 +62,8 @@
 #define SCHED_TASKS_MAX  8
 #endif
 
+#define TMR         timer2
+#define TMR_CHANNEL oca
 
 struct task_node
 {
@@ -93,10 +97,10 @@ void sched_init(void)
   free_head = &(tasks[0]);
 
   // Set up and enable timer 2
-  TMR2_ENABLE_OCA_INTERRUPT; // Enable the OCR2A interrupt
-  TMR2_SET_OCA_DISCONNECTED; // Disconnect the OC2A output
-  TMR2_SET_CLOCK_PS1024; // Enable timer with prescaler set to /1024
-  // OCR2A interrupt will fire soon 
+  ENABLE_INTERRUPT(TMR,TMR_CHANNEL);        // Enable the timer interrupt
+  SET_OUTPUT_DISCONNECTED(TMR,TMR_CHANNEL); // Disconnect the timer output
+  SET_CLOCK(TMR,ps_1024);                   // Start timer with prescaler /1024
+  // Note: timer interrupt will fire soon 
 }
 
 
@@ -119,8 +123,8 @@ sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* 
     if (ticks == 0) {
       ready_queue_put(new_node);
     } else {
-      uint8_t current_timer_value = TMR2_CNTR;
-      uint8_t ticks_until_next_interrupt = TMR2_OCRA - current_timer_value;
+      uint8_t current_timer_value = TMR_REG(TMR, cntr);
+      uint8_t ticks_until_next_interrupt = TMR_REG(TMR, TMR_CHANNEL) - current_timer_value;
       uint16_t current_tick = next_interrupt_tick - ticks_until_next_interrupt;
 
       // Insert node into waiting queue
@@ -132,8 +136,8 @@ sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* 
       new_node->next = *node;
       *node = new_node;
 
-      if (ticks < TMR2_OCRA - current_timer_value) {
-        TMR2_OCRA = current_timer_value + ticks;
+      if (ticks < TMR_REG(TMR,TMR_CHANNEL) - current_timer_value) {
+        TMR_REG(TMR,TMR_CHANNEL) = current_timer_value + ticks;
         next_interrupt_tick = new_node->tick; 
       }
     }
@@ -146,9 +150,9 @@ sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* 
 //  - next_interrupt_tick
 //  - waiting_head
 //  - ready_queue_put: ready_head, ready_tail
-//  - TMR2_OCRA
-//  - TMR2_CNTR
-TMR2_OCA_INTERRUPT_vect
+//  - TMR_REG(TMR, TMR_CHANNEL)
+//  - TMR_REG(TMR, cntr)
+TMR_INTERRUPT_VECT(TMR,TMR_CHANNEL)
 {
   uint16_t current_tick = next_interrupt_tick;
 
@@ -164,11 +168,11 @@ TMR2_OCA_INTERRUPT_vect
   // Set-up timer for next event
   uint8_t ticks_until_next_isr;
   if (*node == 0) {
-    ticks_until_next_isr = 255;
+    ticks_until_next_isr = TMR_REG_MAX(TMR, TMR_CHANNEL);
   } else {
-    ticks_until_next_isr = MIN((*node)->tick - current_tick, 255); 
+    ticks_until_next_isr = MIN((*node)->tick - current_tick, TMR_REG_MAX(TMR, TMR_CHANNEL)); 
   }
-  TMR2_OCRA = TMR2_CNTR + ticks_until_next_isr;
+  TMR_REG(TMR, TMR_CHANNEL) = TMR_REG(TMR, cntr) + ticks_until_next_isr;
   next_interrupt_tick += ticks_until_next_isr;
 }
 

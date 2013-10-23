@@ -4,14 +4,18 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#define TMR2_SET_OCA_DISCONNECTED  ( TCCR2A &= ~(_BV(COM2A1) | _BV(COM2A0)) ) // Disconnect OC2A output
-#define TMR2_ENABLE_OCA_INTERRUPT  ( TIMSK2 |= _BV(OCIE2A) )                  // Enable OCR2A compare match interrupt
-#define TMR2_SET_CLOCK_PS1024      ( TCCR2B |= _BV(CS22) | _BV(CS21) | _BV(CS20) ) // Set clock source to clk/1024
-#define TMR2_SET_CLOCK_DISABLED    ( TCCR2B &= ~( _BV(CS22) | _BV(CS21) | _BV(CS20)) ) // Disable timer
+#include "timers.h"
 
-#define TMR2_OCRA  ( OCR2A )
-#define TMR2_CNTR  ( TCNT2 )
+#define timer2_oca_SET_DISCONNECTED ( TCCR2A &= ~(_BV(COM2A1) | _BV(COM2A0)) ) // Disconnect OC2A output
+#define timer2_oca_SET_ENABLED      ( TIMSK2 |= _BV(OCIE2A) )                  // Enable OCR2A compare match interrupt
+#define timer2_SET_CLOCK_ps_1024    ( TCCR2B |= _BV(CS22) | _BV(CS21) | _BV(CS20) ) // Set clock source to clk/1024
+#define timer2_SET_CLOCK_disabled   ( TCCR2B &= ~( _BV(CS22) | _BV(CS21) | _BV(CS20)) ) // Disable timer
 
-#define TMR2_OCA_INTERRUPT_vect  ISR(TIMER2_COMPA_vect)
+#define timer2_oca_REG      OCR2A
+#define timer2_oca_REG_MAX  255
+#define timer2_cntr_REG     TCNT2
+#define timer2_cntr_REG_MAX 255
+
+#define timer2_oca_INTERRUPT_VECT ISR(TIMER2_COMPA_vect)
 
 #endif
