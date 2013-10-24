@@ -38,6 +38,7 @@
 
 static void setup(void)
 {
+  timer2_mock_init();
   sched_init();
   timer2_mock_ffw_to_oca();
 }
@@ -102,6 +103,12 @@ START_TEST(test_schedule_delayed0)
   sched_schedule(3, task_schedule_delayed0, (void*)data);
   ck_assert(task_schedule_delayed0_ran == false);
   
+  // TCNT2 = 255
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_delayed0_ran == false);
+  timer2_mock_tick();
+  
   // TCNT2 = 0
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
@@ -116,17 +123,11 @@ START_TEST(test_schedule_delayed0)
   
   // TCNT2 = 2
   task_executed = sched_exec();
-  ck_assert(task_executed == SCHED_IDLE);
-  ck_assert(task_schedule_delayed0_ran == false);
-  timer2_mock_tick();
-  
-  // TCNT2 = 3
-  task_executed = sched_exec();
   ck_assert(task_executed == SCHED_TASK_EXECUTED);
   ck_assert(task_schedule_delayed0_ran == true);
   timer2_mock_tick();
   
-  // TCNT2 = 4
+  // TCNT2 = 3
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
   ck_assert(task_schedule_delayed0_ran == true);

@@ -158,17 +158,19 @@ TMR_INTERRUPT_VECT(TMR,TMR_CHANNEL)
 
   struct task_node** node = &waiting_head;
   while (*node != 0 && (*node)->tick <= current_tick) {
-    // Add to run queue
-    ready_queue_put(*node);
+    // Remember node
+    struct task_node* node0 = *node;
 
     // Remove from waiting list
     *node = (*node)->next;
-    (*node)->next = 0;
+
+    // Add to run queue
+    ready_queue_put(node0);
   }
   // Set-up timer for next event
   uint8_t ticks_until_next_isr;
   if (*node == 0) {
-    ticks_until_next_isr = TMR_REG_MAX(TMR, TMR_CHANNEL);
+    ticks_until_next_isr = TMR_REG_MAX(TMR, TMR_CHANNEL); // +1?
   } else {
     ticks_until_next_isr = MIN((*node)->tick - current_tick, TMR_REG_MAX(TMR, TMR_CHANNEL)); 
   }
