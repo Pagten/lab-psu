@@ -109,20 +109,20 @@ void sched_init(void)
 
 sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* data)
 {
-  if (free_head == 0) {
-    LOG_WARN("no free task slots in scheduler");
-    return SCHED_QUEUE_FULL;
-  }
-  
-  // Remove node from free list
-  struct task_node* new_node = free_head;
-  free_head = free_head->next;
-  
-  // Populate the node with data
-  new_node->task = task;
-  new_node->data = data;
-  
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    if (free_head == 0) {
+      LOG_WARN("no free task slots in scheduler");
+      return SCHED_QUEUE_FULL;
+    }
+  
+    // Remove node from free list
+    struct task_node* new_node = free_head;
+    free_head = free_head->next;
+  
+    // Populate the node with data
+    new_node->task = task;
+    new_node->data = data;
+  
     if (ticks == 0) {
       ready_queue_put(new_node);
     } else {
@@ -132,7 +132,7 @@ sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* da
 
       // Insert node into waiting queue
       struct task_node** node = &waiting_head;
-      while (*node != 0 && (*node)->tick - current_tick < ticks) {
+      while (*node != 0 && (*node)->tick - current_tick <= ticks) {
         node = &((*node)->next);
       }
       new_node->tick = current_tick + ticks;

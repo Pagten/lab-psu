@@ -50,97 +50,199 @@ static void teardown(void)
 }
 
 // ****************************************************************************
-//                       test_schedule_immediately0
+//                       test_schedule_one_immediately
 // ****************************************************************************
-static bool task_schedule_immediately0_ran = false;
-static void task_schedule_immediately0(void* data)
+static bool task_schedule_one_immediately_executed = false;
+static void task_schedule_one_immediately(void* data)
 {
-  task_schedule_immediately0_ran = true;
+  task_schedule_one_immediately_executed = true;
   ck_assert_uint_eq((unsigned int)data, 42);
 }
 
-static bool task_schedule_immediately1_ran = false;
-static void task_schedule_immediately1(void* data)
-{
-  task_schedule_immediately1_ran = true;
-  ck_assert(task_schedule_immediately0_ran == true);
-  ck_assert_ptr_eq(data, NULL);
-}
 
-
-START_TEST(test_schedule_immediately0)
+START_TEST(test_schedule_one_immediately)
 {
   sched_schedule_status task_scheduled;
   sched_exec_status task_executed;
   unsigned int data = 42;
-  task_scheduled = sched_schedule(0, task_schedule_immediately0, (void*)data);
+  task_scheduled = sched_schedule(0, task_schedule_one_immediately, (void*)data);
   ck_assert(task_scheduled == SCHED_OK);
-  task_scheduled = sched_schedule(0, task_schedule_immediately1, NULL);
-  ck_assert(task_scheduled == SCHED_OK);
-  ck_assert(task_schedule_immediately0_ran == false);
-  ck_assert(task_schedule_immediately1_ran == false);
+  ck_assert(task_schedule_one_immediately_executed == false);
+
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(task_schedule_immediately0_ran == true);
-  ck_assert(task_schedule_immediately1_ran == false);
-  task_executed = sched_exec();
-  ck_assert(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(task_schedule_immediately0_ran == true);
-  ck_assert(task_schedule_immediately1_ran == true);
+  ck_assert(task_schedule_one_immediately_executed == true);
+
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
 }
 END_TEST
 
 
+
 // ****************************************************************************
-//                       test_schedule_delayed0
+//                      test_schedule_multiple_immediately
 // ****************************************************************************
-static bool task_schedule_delayed0_ran = false;
-static void task_schedule_delayed0(void* data)
+static int task_schedule_multiple_immediately_executed = 0;
+static void task_schedule_multiple_immediately(void* data)
 {
-  task_schedule_delayed0_ran = true;
+  task_schedule_multiple_immediately_executed += 1;
+  ck_assert_int_eq((int)data, task_schedule_multiple_immediately_executed);
+}
+
+
+START_TEST(test_schedule_multiple_immediately)
+{
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
+  
+  // Scheduling phase
+  task_scheduled = sched_schedule(0, task_schedule_multiple_immediately, (void*)1);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_immediately_executed == 0);
+
+  task_scheduled = sched_schedule(0, task_schedule_multiple_immediately, (void*)2);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_immediately_executed == 0);
+
+  task_scheduled = sched_schedule(0, task_schedule_multiple_immediately, (void*)3);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_immediately_executed == 0);
+
+  // Execution phase
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_immediately_executed == 1);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_immediately_executed == 2);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_immediately_executed == 3);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_multiple_immediately_executed == 3);
+}
+END_TEST
+
+
+// ****************************************************************************
+//                       test_schedule_one_delayed
+// ****************************************************************************
+static bool task_schedule_one_delayed_executed = false;
+static void task_schedule_one_delayed(void* data)
+{
+  task_schedule_one_delayed_executed = true;
   ck_assert_uint_eq((unsigned int)data, 88);
 }
 
 
-START_TEST(test_schedule_delayed0)
+START_TEST(test_schedule_one_delayed)
 {
   sched_schedule_status task_scheduled;
   sched_exec_status task_executed;
   unsigned int data = 88;
-  task_scheduled = sched_schedule(3, task_schedule_delayed0, (void*)data);
+  task_scheduled = sched_schedule(3, task_schedule_one_delayed, (void*)data);
   ck_assert(task_scheduled == SCHED_OK);
-  ck_assert(task_schedule_delayed0_ran == false);
+  ck_assert(task_schedule_one_delayed_executed == false);
   
   // TCNT2 = 255
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
-  ck_assert(task_schedule_delayed0_ran == false);
+  ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
   // TCNT2 = 0
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
-  ck_assert(task_schedule_delayed0_ran == false);
+  ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
   // TCNT2 = 1
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
-  ck_assert(task_schedule_delayed0_ran == false);
+  ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
   // TCNT2 = 2
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(task_schedule_delayed0_ran == true);
+  ck_assert(task_schedule_one_delayed_executed == true);
   timer2_mock_tick();
   
   // TCNT2 = 3
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
-  ck_assert(task_schedule_delayed0_ran == true);
+  ck_assert(task_schedule_one_delayed_executed == true);
+}
+END_TEST
+
+
+// ****************************************************************************
+//                      test_schedule_multiple_delayed
+// ****************************************************************************
+static int task_schedule_multiple_delayed_executed = 0;
+static void task_schedule_multiple_delayed(void* data)
+{
+  task_schedule_multiple_delayed_executed += 1;
+  ck_assert_int_eq((int)data, task_schedule_multiple_delayed_executed);
+}
+
+
+START_TEST(test_schedule_multiple_delayed)
+{
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
+  
+  // Scheduling phase
+  task_scheduled = sched_schedule(1, task_schedule_multiple_delayed, (void*)1);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_delayed_executed == 0);
+
+  task_scheduled = sched_schedule(1, task_schedule_multiple_delayed, (void*)2);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_delayed_executed == 0);
+
+  task_scheduled = sched_schedule(2, task_schedule_multiple_delayed, (void*)3);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_delayed_executed == 0);
+
+  // Execution phase
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_multiple_delayed_executed == 0);
+
+  timer2_mock_tick();
+  ck_assert(task_schedule_multiple_delayed_executed == 0);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_delayed_executed == 1);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_delayed_executed == 2);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_multiple_delayed_executed == 2);
+
+  timer2_mock_tick();
+  ck_assert(task_schedule_multiple_delayed_executed == 2);
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_multiple_delayed_executed == 3);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_multiple_delayed_executed == 3);
+
+  timer2_mock_tick();
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_multiple_delayed_executed == 3);
 }
 END_TEST
 
@@ -148,27 +250,27 @@ END_TEST
 // ****************************************************************************
 //                       test_schedule_max_tasks
 // ****************************************************************************
-static bool task_schedule_max_tasks_executed = false;
-static void task_schedule_max_tasks(void* data)
+static bool task_schedule_max_tasks_delayed_executed = false;
+static void task_schedule_max_tasks_delayed(void* data)
 {
-  task_schedule_max_tasks_executed = true;
+  task_schedule_max_tasks_delayed_executed = true;
   ck_assert_uint_eq((unsigned int)data, NULL);
 }
 
-START_TEST(test_schedule_max_tasks)
+START_TEST(test_schedule_max_tasks_delayed)
 {
   sched_schedule_status task_scheduled;
   sched_exec_status task_executed;
   int i;
   for (i = 0; i < SCHED_TASKS_MAX; ++i) { 
-    task_scheduled = sched_schedule(1, task_schedule_max_tasks, NULL);
+    task_scheduled = sched_schedule(1, task_schedule_max_tasks_delayed, NULL);
     ck_assert(task_scheduled == SCHED_OK);
-    ck_assert(task_schedule_max_tasks_executed == false);
+    ck_assert(task_schedule_max_tasks_delayed_executed == false);
   }
 
-  task_scheduled = sched_schedule(1, task_schedule_max_tasks, NULL);
+  task_scheduled = sched_schedule(1, task_schedule_max_tasks_delayed, NULL);
   ck_assert(task_scheduled == SCHED_QUEUE_FULL);
-  ck_assert(task_schedule_max_tasks_executed == false);
+  ck_assert(task_schedule_max_tasks_delayed_executed == false);
 }
 END_TEST
 
@@ -194,20 +296,30 @@ Suite *schedule_suite(void)
 {
   Suite *s = suite_create("Scheduler");
 
-  TCase *tc_sched_immediately0 = tcase_create("Schedule immediately");
-  tcase_add_checked_fixture(tc_sched_immediately0, setup, teardown);
-  tcase_add_test(tc_sched_immediately0, test_schedule_immediately0);
-  suite_add_tcase(s, tc_sched_immediately0);
+  TCase *tc_sched_one_immediately = tcase_create("Schedule one immediately");
+  tcase_add_checked_fixture(tc_sched_one_immediately, setup, teardown);
+  tcase_add_test(tc_sched_one_immediately, test_schedule_one_immediately);
+  suite_add_tcase(s, tc_sched_one_immediately);
 
-  TCase *tc_sched_delayed0 = tcase_create("Schedule delayed");
-  tcase_add_checked_fixture(tc_sched_delayed0, setup, teardown);
-  tcase_add_test(tc_sched_delayed0, test_schedule_delayed0);
-  suite_add_tcase(s, tc_sched_delayed0);
+  TCase *tc_sched_multiple_immediately = tcase_create("Schedule multiple immediately");
+  tcase_add_checked_fixture(tc_sched_multiple_immediately, setup, teardown);
+  tcase_add_test(tc_sched_multiple_immediately, test_schedule_multiple_immediately);
+  suite_add_tcase(s, tc_sched_multiple_immediately);
 
-  TCase *tc_sched_max_tasks = tcase_create("Schedule max tasks");
-  tcase_add_checked_fixture(tc_sched_max_tasks, setup, teardown);
-  tcase_add_test(tc_sched_max_tasks, test_schedule_max_tasks);
-  suite_add_tcase(s, tc_sched_max_tasks);
+  TCase *tc_sched_one_delayed = tcase_create("Schedule one delayed");
+  tcase_add_checked_fixture(tc_sched_one_delayed, setup, teardown);
+  tcase_add_test(tc_sched_one_delayed, test_schedule_one_delayed);
+  suite_add_tcase(s, tc_sched_one_delayed);
+
+  TCase *tc_sched_multiple_delayed = tcase_create("Schedule multiple delayed");
+  tcase_add_checked_fixture(tc_sched_multiple_delayed, setup, teardown);
+  tcase_add_test(tc_sched_multiple_delayed, test_schedule_multiple_delayed);
+  suite_add_tcase(s, tc_sched_multiple_delayed);
+
+  TCase *tc_sched_max_tasks_delayed = tcase_create("Schedule max tasks delayed");
+  tcase_add_checked_fixture(tc_sched_max_tasks_delayed, setup, teardown);
+  tcase_add_test(tc_sched_max_tasks_delayed, test_schedule_max_tasks_delayed);
+  suite_add_tcase(s, tc_sched_max_tasks_delayed);
 
   return s;
 }
