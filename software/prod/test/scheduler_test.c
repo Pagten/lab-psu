@@ -34,6 +34,7 @@
 
 #include <hal/timer2.h>
 #include "scheduler.h"
+#include "config.h"
 
 
 static void setup(void)
@@ -48,7 +49,9 @@ static void teardown(void)
 
 }
 
-// ***** test_schedule_task0_immediately *****
+// ****************************************************************************
+//                       test_schedule_immediately0
+// ****************************************************************************
 static bool task_schedule_immediately0_ran = false;
 static void task_schedule_immediately0(void* data)
 {
@@ -67,10 +70,13 @@ static void task_schedule_immediately1(void* data)
 
 START_TEST(test_schedule_immediately0)
 {
-  sched_exec_status_t task_executed;
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
   unsigned int data = 42;
-  sched_schedule(0, task_schedule_immediately0, (void*)data);
-  sched_schedule(0, task_schedule_immediately1, NULL);
+  task_scheduled = sched_schedule(0, task_schedule_immediately0, (void*)data);
+  ck_assert(task_scheduled == SCHED_OK);
+  task_scheduled = sched_schedule(0, task_schedule_immediately1, NULL);
+  ck_assert(task_scheduled == SCHED_OK);
   ck_assert(task_schedule_immediately0_ran == false);
   ck_assert(task_schedule_immediately1_ran == false);
   task_executed = sched_exec();
@@ -87,7 +93,9 @@ START_TEST(test_schedule_immediately0)
 END_TEST
 
 
-
+// ****************************************************************************
+//                       test_schedule_delayed0
+// ****************************************************************************
 static bool task_schedule_delayed0_ran = false;
 static void task_schedule_delayed0(void* data)
 {
@@ -98,9 +106,11 @@ static void task_schedule_delayed0(void* data)
 
 START_TEST(test_schedule_delayed0)
 {
-  sched_exec_status_t task_executed;
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
   unsigned int data = 88;
-  sched_schedule(3, task_schedule_delayed0, (void*)data);
+  task_scheduled = sched_schedule(3, task_schedule_delayed0, (void*)data);
+  ck_assert(task_scheduled == SCHED_OK);
   ck_assert(task_schedule_delayed0_ran == false);
   
   // TCNT2 = 255
@@ -135,6 +145,34 @@ START_TEST(test_schedule_delayed0)
 END_TEST
 
 
+// ****************************************************************************
+//                       test_schedule_max_tasks
+// ****************************************************************************
+static bool task_schedule_max_tasks_executed = false;
+static void task_schedule_max_tasks(void* data)
+{
+  task_schedule_max_tasks_executed = true;
+  ck_assert_uint_eq((unsigned int)data, NULL);
+}
+
+START_TEST(test_schedule_max_tasks)
+{
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
+  int i;
+  for (i = 0; i < SCHED_TASKS_MAX; ++i) { 
+    task_scheduled = sched_schedule(1, task_schedule_max_tasks, NULL);
+    ck_assert(task_scheduled == SCHED_OK);
+    ck_assert(task_schedule_max_tasks_executed == false);
+  }
+
+  task_scheduled = sched_schedule(1, task_schedule_max_tasks, NULL);
+  ck_assert(task_scheduled == SCHED_QUEUE_FULL);
+  ck_assert(task_schedule_max_tasks_executed == false);
+}
+END_TEST
+
+
 // ***** test_schedule_recursive *****
 /*#define NB_RECURSIVE_SCHEDS SCHED_TASK_QUEUE_SIZE//todo: this is not public
 static void task_schedule_recursive(void* data)
@@ -154,17 +192,22 @@ START_TEST(test_schedule_task0_immediately)
 
 Suite *schedule_suite(void)
 {
-  Suite *s = suite_create("Schedule function");
+  Suite *s = suite_create("Scheduler");
 
-  TCase *tc_sched_immediately0 = tcase_create("Schedule immediately 0");
+  TCase *tc_sched_immediately0 = tcase_create("Schedule immediately");
   tcase_add_checked_fixture(tc_sched_immediately0, setup, teardown);
   tcase_add_test(tc_sched_immediately0, test_schedule_immediately0);
   suite_add_tcase(s, tc_sched_immediately0);
 
-  TCase *tc_sched_delayed0 = tcase_create("Schedule delayed 0");
+  TCase *tc_sched_delayed0 = tcase_create("Schedule delayed");
   tcase_add_checked_fixture(tc_sched_delayed0, setup, teardown);
   tcase_add_test(tc_sched_delayed0, test_schedule_delayed0);
   suite_add_tcase(s, tc_sched_delayed0);
+
+  TCase *tc_sched_max_tasks = tcase_create("Schedule max tasks");
+  tcase_add_checked_fixture(tc_sched_max_tasks, setup, teardown);
+  tcase_add_test(tc_sched_max_tasks, test_schedule_max_tasks);
+  suite_add_tcase(s, tc_sched_max_tasks);
 
   return s;
 }

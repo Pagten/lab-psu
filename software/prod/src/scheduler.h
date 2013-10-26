@@ -36,13 +36,13 @@ typedef enum
 {
   SCHED_OK,
   SCHED_QUEUE_FULL,
-} sched_schedule_status_t;
+} sched_schedule_status;
 
 typedef enum
 {
   SCHED_TASK_EXECUTED,
   SCHED_IDLE,
-} sched_exec_status_t;
+} sched_exec_status;
 
 /**
  * The number of timer ticks per millisecond.
@@ -69,17 +69,8 @@ void sched_init(void);
  * @return SCHED_OK if the task was scheduled correctly, SCHED_QUEUE_FULL if
  *         the task scheduling queue was full.
  */
-sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* data);
+sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* data);
 
-
-///**
-// * Start the scheduler.
-// *
-// * The scheduler will start an infinite loop that executes each scheduled task
-// * at the requested time. The loop can only be interrupted by calling the
-// * sched_stop function.
-// */
-//void sched_start(void);
 
 /**
  * Execute a scheduled task, if one is ready to be executed.
@@ -90,6 +81,6 @@ sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* 
  * tasks as soon as they are ready to be executed. The function returns
  * SCHED_TASK_EXECUTED if a task was executed and SCHED_IDLE otherwise. 
  */
-sched_exec_status_t sched_exec(void);
+sched_exec_status sched_exec(void);
  
 #endif

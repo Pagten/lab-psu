@@ -16,7 +16,8 @@ extern struct tmr2 timer2_mock;
 
 void timer2_mock_set_oca_disconnected(void);
 void timer2_mock_enable_oca_interrupt(void);
-void timer2_mock_set_clock_ps1024(void);
+void timer2_mock_set_mode(char);
+void timer2_mock_set_clock_prescaler(int);
 void timer2_mock_set_clock_disabled(void);
 void timer2_mock_oca_interrupt_vect(void);
 
@@ -24,10 +25,11 @@ void timer2_mock_init(void);
 void timer2_mock_tick(void);
 void timer2_mock_ffw_to_oca(void);
 
-#define timer2_oca_SET_DISCONNECTED timer2_mock_set_oca_disconnected()
-#define timer2_oca_SET_ENABLED      timer2_mock_enable_oca_interrupt()
-#define timer2_SET_CLOCK_ps_1024    timer2_mock_set_clock_ps1024()
-#define timer2_SET_CLOCK_disabled   timer2_mock_set_clock_disabled()
+#define timer2_oca_SET_DISCONNECTED      timer2_mock_set_oca_disconnected()
+#define timer2_oca_SET_INTERRUPT_ENABLED timer2_mock_enable_oca_interrupt()
+#define timer2_SET_MODE_0                timer2_mock_set_mode(0)
+#define timer2_SET_CLOCK_ps_1024         timer2_mock_set_clock_prescaler(1024)
+#define timer2_SET_CLOCK_disabled        timer2_mock_set_clock_disabled()
 
 #define timer2_oca_REG      timer2_mock.OCR2A
 #define timer2_oca_REG_MAX  255

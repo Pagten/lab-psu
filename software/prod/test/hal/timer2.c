@@ -21,7 +21,12 @@ void timer2_mock_enable_oca_interrupt()
   timer2_mock.oca_interrupt_enabled = true;
 }
 
-void timer2_mock_set_clock_ps1024()
+void timer2_mock_set_mode(char mode)
+{
+
+}
+
+void timer2_mock_set_clock_prescaler(int value)
 {
 
 }

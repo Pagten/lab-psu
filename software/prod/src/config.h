@@ -23,4 +23,4 @@
 /**
  * Size of the task scheduling queue.
  */
-//#define SCHED_TASKS_MAX  8
+#define SCHED_TASKS_MAX  8

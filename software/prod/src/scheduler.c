@@ -57,8 +57,10 @@
 #include "utils/log.h"
 
 #include "scheduler.h"
+#include "config.h"
 
 #ifndef SCHED_TASKS_MAX
+#warning "SCHED_TASKS_MAX undefined in config file, using default value"
 #define SCHED_TASKS_MAX  8
 #endif
 
@@ -97,14 +99,15 @@ void sched_init(void)
   free_head = &(tasks[0]);
 
   // Set up and enable timer 2
-  ENABLE_INTERRUPT(TMR,TMR_CHANNEL);        // Enable the timer interrupt
-  SET_OUTPUT_DISCONNECTED(TMR,TMR_CHANNEL); // Disconnect the timer output
-  SET_CLOCK(TMR,ps_1024);                   // Start timer with prescaler /1024
+  TMR_ENABLE_INTERRUPT(TMR,TMR_CHANNEL);        // Enable the timer interrupt
+  TMR_SET_OUTPUT_DISCONNECTED(TMR,TMR_CHANNEL); // Disconnect the timer output
+  TMR_SET_MODE(TMR,0);                          // Set normal mode
+  TMR_SET_CLOCK(TMR,ps_1024);                   // Start timer with prescaler /1024
   // Note: timer interrupt will fire soon 
 }
 
 
-sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* data)
+sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* data)
 {
   if (free_head == 0) {
     LOG_WARN("no free task slots in scheduler");
@@ -142,6 +145,7 @@ sched_schedule_status_t sched_schedule(uint16_t ticks, sched_task_t task, void* 
       }
     }
   }
+  return SCHED_OK;
 }
 
 // Interrupt routine for OCR2A compare match
@@ -179,7 +183,7 @@ TMR_INTERRUPT_VECT(TMR,TMR_CHANNEL)
 }
 
 
-sched_exec_status_t sched_exec(void)
+sched_exec_status sched_exec(void)
 {
   struct task_node* first;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
