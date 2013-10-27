@@ -200,8 +200,10 @@ sched_exec_status sched_exec(void)
     first->task(first->data);
       
     // Add it back to the free list
-    first->next = free_head;
-    free_head = first;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      first->next = free_head;    
+      free_head = first;
+    }
     return SCHED_TASK_EXECUTED;
   }
   

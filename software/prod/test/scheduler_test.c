@@ -149,31 +149,31 @@ START_TEST(test_schedule_one_delayed)
   ck_assert(task_scheduled == SCHED_OK);
   ck_assert(task_schedule_one_delayed_executed == false);
   
-  // TCNT2 = 255
+  // After 0 ticks
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
   ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
-  // TCNT2 = 0
+  // After 1 tick
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
   ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
-  // TCNT2 = 1
+  // After 2 ticks
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
   ck_assert(task_schedule_one_delayed_executed == false);
   timer2_mock_tick();
   
-  // TCNT2 = 2
+  // After 3 ticks: execute task
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_TASK_EXECUTED);
   ck_assert(task_schedule_one_delayed_executed == true);
   timer2_mock_tick();
   
-  // TCNT2 = 3
+  // After 4 ticks
   task_executed = sched_exec();
   ck_assert(task_executed == SCHED_IDLE);
   ck_assert(task_schedule_one_delayed_executed == true);
@@ -275,22 +275,83 @@ START_TEST(test_schedule_max_tasks_delayed)
 END_TEST
 
 
-// ***** test_schedule_recursive *****
-/*#define NB_RECURSIVE_SCHEDS SCHED_TASK_QUEUE_SIZE//todo: this is not public
+// ****************************************************************************
+//                       test_schedule_recursive
+// ****************************************************************************
+static int task_schedule_recursive_executed = 0;
 static void task_schedule_recursive(void* data)
 {
-  // ASSERT (uint16_t)data <= 
-  // SUCCESS
+  ck_assert_int_eq((int)data, task_schedule_recursive_executed);
+  task_schedule_recursive_executed += 1;
+  if (task_schedule_recursive_executed < 3) {
+    sched_schedule_status task_scheduled = sched_schedule(0, task_schedule_recursive, (void*)task_schedule_recursive_executed);
+    ck_assert(task_scheduled == SCHED_OK);
+  }
 }
 
-START_TEST(test_schedule_task0_immediately)
+START_TEST(test_schedule_recursive)
 {
-  uint16_t data = 88;
-  sched_schedule(0, task_schedule_recursive, (void*)data);
-  // ASSERT task0_ran = false
-  sched_start();
-  ck_abort_msg("sched_start shouldn't return");
-  }*/
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
+  task_scheduled = sched_schedule(0, task_schedule_recursive, (void*)0);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_recursive_executed == 0);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_recursive_executed == 1);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_recursive_executed == 2);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_recursive_executed == 3);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_recursive_executed == 3);
+}
+END_TEST
+
+// ****************************************************************************
+//                       test_schedule_one_long_delay
+// ****************************************************************************
+static bool task_schedule_one_long_delay_executed = false;
+static void task_schedule_one_long_delay(void* data)
+{
+  task_schedule_one_long_delay_executed = true;
+  ck_assert_uint_eq((unsigned int)data, NULL);
+}
+
+START_TEST(test_schedule_one_long_delay)
+{
+  sched_schedule_status task_scheduled;
+  sched_exec_status task_executed;
+  int i;
+  task_scheduled = sched_schedule(UINT16_MAX, task_schedule_one_long_delay, NULL);
+  ck_assert(task_scheduled == SCHED_OK);
+  ck_assert(task_schedule_one_long_delay_executed == false);
+
+  for (i = 0; i < UINT16_MAX; ++i) {
+    task_executed = sched_exec();
+    ck_assert(task_executed == SCHED_IDLE);
+    ck_assert(task_schedule_one_long_delay_executed == false);
+    timer2_mock_tick();
+  }
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(task_schedule_one_long_delay_executed == true);
+
+  task_executed = sched_exec();
+  ck_assert(task_executed == SCHED_IDLE);
+  ck_assert(task_schedule_one_long_delay_executed == true);
+}
+END_TEST
+
+
 
 Suite *schedule_suite(void)
 {
@@ -320,6 +381,17 @@ Suite *schedule_suite(void)
   tcase_add_checked_fixture(tc_sched_max_tasks_delayed, setup, teardown);
   tcase_add_test(tc_sched_max_tasks_delayed, test_schedule_max_tasks_delayed);
   suite_add_tcase(s, tc_sched_max_tasks_delayed);
+
+  TCase *tc_sched_recursive = tcase_create("Schedule recursive");
+  tcase_add_checked_fixture(tc_sched_recursive, setup, teardown);
+  tcase_add_test(tc_sched_recursive, test_schedule_recursive);
+  suite_add_tcase(s, tc_sched_recursive);
+
+  TCase *tc_sched_one_long_delay = tcase_create("Schedule one long delay");
+  tcase_add_checked_fixture(tc_sched_one_long_delay, setup, teardown);
+  tcase_add_test(tc_sched_one_long_delay, test_schedule_one_long_delay);
+  suite_add_tcase(s, tc_sched_one_long_delay);
+
 
   return s;
 }
