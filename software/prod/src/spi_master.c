@@ -27,19 +27,16 @@
 
 #include "spi.h"
 
-#ifndef SPI_RECEIVE_BUF_SIZE
-#define SPI_RECEIVE_BUF_SIZE  64
-#endif
 
-static uint8_t receive_buf[SPI_RECEIVE_BUF_SIZE];
-
-void spi_init()
+void spi_m_init()
 {
   
 }
 
-int8_t spi_transceive(void* buf_tx, uint8_t size_tx, spi_slave_select_callback cb_ss,
-                      uint8_t size_rx, spi_receive_callback cb_rx, void *cb_rx_data)
+spi_m_trx_status spi_m_trx(uint8_t* tx_buf, size_t tx_buf_size,
+                           volatile uint8_t *ss_port, uint8_t ss_mask,
+                           uint8_t* rx_buf, size_t rx_buf_size,
+                           spi_m_rx_callback rx_cb, void *rx_cb_data)
 {
   
 }
