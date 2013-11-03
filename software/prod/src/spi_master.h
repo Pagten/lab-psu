@@ -64,13 +64,20 @@ typedef size_t (*spim_trx_callback)(spim_cb_status status, void *rx_cb_data);
  * handled as soon as the SPI hardware becomes available. The specified slave
  * select pin(s) will be pulled low during the data transfer and pulled high
  * afterwards. The caller must keep the given transmit/receive buffer intact
- * until all bytes are sent/received. The rx_cb_callback will be called when
- * the transfer is completed. The argument passed to the callback is the opaque
- * rx_cb_data pointer. 
+ * until all bytes are sent/received.
+ *
+ * The rx_cb_callback will be called with SPIM_TX_DONE as its first argument
+ * when all tx_size bytes have been transmitted from tx_buf. The return value
+ * of the callback is ignored in this case. The rx_cb_callback will be called
+ * with SPIM_RX_DONE as its first argument when all rx_size bytes have been
+ * received and written into rx_buf. The return value of the callback is the
+ * number of bytes to receive next. The transfer ends when this value is 0 and
+ * all bytes have been transmitted. In each case, the second argument is the
+ * opaque rx_cb_data pointer. 
  *
  * A minimum time of trx_delay scheduler timer ticks is waited before
- * sending/receiving each byte, to give the slave device time to prepare the
- * next byte to be sent.
+ * sending/receiving each byte and before starting a new transfer, to give the
+ * slave device time to prepare the next byte to be sent.
  * 
  * @param tx_buf       The data to be sent
  * @param tx_size      The number of bytes to be sent
