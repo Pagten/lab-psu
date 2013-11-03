@@ -27,6 +27,8 @@
 
 #include <config.h>
 #include <scheduler.h>
+#include <hal/spi.h>
+#include <utils/log.h>
 
 #include "spi_master.h"
 
@@ -77,7 +79,7 @@ static void task_trx_start(void *data)
 
   sched_schedule_status task_scheduled;
   task_scheduled = sched_schedule(trx->delay, task_trx_byte, NULL);
-  if (task_scheduled != SCHED_TASK_SCHEDULED) {
+  if (task_scheduled != SCHED_OK) {
     LOG_ERROR("SPIM: couldn't shedule first task_trx_byte";)
     trx->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
   }
@@ -104,9 +106,9 @@ static void task_trx_byte(void *data)
       // Schedule next transfer (if any)
       sched_schedule_status task_scheduled;
       task_scheduled = sched_schedule(0, task_trx_start, NULL);
-      if (task_scheduled != SCHED_TASK_SCHEDULED) {
+      if (task_scheduled != SCHED_OK) {
         LOG_ERROR("SPIM: couldn't schedule next transfer");
-	trx_queue[trx_queue_head]->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
+	trx_queue[trx_queue_head].cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
       }
     }   
   } else {
@@ -128,13 +130,13 @@ static void task_trx_byte(void *data)
       }
     } else {
       // Transmit null byte
-      SPDR = 0;
+      SPI_DATA_REG = 0;
     }
 
     // Schedule next byte
     sched_schedule_status task_scheduled;
     task_scheduled = sched_schedule(trx->delay, task_trx_byte, data);
-    if (task_scheduled != SCHED_TASK_SCHEDULED && trx->cb != 0) {
+    if (task_scheduled != SCHED_OK && trx->cb != 0) {
       LOG_ERROR("SPIM: couldn't schedule next byte");
       trx->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
     }
@@ -151,7 +153,7 @@ spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
   }
 
   // Reserve slot in transfer queue
-  struct transfer trx = trx_queue[trx_queue_tail];
+  struct transfer *trx = &trx_queue[trx_queue_tail];
   trx_queue_tail = (trx_queue_tail + 1) % SPIM_TRX_QUEUE_SIZE;
   trx_queue_count += 1;
 
@@ -170,7 +172,7 @@ spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
   if (trx_queue_count == 1) {
     sched_schedule_status task_scheduled;
     task_scheduled = sched_schedule(0, task_trx_start, NULL);
-    if (task_scheduled != SCHED_TASK_SCHEDULED) {
+    if (task_scheduled != SCHED_OK) {
       LOG_ERROR("SPIM: couldn't schedule new transfer");
       trx->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
     }

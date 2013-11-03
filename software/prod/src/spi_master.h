@@ -30,6 +30,9 @@
  * This file implements SPI master communication.
  */
 
+#include <stdlib.h>
+#include <scheduler.h>
+
 typedef enum
 {
   SPIM_OK,
@@ -41,13 +44,17 @@ typedef enum
   SPIM_RX_DONE,
   SPIM_TX_DONE,
   SPIM_ERR_SCHED_FAILED,
-} spim_cb_status
+} spim_cb_status;
 
 
 extern uint8_t spim_receive_buf;
 
 /**
  * Initializes the SPI master module.
+ *
+ * Dependencies that need to be initialized first:
+ *  * scheduler
+ *
  */
 void spim_init();
 
@@ -94,7 +101,7 @@ typedef size_t (*spim_trx_callback)(spim_cb_status status, void *rx_cb_data);
 spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
                          volatile uint8_t *ss_port, uint8_t ss_mask,
                          uint8_t *rx_buf, size_t rx_size,
-                         spim_trx_callback trx_cb, void *trx_cb_data)
+                         spim_trx_callback trx_cb, void *trx_cb_data);
 
 
 #endif

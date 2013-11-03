@@ -8,7 +8,7 @@ LIBS =
 LDFLAGS =
 
 BUILD_DIR = build
-SRC = src/scheduler.c
+SRC = src/scheduler.c src/spi_master.c
 
 all: test
 

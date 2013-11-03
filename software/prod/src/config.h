@@ -24,3 +24,8 @@
  * Size of the task scheduling queue.
  */
 #define SCHED_TASKS_MAX  8
+
+/**
+ * Size of the spi master transfer queue.
+ */
+#define SPIM_TRX_QUEUE_SIZE 4
