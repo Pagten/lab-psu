@@ -44,6 +44,8 @@ typedef enum
   SCHED_IDLE,
 } sched_exec_status;
 
+typedef uint16_t ticks_t;
+
 /**
  * The number of timer ticks per millisecond.
  */
@@ -69,7 +71,7 @@ void sched_init(void);
  * @return SCHED_OK if the task was scheduled correctly, SCHED_QUEUE_FULL if
  *         the task scheduling queue was full.
  */
-sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* data);
+sched_schedule_status sched_schedule(ticks_t ticks, sched_task_t task, void* data);
 
 
 /**

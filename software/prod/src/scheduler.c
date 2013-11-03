@@ -52,12 +52,13 @@
 
 #include <util/atomic.h>
 #include <hal/timer2.h>
+#include <config.h>
 
 #include "utils/math.h"
 #include "utils/log.h"
 
 #include "scheduler.h"
-#include "config.h"
+
 
 #ifndef SCHED_TASKS_MAX
 #warning "SCHED_TASKS_MAX undefined in config file, using default value"
@@ -91,6 +92,13 @@ static inline void ready_queue_put(struct task_node* node);
 
 void sched_init(void)
 {
+  // Reset global vars to default value
+  waiting_head = 0;
+  ready_head = 0;
+  ready_tail = 0;
+  next_interrupt_tick = 0;
+  scheduler_must_stop = false;
+
   // Put all task slots in free list
   int i;
   for (i = 0; i < SCHED_TASKS_MAX - 1; ++i) {
@@ -107,11 +115,11 @@ void sched_init(void)
 }
 
 
-sched_schedule_status sched_schedule(uint16_t ticks, sched_task_t task, void* data)
+sched_schedule_status sched_schedule(ticks_t ticks, sched_task_t task, void* data)
 {
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     if (free_head == 0) {
-      LOG_WARN("no free task slots in scheduler");
+      LOG_ERROR("SCHED: no free task slots in scheduler");
       return SCHED_QUEUE_FULL;
     }
   
