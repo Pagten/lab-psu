@@ -39,7 +39,7 @@
 #endif
 
 
-#define LOG_WARN(msg)  IFLE(puts(msg);)
+#define LOG_ERROR(msg)  IFLE(puts(msg);)
 
 
 #endif
