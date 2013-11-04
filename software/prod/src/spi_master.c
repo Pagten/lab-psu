@@ -114,7 +114,7 @@ static void task_trx_byte(void *data)
   } else {
     // Transmit/receive next byte
     if (trx->rx_remaining > 0) {
-      *(trx->rx_pos) = SPI_DATA_REG;
+      *(trx->rx_pos) = GET_SPI_DATA_REG;
       trx->rx_pos += 1;
       trx->rx_remaining -= 1;
       if (trx->rx_remaining == 0 && trx->cb != 0) {
@@ -122,7 +122,7 @@ static void task_trx_byte(void *data)
       }
     }
     if (trx->tx_remaining > 0) {
-      SPI_DATA_REG = *(trx->tx_pos);
+      SET_SPI_DATA_REG(*(trx->tx_pos));
       trx->tx_pos += 1;
       trx->tx_remaining -= 1;
       if (trx->tx_remaining == 0 && trx->cb != 0) {
@@ -130,7 +130,7 @@ static void task_trx_byte(void *data)
       }
     } else {
       // Transmit null byte
-      SPI_DATA_REG = 0;
+      SET_SPI_DATA_REG(0);
     }
 
     // Schedule next byte

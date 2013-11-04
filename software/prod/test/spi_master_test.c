@@ -35,6 +35,8 @@
 #include "spi_master.h"
 #include "config.h"
 
+#include "spi_master_test.h"
+
 static uint8_t dummy_port;
 static uint8_t dummy_pin_mask;
 
@@ -73,3 +75,15 @@ START_TEST(test_send_single_byte)
            test_send_single_byte_cb, (void*)88U);
 }
 END_TEST
+
+Suite *spi_master_suite(void)
+{
+  Suite *s = suite_create("Spi master");
+
+  TCase *tc_send_single_byte = tcase_create("Send single byte");
+  tcase_add_checked_fixture(tc_send_single_byte, setup, teardown);
+  tcase_add_test(tc_send_single_byte, test_send_single_byte);
+  suite_add_tcase(s, tc_send_single_byte);
+
+  return s;
+}

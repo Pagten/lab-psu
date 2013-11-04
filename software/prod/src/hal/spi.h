@@ -11,8 +11,10 @@
 #define SPI_ENABLE               ( SPCR |= _BV(SPE) )
 
 
-#define SPI_DATA_REG   SPDR
-#define SPI_STATUS_REG SPSR
+#define SET_SPI_DATA_REG(x)   (SPDR = x)
+#define GET_SPI_DATA REG       SPDR
+#define SET_SPI_STATUS_REG(x) (SPSR = x_
+#define GET_SPI_STATUS_REG     SPSR
 
 #define SPI_INTERRUPT_FLAG_SET (SPSR & _BV(SPIF))
 

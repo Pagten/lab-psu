@@ -29,6 +29,11 @@ struct spi {
 
 extern struct spi spi_mock;
 
+void spi_mock_set_data_reg(uint8_t val);
+uint8_t spi_mock_get_data_reg(void);
+void spi_mock_set_status_reg(uint8_t val);
+uint8_t spi_mock_get_status_reg(void);
+
 
 #define SPI_SET_ROLE_MASTER       ( spi_mock.role = SPI_DUMMY_MASTER )
 #define SPI_SET_DATA_ORDER_LSB    ( spi_mock.data_order = SPI_DUMMY_LSB )
@@ -38,8 +43,10 @@ extern struct spi spi_mock;
 #define SPI_ENABLE                ( spi_mock.enabled = true )
 
 
-#define SPI_DATA_REG    spi_mock.data_reg
-#define SPI_STATUS_REG  spi_mock.status_reg 
+#define SET_SPI_DATA_REG(x)   spi_mock_set_data_reg(x)
+#define GET_SPI_DATA_REG      spi_mock_get_data_reg()
+#define SET_SPI_STATUS_REG(x) spi_mock_set_status_reg(x)
+#define GET_SPI_STATUS_REG    spi_mock_get_status_reg()
 
 #define SPI_INTERRUPT_FLAG_SET (true)
 
