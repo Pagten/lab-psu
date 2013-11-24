@@ -68,6 +68,32 @@ void spim_init()
   SPI_ENABLE;
 }
 
+static inline void tx_byte(struct transfer *trx)
+{
+  if (trx->tx_remaining > 0) {
+    SET_SPI_DATA_REG(*(trx->tx_pos));
+    trx->tx_pos += 1;
+    trx->tx_remaining -= 1;
+    if (trx->tx_remaining == 0 && trx->cb != 0) {
+      trx->cb(SPIM_TX_DONE, trx->cb_data);
+    }
+  } else {
+    // Transmit null byte
+    SET_SPI_DATA_REG(0);
+  }
+}
+
+static inline void rx_byte(struct transfer *trx)
+{
+  if (trx->rx_remaining > 0) {
+    *(trx->rx_pos) = GET_SPI_DATA_REG;
+    trx->rx_pos += 1;
+    trx->rx_remaining -= 1;
+    if (trx->rx_remaining == 0 && trx->cb != 0) {
+      trx->rx_remaining = trx->cb(SPIM_RX_DONE, trx->cb_data);
+    }
+  }
+}
 
 static void task_trx_byte(void *data);
 static void task_trx_start(void *data)
@@ -76,6 +102,9 @@ static void task_trx_start(void *data)
 
   // Pull slave select pin(s) low
   *(trx->ss_port) &= ~(trx->ss_mask);
+
+  // Transmit first byte
+  tx_byte(trx);
 
   sched_schedule_status task_scheduled;
   task_scheduled = sched_schedule(trx->delay, task_trx_byte, NULL);
@@ -113,25 +142,8 @@ static void task_trx_byte(void *data)
     }   
   } else {
     // Transmit/receive next byte
-    if (trx->rx_remaining > 0) {
-      *(trx->rx_pos) = GET_SPI_DATA_REG;
-      trx->rx_pos += 1;
-      trx->rx_remaining -= 1;
-      if (trx->rx_remaining == 0 && trx->cb != 0) {
-	trx->rx_remaining = trx->cb(SPIM_RX_DONE, trx->cb_data);
-      }
-    }
-    if (trx->tx_remaining > 0) {
-      SET_SPI_DATA_REG(*(trx->tx_pos));
-      trx->tx_pos += 1;
-      trx->tx_remaining -= 1;
-      if (trx->tx_remaining == 0 && trx->cb != 0) {
-	trx->cb(SPIM_TX_DONE, trx->cb_data);
-      }
-    } else {
-      // Transmit null byte
-      SET_SPI_DATA_REG(0);
-    }
+    rx_byte(trx);
+    tx_byte(trx);
 
     // Schedule next byte
     sched_schedule_status task_scheduled;
