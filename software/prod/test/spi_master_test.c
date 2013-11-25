@@ -185,7 +185,7 @@ static size_t test_receive_bytes_cb(spim_cb_status status, void *rx_cb_data)
 
 START_TEST(test_receive_bytes)
 {
-sched_exec_status task_executed;
+  sched_exec_status task_executed;
   unsigned int i;
   for (i = 0; i < TEST_RECEIVE_BYTES_LEN; ++i) {
     test_receive_bytes_mock[i] = (uint8_t)i;
@@ -200,6 +200,60 @@ sched_exec_status task_executed;
   } while(task_executed == SCHED_TASK_EXECUTED);
  
   ck_assert(test_receive_bytes_cb_executed);
+}
+END_TEST
+
+
+// ****************************************************************************
+//                       test_receive_bytes_cont
+// ****************************************************************************
+#define TEST_RECEIVE_BYTES_CONT_LEN 16
+#define TEST_RECEIVE_BYTES_CONT_COUNT 4
+static uint8_t test_receive_bytes_cont_rx_buf[TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT];
+static uint8_t test_receive_bytes_cont_mock[TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT];
+static int test_receive_bytes_cont_cb_executed = 0;
+
+static size_t test_receive_bytes_cont_cb(spim_cb_status status, void *rx_cb_data)
+{
+  ck_assert(status == SPIM_RX_DONE);
+  ck_assert((unsigned int)rx_cb_data == 5);
+  ck_assert(! (dummy_port & dummy_pin_mask));
+  ck_assert(dummy_port == 0);
+
+  test_receive_bytes_cont_cb_executed += 1;
+  if (test_receive_bytes_cont_cb_executed <= 0 ||
+      test_receive_bytes_cont_cb_executed > TEST_RECEIVE_BYTES_CONT_COUNT) {
+    ck_abort_msg("Unexpected value for test_receive_bytes_cont_cb_executed");
+  }
+
+  unsigned int i;
+  for (i = 0; i < TEST_RECEIVE_BYTES_CONT_LEN * test_receive_bytes_cont_cb_executed; ++i) {
+    ck_assert(test_receive_bytes_cont_mock[i] == test_receive_bytes_cont_rx_buf[i]);
+  }
+  if (test_receive_bytes_cont_cb_executed < TEST_RECEIVE_BYTES_CONT_COUNT) {
+    return TEST_RECEIVE_BYTES_CONT_LEN;
+  } else {
+    return 0;
+  }
+}
+
+START_TEST(test_receive_bytes_cont)
+{
+  sched_exec_status task_executed;
+  unsigned int i;
+  for (i = 0; i < TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT; ++i) {
+    test_receive_bytes_cont_mock[i] = (uint8_t)i;
+  }
+  spi_mock_set_incoming_data(test_receive_bytes_cont_mock, TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT);
+  spim_trx(NULL, 0, 0,
+           &dummy_port, dummy_pin_mask,
+	   test_receive_bytes_cont_rx_buf, TEST_RECEIVE_BYTES_CONT_LEN,
+           test_receive_bytes_cont_cb, (void*)5U);
+  do {
+    task_executed = sched_exec();
+  } while(task_executed == SCHED_TASK_EXECUTED);
+ 
+  ck_assert(test_receive_bytes_cont_cb_executed == 4);
 }
 END_TEST
 
@@ -228,6 +282,10 @@ Suite *spi_master_suite(void)
   tcase_add_test(tc_receive_bytes, test_receive_bytes);
   suite_add_tcase(s, tc_receive_bytes);
 
+  TCase *tc_receive_bytes_cont = tcase_create("Receive bytes cont");
+  tcase_add_checked_fixture(tc_receive_bytes_cont, setup, teardown);
+  tcase_add_test(tc_receive_bytes_cont, test_receive_bytes_cont);
+  suite_add_tcase(s, tc_receive_bytes_cont);
 
   return s;
 }
