@@ -77,7 +77,7 @@ static inline void tx_byte(struct transfer *trx)
     if (trx->tx_remaining == 0 && trx->cb != 0) {
       trx->cb(SPIM_TX_DONE, trx->cb_data);
     }
-  } else {
+  } else if (trx->rx_remaining > 0) {
     // Transmit null byte
     SET_SPI_DATA_REG(0);
   }

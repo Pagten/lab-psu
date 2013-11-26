@@ -353,7 +353,9 @@ START_TEST(test_schedule_one_long_delay)
 END_TEST
 
 
-
+// ****************************************************************************
+//                           Test suite setup
+// ****************************************************************************
 Suite *schedule_suite(void)
 {
   Suite *s = suite_create("Scheduler");

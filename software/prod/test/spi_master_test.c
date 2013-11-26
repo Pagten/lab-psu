@@ -314,7 +314,89 @@ START_TEST(test_receive_bytes_cont)
 }
 END_TEST
 
+// ****************************************************************************
+//                       test_trx_multiple
+// ****************************************************************************
+#define TEST_TRX_MULTIPLE_TX_LEN0 1
+#define TEST_TRX_MULTIPLE_TX_LEN1 2
+#define TEST_TRX_MULTIPLE_RX_LEN0 3
+#define TEST_TRX_MULTIPLE_RX_LEN1 4
+static uint8_t test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1];
+static uint8_t test_trx_multiple_rx_buf[TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1];
+static uint8_t test_trx_multiple_mock[TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1];
+static bool test_trx_multiple_cb0_executed = false;
+static bool test_trx_multiple_cb1_executed = false;
 
+static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
+{
+  ck_assert((unsigned int)trx_cb_data == 6);
+  ck_assert(! (dummy_port & dummy_pin_mask));
+  ck_assert(dummy_port == 0);
+  unsigned int i;
+  if (status == SPIM_RX_DONE) {
+    for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0; ++i) {
+      ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
+    }
+  } else if (status = SPIM_TX_DONE) {
+    for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0; ++i) {
+      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1-i-1]);
+    } 
+  }
+  test_trx_multiple_cb0_executed = true;
+  return 0;
+}
+static size_t test_trx_multiple_cb1(spim_cb_status status, void *trx_cb_data)
+{
+  ck_assert((unsigned int)trx_cb_data == 7);
+  ck_assert(! (dummy_port & dummy_pin_mask));
+  ck_assert(dummy_port == 0);
+  unsigned int i;
+  if (status == SPIM_RX_DONE) {
+    for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1; ++i) {
+      ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
+    }
+  } else if (status = SPIM_TX_DONE) {
+    for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1; ++i) {
+      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1-i-1]);
+    } 
+  }
+  test_trx_multiple_cb1_executed = true;
+  return 0;
+}
+
+START_TEST(test_trx_multiple)
+{
+  sched_exec_status task_executed;
+  unsigned int i;
+  for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1; ++i) {
+    test_trx_multiple_mock[i] = (uint8_t)i;
+  }
+  spi_mock_set_incoming_data(test_trx_multiple_mock, TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1);
+  spim_trx(test_trx_multiple_tx_buf, TEST_TRX_MULTIPLE_TX_LEN0, 0,
+           &dummy_port, dummy_pin_mask,
+	   test_trx_multiple_rx_buf, TEST_TRX_MULTIPLE_RX_LEN0,
+           test_trx_multiple_cb0, (void*)6U);
+
+  spim_trx(&test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0], 
+           TEST_TRX_MULTIPLE_TX_LEN1, 0,
+           &dummy_port, dummy_pin_mask,
+	   &test_trx_multiple_rx_buf[TEST_TRX_MULTIPLE_RX_LEN0],
+           TEST_TRX_MULTIPLE_RX_LEN1,
+           test_trx_multiple_cb1, (void*)7U);
+  do {
+    task_executed = sched_exec();
+  } while(task_executed == SCHED_TASK_EXECUTED);
+ 
+  ck_assert(test_trx_multiple_cb0_executed);
+  ck_assert(test_trx_multiple_cb1_executed);
+}
+END_TEST
+
+
+
+// ****************************************************************************
+//                           Test suite setup
+// ****************************************************************************
 Suite *spi_master_suite(void)
 {
   Suite *s = suite_create("Spi master");
@@ -348,6 +430,12 @@ Suite *spi_master_suite(void)
   tcase_add_checked_fixture(tc_receive_bytes_cont, setup, teardown);
   tcase_add_test(tc_receive_bytes_cont, test_receive_bytes_cont);
   suite_add_tcase(s, tc_receive_bytes_cont);
+
+  TCase *tc_trx_multiple = tcase_create("Trx multiple");
+  tcase_add_checked_fixture(tc_trx_multiple, setup, teardown);
+  tcase_add_test(tc_trx_multiple, test_trx_multiple);
+  suite_add_tcase(s, tc_trx_multiple);
+
 
   return s;
 }
