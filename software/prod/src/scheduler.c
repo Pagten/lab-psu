@@ -110,8 +110,10 @@ void sched_init(void)
   TMR_ENABLE_INTERRUPT(TMR,TMR_CHANNEL);        // Enable the timer interrupt
   TMR_SET_OUTPUT_DISCONNECTED(TMR,TMR_CHANNEL); // Disconnect the timer output
   TMR_SET_MODE(TMR,0);                          // Set normal mode
+  TMR_REG(TMR,cntr) = 0;                        // Set counter to 0
+  TMR_REG(TMR,TMR_CHANNEL) = TMR_REG_MAX(TMR,TMR_CHANNEL); // Set interrupt tick
+  next_interrupt_tick = TMR_REG_MAX(TMR,TMR_CHANNEL);
   TMR_SET_CLOCK(TMR,ps_1024);                   // Start timer with prescaler /1024
-  // Note: timer interrupt will fire soon 
 }
 
 

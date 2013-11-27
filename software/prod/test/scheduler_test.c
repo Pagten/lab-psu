@@ -42,7 +42,6 @@ static void setup(void)
 {
   timer2_mock_init();
   sched_init();
-  timer2_mock_ffw_to_oca();
 }
 
 static void teardown(void)

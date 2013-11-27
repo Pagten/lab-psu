@@ -32,6 +32,7 @@
 #include <check.h>
 
 #include "hal/spi.h"
+#include "hal/timer2.h"
 #include "spi_master.h"
 #include "config.h"
 
@@ -45,6 +46,7 @@ static uint8_t dummy_pin_mask;
 static void setup(void)
 {
   spi_mock_init(SPI_MOCK_TX_DATA_BUFFER_SIZE);
+  timer2_mock_init();
   sched_init();
   spim_init();
   dummy_pin_mask = 1;
@@ -220,7 +222,7 @@ static size_t test_send_receive_cb(spim_cb_status status, void *trx_cb_data)
    case 0:
      ck_assert(status == SPIM_RX_DONE);
      for (i = 0; i < TEST_SEND_RECEIVE_RX_LEN; ++i) {
-       ck_assert(test_receive_bytes_mock[i] == test_receive_bytes_rx_buf[i]);
+       ck_assert(test_send_receive_mock[i] == test_send_receive_rx_buf[i]);
      }
      break;
    case 1:
@@ -244,6 +246,9 @@ START_TEST(test_send_receive)
 {
   sched_exec_status task_executed;
   unsigned int i;
+  for (i = 0; i < TEST_SEND_RECEIVE_TX_LEN; ++i) {
+    test_send_receive_tx_buf[i] = (uint8_t)i;
+  }
   for (i = 0; i < TEST_SEND_RECEIVE_RX_LEN; ++i) {
     test_send_receive_mock[i] = (uint8_t)i;
   }
@@ -342,7 +347,7 @@ static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
     test_trx_multiple_cb0_rx_executed = true;
   } else if (status = SPIM_TX_DONE) {
     for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0; ++i) {
-      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1-i-1]);
+      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0-i-1]);
     }
     test_trx_multiple_cb0_tx_executed = true;
   }
@@ -372,6 +377,9 @@ START_TEST(test_trx_multiple)
 {
   sched_exec_status task_executed;
   unsigned int i;
+  for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1; ++i) {
+    test_trx_multiple_tx_buf[i] = (uint8_t)i;
+  }
   for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1; ++i) {
     test_trx_multiple_mock[i] = (uint8_t)i;
   }
@@ -400,6 +408,78 @@ START_TEST(test_trx_multiple)
   ck_assert(test_trx_multiple_cb0_rx_executed);
   ck_assert(test_trx_multiple_cb1_tx_executed);
   ck_assert(test_trx_multiple_cb1_rx_executed);
+}
+END_TEST
+
+// ****************************************************************************
+//                       test_trx_delay
+// ****************************************************************************
+#define TEST_TRX_DELAY_TRX_LEN 10
+#define TEST_TRX_DELAY_DELAY 200
+static uint8_t test_trx_delay_tx_buf[TEST_TRX_DELAY_TRX_LEN];
+static uint8_t test_trx_delay_rx_buf[TEST_TRX_DELAY_TRX_LEN];
+static uint8_t test_trx_delay_mock[TEST_TRX_DELAY_TRX_LEN];
+static int test_trx_delay_cb_executed = 0;
+
+static size_t test_trx_delay_cb(spim_cb_status status, void *trx_cb_data)
+{
+   unsigned int i;
+   switch(status) {
+   case SPIM_RX_DONE:
+     for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
+       ck_assert(test_trx_delay_mock[i] == test_trx_delay_rx_buf[i]);
+     }
+     break;
+   case SPIM_TX_DONE:
+     for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
+      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_delay_tx_buf[TEST_TRX_DELAY_TRX_LEN-i-1]);
+     }
+     break;
+   default:
+     ck_abort_msg("Unexpected status in test_trx_delay_cb");
+     break;
+  }
+  ck_assert((unsigned int)trx_cb_data == 8);
+  ck_assert(! (dummy_port & dummy_pin_mask));
+  ck_assert(dummy_port == 0);
+  test_trx_delay_cb_executed += 1;
+  return 0;
+}
+
+START_TEST(test_trx_delay)
+{
+  sched_exec_status task_executed;
+  unsigned int i;
+  for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
+    test_trx_delay_tx_buf[i] = (uint8_t)i;
+  }
+  for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
+    test_trx_delay_mock[i] = (uint8_t)i;
+  }
+  spi_mock_set_incoming_data(test_trx_delay_mock, TEST_TRX_DELAY_TRX_LEN);
+  spim_trx(test_trx_delay_tx_buf, TEST_TRX_DELAY_TRX_LEN, TEST_TRX_DELAY_DELAY,
+           &dummy_port, dummy_pin_mask,
+	   test_trx_delay_rx_buf, TEST_TRX_DELAY_TRX_LEN,
+           test_trx_delay_cb, (void*)8U);
+
+  unsigned int bytes_trxed = 0;
+  for (bytes_trxed = 0; bytes_trxed < TEST_TRX_DELAY_TRX_LEN; ++bytes_trxed) {
+    do {
+      task_executed = sched_exec();
+    } while(task_executed == SCHED_TASK_EXECUTED);
+    
+    ck_assert(test_send_receive_cb_executed == 0);
+    ck_assert(spi_mock_get_last_transmitted_data(0) == test_trx_delay_tx_buf[bytes_trxed]);
+    for (i = 0; i < bytes_trxed; ++i) {
+      ck_assert(test_trx_delay_mock[i] == test_trx_delay_rx_buf[i]);
+    }
+
+    timer2_mock_ffw_to_oca();
+  }
+  do {
+      task_executed = sched_exec();
+    } while(task_executed == SCHED_TASK_EXECUTED);
+  ck_assert(test_trx_delay_cb_executed == 2);
 }
 END_TEST
 
@@ -447,6 +527,10 @@ Suite *spi_master_suite(void)
   tcase_add_test(tc_trx_multiple, test_trx_multiple);
   suite_add_tcase(s, tc_trx_multiple);
 
+  TCase *tc_trx_delay = tcase_create("Trx delay");
+  tcase_add_checked_fixture(tc_trx_delay, setup, teardown);
+  tcase_add_test(tc_trx_delay, test_trx_delay);
+  suite_add_tcase(s, tc_trx_delay);
 
   return s;
 }

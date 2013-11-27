@@ -6,7 +6,7 @@ struct tmr2 timer2_mock;
 
 void timer2_mock_init()
 {
-  timer2_mock.TCNT2 = 0;
+  timer2_mock.TCNT2 = 1;
   timer2_mock.OCR2A = 0;
   timer2_mock.oca_interrupt_enabled = false; 
 }
