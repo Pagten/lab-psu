@@ -40,7 +40,6 @@
 
 static void setup(void)
 {
-  timer2_mock_init();
   sched_init();
 }
 

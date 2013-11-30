@@ -46,7 +46,6 @@ static uint8_t dummy_pin_mask;
 static void setup(void)
 {
   spi_mock_init(SPI_MOCK_TX_DATA_BUFFER_SIZE);
-  timer2_mock_init();
   sched_init();
   spim_init();
   dummy_pin_mask = 1;

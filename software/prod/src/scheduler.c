@@ -107,6 +107,7 @@ void sched_init(void)
   free_head = &(tasks[0]);
 
   // Set up and enable timer 2
+  TMR_INIT(TMR);
   TMR_ENABLE_INTERRUPT(TMR,TMR_CHANNEL);        // Enable the timer interrupt
   TMR_SET_OUTPUT_DISCONNECTED(TMR,TMR_CHANNEL); // Disconnect the timer output
   TMR_SET_MODE(TMR,0);                          // Set normal mode

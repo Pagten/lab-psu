@@ -14,6 +14,7 @@ struct tmr2 {
 
 extern struct tmr2 timer2_mock;
 
+void timer2_mock_init(void);
 void timer2_mock_set_oca_disconnected(void);
 void timer2_mock_enable_oca_interrupt(void);
 void timer2_mock_set_mode(char);
@@ -21,10 +22,10 @@ void timer2_mock_set_clock_prescaler(int);
 void timer2_mock_set_clock_disabled(void);
 void timer2_mock_oca_interrupt_vect(void);
 
-void timer2_mock_init(void);
 void timer2_mock_tick(void);
 void timer2_mock_ffw_to_oca(void);
 
+#define timer2_INIT                      timer2_mock_init()
 #define timer2_oca_SET_DISCONNECTED      timer2_mock_set_oca_disconnected()
 #define timer2_oca_SET_INTERRUPT_ENABLED timer2_mock_enable_oca_interrupt()
 #define timer2_SET_MODE_0                timer2_mock_set_mode(0)
