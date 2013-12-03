@@ -101,7 +101,7 @@ static void task_trx_start(void *data)
   struct transfer *trx = &trx_queue[trx_queue_head];
 
   // Pull slave select pin(s) low
-  *(trx->ss_port) &= ~(trx->ss_mask);
+  *(trx->ss_port) &= (uint8_t)(~trx->ss_mask);
 
   // Transmit first byte
   tx_byte(trx);
