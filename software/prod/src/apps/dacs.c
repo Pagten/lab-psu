@@ -28,3 +28,19 @@
  * This is the main file for a small DAC test program. It allows controlling
  * the DAC outputs using a rotary encoder.
  */
+
+#include "scheduler.h"
+#include "rotary.h"
+
+void main(void) __attribute__((noreturn));
+
+ROTARY(rot0)
+
+
+void main(void)
+{
+  sched_init();
+  while (1) {
+    sched_exec();
+  }
+}
