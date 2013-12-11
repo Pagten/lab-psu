@@ -29,17 +29,46 @@
  * the DAC outputs using a rotary encoder.
  */
 
+#include "config.h"
+#include <hal/gpio.h> 
+
 #include "scheduler.h"
 #include "rotary.h"
 
+
+#define ROT0A C,3
+#define ROT0B C,2
+
+ROTARY(ROT0,ROT0A,ROT0B)
+
+
+static inline
+void init_pin_directions(void)
+{
+  SET_PIN_DIRECTION_INPUT(ROT0A);
+  SET_PIN_DIRECTION_OUTPUT(ROT0B);
+}
+
+
+ISR(PCINT_VECTOR(ROT0A))
+{
+  rot_process_step(rot0);
+}
+ISR(PCINT_VECTOR(ROT0B), ISR_ALIASOF(PCINT_VECTOR(ROT0A)));
+
+
 void main(void) __attribute__((noreturn));
-
-ROTARY(rot0)
-
-
 void main(void)
 {
+  init_pin_directions();
   sched_init();
+
+  PCINT_ENABLE_GROUP(ROT0A);
+  PCINT_ENABLE_GROUP(ROT0B);
+  PCINT_ENABLE(ROT0A);
+  PCINT_ENABLE(ROT0B);
+  sei(); // Enable interrupts
+
   while (1) {
     sched_exec();
   }

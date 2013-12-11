@@ -30,9 +30,8 @@
  * This file implements rotary encoder step decoding and debouncing.
  */
 
-
 #include <stdint.h>
-
+#include <hal/gpio.h>
 
 typedef enum
 {
@@ -46,21 +45,20 @@ typedef enum
  * Declare a new rotary encoder
  *
  * This macro declares a rotary encoder attached to two specific pins. The
- * rotary encoder is named so that it can be refered to later on.
+ * rotary encoder is named so that it can be refered to later on. The pin
+ * symbols refer to symbols defined using the gpio abstraction layer (see
+ * hal/gpio.h)
  *
  * @param name  The name of the rotary encoder
- * @param porta The port of rotary encoder pin A
- * @param pina  The number of pin A within the port
- * @param portb The port of rotary encoder pin B
- * @param pinb  The number of pin B within the port
+ * @param pina  The symbol for pin A
+ * @param pinb  The symbol for pin B
  */
-#define ROTARY(name,porta,pina,portb,pinb)                             \
+#define ROTARY(name,pina,pinb)                                         \
   static uint8_t rot_state_##name;                                     \
   static inline                                                        \
   rot_step_status rot_process_step_##name(void) {	      	       \
-    uint8t_t pins_state = (((porta & _BV(pina)) == _BV(pina)) << 1) |  \
-                           ((portb & _BV(pinb)) == _BV(pinb));         \
-    rot_state_##name = ttable[rot_state_##name][pins_state];           \
+    uint8t_t pins_state = ((GET_PIN(pina) << 1) | GET_PIN(pinb))       \
+    rot_state_##name = rot_ttable[rot_state_##name][pins_state];       \
     return (rot_state_##name & 0xF0);                                  \
   }
 
@@ -86,7 +84,7 @@ typedef enum
 /**
  * Transition table for the rotary encoder state machine. Not be used directly.
  */
-extern const uint8_t ttable[6][4];
+extern const uint8_t rot_ttable[6][4];
 
 
 #endif

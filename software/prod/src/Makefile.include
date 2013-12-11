@@ -1,0 +1,156 @@
+# Based on the Contiki build system
+ifndef FW_ROOT
+  ${error FW_ROOT not defined! You must specify the root dir of the firmware}
+endif
+
+usage:
+	@echo "TODO: come up with usage string"
+
+
+# Target config
+MCU=atmega328
+F_CPU=16000000UL
+CC = avr-gcc
+LD = avr-gcc
+AS = avr-as
+AR = avr-ar
+ELF_SIZE = avr-size -C --mcu=$(MCU)
+OBJCOPY = avr-objcopy
+STRIP = avr-strip
+CFLAGS = -Wall -mmcu=$(MCU) -fno-strict-aliasing
+LDFLAGS = -mmcu=$(MCU)
+
+BUILDDIR = $(FW_ROOT)/build
+
+#LOWERCASE = -abcdefghijklmnopqrstuvwxyz
+#UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ
+#TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
+#CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
+
+SOURCEDIRS += $(FW_ROOT)
+SOURCEFILES += ${addprefix $(FW_ROOT)/, core/rotary.c core/spi_master.c}
+OBJECTFILES = ${addprefix $(BUILDDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
+
+
+# Create $(BUILDDIR) if it has been removed by make clean
+$(BUILDDIR):
+	mkdir $@
+
+
+### Verbosity control. Use  make V=1  to get verbose builds.
+ifeq ($(V),1)
+  TRACE_CC =
+  TRACE_LD =
+  TRACE_AR =
+  TRACE_AS =
+  Q=
+else
+  TRACE_CC = @echo "  CC       " $<
+  TRACE_LD = @echo "  LD       " $@
+  TRACE_AR = @echo "  AR       " $@
+  TRACE_AS = @echo "  AS       " $<
+  Q=@
+endif
+
+CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
+
+### Check for a git repo and pass version if found
+RELSTR=${shell git describe --tags 2>/dev/null}
+ifneq ($(RELSTR),)
+CFLAGS += -DFW_VERSION=\"$(RELSTR)\"
+endif
+
+### Automatic dependency generation
+ifneq ($(MAKECMDGOALS),clean)
+-include ${addprefix $(OBJECTDIR)/,$(SOURCEFILES:.c=.d)}
+endif
+
+### See http://make.paulandlesley.org/autodep.html#advanced
+
+define FINALIZE_DEPENDENCY
+cp $(@:.o=.d) $(@:.o=.$$$$); \
+sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+    -e '/^$$/ d' -e 's/$$/ :/' < $(@:.o=.$$$$) >> $(@:.o=.d); \
+rm -f $(@:.o=.$$$$)
+endef
+
+clean:
+	-rm -f *~ *core core *.srec \
+	*.lst *.map \
+	*.cprg *.bin *.data contiki*.a *.firmware core-labels.S *.ihex *.ini \
+	*.ce *.co
+	rm -rf $(CLEAN)
+	-rm -rf $(OBJECTDIR)
+
+distclean: clean
+	-rm -rf $(CONTIKI_PROJECT).$(TARGET)
+
+#ifndef CUSTOM_RULE_C_TO_CE
+#%.ce: %.c
+#	$(TRACE_CC)
+#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+#	$(STRIP) --strip-unneeded -g -x $@
+#endif
+
+ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
+$(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
+	$(TRACE_CC)
+	$(Q)$(CC) $(CFLAGS) -MMD -c $< -o $@
+	@$(FINALIZE_DEPENDENCY)
+endif
+
+
+#ifndef CUSTOM_RULE_C_TO_O
+#%.o: %.c
+#	$(TRACE_CC)
+#	$(Q)$(CC) $(CFLAGS) -c $< -o $@
+#endif
+
+
+#ifndef CUSTOM_RULE_C_TO_CO
+#%.co: %.c
+#	$(TRACE_CC)
+#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
+#endif
+
+#ifndef AROPTS
+#  AROPTS = rcf
+#endif
+
+ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
+fw.a: $(OBJECTFILES)
+	$(TRACE_AR)
+	$(Q)$(AR) $(AROPTS) $@ $^
+endif
+
+ifndef LD
+  LD = $(CC)
+endif
+
+ifndef CUSTOM_RULE_LINK
+%.fw: %.co $(OBJECTFILES) fw.a
+	$(TRACE_LD)
+	$(Q)$(LD) $(LDFLAGS) ${filter-out %.a,$^} \
+	    ${filter %.a,$^} -o $@
+endif
+
+%.ramprof: %.fw
+	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
+
+%.flashprof: %.fw
+	$(NM) -S -td --size-sort $< | grep -i " [t] " | cut -d' ' -f2,4
+
+# Don't treat %.$(TARGET) as an intermediate file because it is
+# in fact the primary target.
+.PRECIOUS: %.fw
+
+# Cancel the predefined implict rule for compiling and linking
+# a single C source into a binary to force GNU make to consider
+# the match-anything rule below instead.
+%: %.c
+
+# Match-anything pattern rule to allow the project makefiles to
+# abstract from the actual binary name. It needs to contain some
+# command in order to be a rule, not just a prerequisite.
+%: %.fw
+	@
