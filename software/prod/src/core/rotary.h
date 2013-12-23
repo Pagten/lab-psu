@@ -27,11 +27,17 @@
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 30 nov 2013
  *
- * This file implements rotary encoder step decoding and debouncing.
+ * This file provides rotary encoder step decoding and debouncing. The
+ * implementation is based on code provided by Ben Buxton at his blog
+ * http://www.buxtronix.net/2011/10/rotary-encoders-done-properly.html .
  */
 
 #include <stdint.h>
-#include <hal/gpio.h>
+
+typedef struct
+{
+  uint8_t state;
+} rotary;
 
 typedef enum
 {
@@ -42,49 +48,37 @@ typedef enum
 
 
 /**
- * Declare a new rotary encoder
+ * Initialize a rotary encoder
  *
- * This macro declares a rotary encoder attached to two specific pins. The
- * rotary encoder is named so that it can be refered to later on. The pin
- * symbols refer to symbols defined using the gpio abstraction layer (see
- * hal/gpio.h)
- *
- * @param name  The name of the rotary encoder
- * @param pina  The symbol for pin A
- * @param pinb  The symbol for pin B
+ * This function initializes a rotary encoder structure. A rotary encoder must 
+ * be initialized before it can be used with the other functions defined in
+ * this file.
  */
-#define ROTARY(name,pina,pinb)                                         \
-  static uint8_t rot_state_##name;                                     \
-  static inline                                                        \
-  rot_step_status rot_process_step_##name(void) {	      	       \
-    uint8t_t pins_state = ((GET_PIN(pina) << 1) | GET_PIN(pinb))       \
-    rot_state_##name = rot_ttable[rot_state_##name][pins_state];       \
-    return (rot_state_##name & 0xF0);                                  \
-  }
+void rot_init(rotary* rot)
+{
+  rot->state = 0;
+}
 
 
 /**
  * Processes a single encoder step
  *
- * This macro resolves to a function that reads the specified rotary encoder's
- * input pins, debounces them and returns a value indicating whether a step was
- * taken and if so, in what direction.
+ * This function takes input from a rotary encoder, debounces it and returns a
+ * value indicating whether a step was taken and if so, in what direction.
  *
- * The macro can safely be used inside an interrupt routine. Typically, this
- * macro will either be called periodically from a timer or from a pin change
+ * The function can safely be used inside an interrupt routine. It will
+ * typically either be called periodically from a timer or from a pin change
  * interrupt.
  *
- * @param  name The name of the rotary encoder for which to process a step
+ * @param rot   The rotary encoder for which to process a step
+ * @param input The rotary encoder input, the LSB must have the value of pin B
+ *              and LSB+1 must have the value of pin A (format 0b'000000AB).
+ *              Inverting both bits has no influence on the outcome of the
+ *              algorithm. 
  * @return ROT_STEP_CW if a clockwise step was performed, ROT_STEP_CCW if a
  *         counter-clockwise step was performed and ROT_NO_STEP otherwise.
  */
-#define rot_process_step(name) rot_process_step_##name()
-
-
-/**
- * Transition table for the rotary encoder state machine. Not be used directly.
- */
-extern const uint8_t rot_ttable[6][4];
+rot_step_status rot_process_step(rotary* rot, uint8_t input);
 
 
 #endif

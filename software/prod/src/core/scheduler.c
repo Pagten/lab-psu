@@ -49,11 +49,10 @@
  */
 
 #include <stdbool.h>
-
 #include <util/atomic.h>
-#include <hal/timer2.h>
-#include <config.h>
 
+#include "config.h"
+#include "hal/timer2.h"
 #include "utils/math.h"
 #include "utils/log.h"
 

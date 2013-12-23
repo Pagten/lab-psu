@@ -25,10 +25,10 @@
  * @date 6 jun 2013
  */
 
-#include <config.h>
-#include <scheduler.h>
-#include <hal/spi.h>
-#include <utils/log.h>
+#include "config.h"
+#include "core/scheduler.h"
+#include "hal/spi.h"
+#include "utils/log.h"
 
 #include "spi_master.h"
 

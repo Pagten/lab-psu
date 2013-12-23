@@ -45,19 +45,23 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+//#define PS(...) __VA_ARGS__
+
 #define GET_PIN(pb)     GET_PORT_BIT(PIN(pb),B(pb))
 #define SET_PIN(pb)     SET_PORT_BIT(PORT(pb),B(pb))
 #define CLR_PIN(pb)     CLR_PORT_BIT(PORT(pb),B(pb)) 
 #define TGL_PIN(pb)     TGL_PORT_BIT(PORT(pb),B(pb)) 
 
-#define GET_PIN_DIRECTION(pb)        GET_PORT_BIT(DDR(pb),B(pb))
-#define SET_PIN_DIRECTION_OUTPUT(pb) SET_PORT_BIT(DDR(pb),B(pb))
-#define SET_PIN_DIRECTION_INPUT(pb)  CLR_PORT_BIT(DDR(pb),B(pb))
-#define TGL_PIN_DIRECTION(pb)        TGL_PORT_BIT(DDR(pb),B(pb))
+#define GET_PIN_DIR(pb)        GET_PORT_BIT(DDR(pb),B(pb))
+#define SET_PIN_DIR_OUTPUT(pb) SET_PORT_BIT(DDR(pb),B(pb))
+#define SET_PIN_DIR_INPUT(pb)  CLR_PORT_BIT(DDR(pb),B(pb))
+#define TGL_PIN_DIR(pb)        TGL_PORT_BIT(DDR(pb),B(pb))
 
-#define PCINT_VECTOR(pb)        (PCINT ## PCI_VEC(PCINT(pb)) ## _vect)
-#define PCINT_ENABLE_GROUP(pb)  SET_PORT_PIN(PCICR, PCIE ## PCI_VEC(PCINT(pb)))
-#define PCINT_ENABLE_BIT(pb)    SET_PORT_PIN(PCMSK ## PCI_VEC(PCINT(pb)), B(pb))
+#define PC_INTERRUPT_VECT(pb)     ISR(PCINT1_vect)
+//#define PCINT_VECTOR(pb)        PCINT1_vect //PCINT ## PS(PCI_VEC(PCINT(pb)), _vect)
+#define PC_INTERRUPT_ENABLE(pb)  SET_PORT_BIT(PCICR,PCIE1) //SET_PORT_BIT(PCICR, PCIE ## PCI_VEC(PCINT(pb)))
+#define PC_INTERRUPT_DISABLE(pb) 
+//#define PCINT_ENABLE_PIN(pb)    SET_PORT_BIT(PCMSK1, 3)//SET_PORT_BIT(PCMSK ## PCI_VEC(PCINT(pb)), B(pb))
 
 
 //*****************************************************************************
@@ -71,9 +75,8 @@
 #define PIN(p,b)                (PIN ## p) 
 #define DDR(p,b)                (DDR ## p)
 
-#define PCINT(p,b)              (PCINT_ ## p ## b)
-#define PCI_VEC(pcint)          (PCI_PCINT ## pcint) 
-
+#define PCINT(p,b)              PCINT_ ## p ## b
+#define PCI_VEC(pcint)          PCI_PCINT ## pcint 
 
 #define GET_PORT_BIT(p,b)       (((p) & _BV(b)) != 0) 
 #define SET_PORT_BIT(p,b)       ((p) |= _BV(b)) 

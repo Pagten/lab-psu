@@ -31,7 +31,7 @@
  */
 
 #include <stdlib.h>
-#include <scheduler.h>
+#include <stdint.h>
 
 typedef enum
 {

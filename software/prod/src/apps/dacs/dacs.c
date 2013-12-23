@@ -30,43 +30,50 @@
  */
 
 #include "config.h"
-#include <hal/gpio.h> 
 
-#include "scheduler.h"
-#include "rotary.h"
+#include "hal/gpio.h" 
+#include "core/scheduler.h"
+#include "core/rotary.h"
 
 
 #define ROT0A C,3
 #define ROT0B C,2
 
-ROTARY(ROT0,ROT0A,ROT0B)
-
+static rotary rot0;
 
 static inline
 void init_pin_directions(void)
 {
-  SET_PIN_DIRECTION_INPUT(ROT0A);
-  SET_PIN_DIRECTION_OUTPUT(ROT0B);
+  SET_PIN_DIR_INPUT(ROT0A);
+  SET_PIN_DIR_OUTPUT(ROT0B);
 }
 
 
-ISR(PCINT_VECTOR(ROT0A))
+//ISR(PCINT_VECTOR(ROT0A))
+PC_INTERRUPT_VECT(ROT0A)
 {
-  rot_process_step(rot0);
+  uint8_t input = (GET_PIN(ROT0A) << 1 | GET_PIN(ROT0B));
+  switch (rot_process_step(&rot0, input)) {
+  case ROT_STEP_CW:
+    break;
+  case ROT_STEP_CCW:
+    break;
+  default:
+    break;
+  }
 }
-ISR(PCINT_VECTOR(ROT0B), ISR_ALIASOF(PCINT_VECTOR(ROT0A)));
+//ISR(PCINT_VECTOR(ROT0B), ISR_ALIASOF(PCINT_VECTOR(ROT0A)));
 
 
 void main(void) __attribute__((noreturn));
 void main(void)
 {
+  rot_init(&rot0);
   init_pin_directions();
   sched_init();
 
-  PCINT_ENABLE_GROUP(ROT0A);
-  PCINT_ENABLE_GROUP(ROT0B);
-  PCINT_ENABLE(ROT0A);
-  PCINT_ENABLE(ROT0B);
+  PC_INTERRUPT_ENABLE(ROT0A);
+  PC_INTERRUPT_ENABLE(ROT0B);
   sei(); // Enable interrupts
 
   while (1) {

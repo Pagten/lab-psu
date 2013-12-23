@@ -6,6 +6,7 @@ endif
 usage:
 	@echo "TODO: come up with usage string"
 
+#TODO: link-time optimization
 
 # Target config
 MCU=atmega328
@@ -20,20 +21,21 @@ STRIP = avr-strip
 CFLAGS = -Wall -mmcu=$(MCU) -fno-strict-aliasing
 LDFLAGS = -mmcu=$(MCU)
 
-BUILDDIR = $(FW_ROOT)/build
+OBJECTDIR = build
 
 #LOWERCASE = -abcdefghijklmnopqrstuvwxyz
 #UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ
 #TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
 #CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 
-SOURCEDIRS += $(FW_ROOT)
-SOURCEFILES += ${addprefix $(FW_ROOT)/, core/rotary.c core/spi_master.c}
-OBJECTFILES = ${addprefix $(BUILDDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
+SOURCEDIRS  = ${addprefix $(FW_ROOT)/, core hal utils}
+SOURCEFILES = rotary.c spi_master.c
+OBJECTFILES = ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
+vpath %.c $(SOURCEDIRS)
 
-# Create $(BUILDDIR) if it has been removed by make clean
-$(BUILDDIR):
+# Create $(OBJECTDIR) if it has been removed by make clean
+$(OBJECTDIR):
 	mkdir $@
 
 
@@ -52,7 +54,7 @@ else
   Q=@
 endif
 
-CFLAGS += ${addprefix -I,$(SOURCEDIRS)}
+CFLAGS += -I. -I$(FW_ROOT)
 
 ### Check for a git repo and pass version if found
 RELSTR=${shell git describe --tags 2>/dev/null}
@@ -117,18 +119,18 @@ endif
 #  AROPTS = rcf
 #endif
 
-ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-fw.a: $(OBJECTFILES)
-	$(TRACE_AR)
-	$(Q)$(AR) $(AROPTS) $@ $^
-endif
+#ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
+#$(APP_NAME).a: $(OBJECTFILES)
+#	$(TRACE_AR)
+#	$(Q)$(AR) $(AROPTS) $@ $^
+#endif
 
 ifndef LD
   LD = $(CC)
 endif
 
 ifndef CUSTOM_RULE_LINK
-%.fw: %.co $(OBJECTFILES) fw.a
+$(APP_NAME): $(OBJECTFILES)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} -o $@
