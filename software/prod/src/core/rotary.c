@@ -61,6 +61,13 @@ static const uint8_t ttable[6][4] = {
 /*R_CCW1 */   {R_POS0|ROT_STEP_CCW, R_POS1,     R_CCW1,    R_POS1},
 };
 
+
+void rot_init(rotary* rot)
+{
+  rot->state = 0;
+}
+
+
 inline
 rot_step_status rot_process_step(rotary* rot, uint8_t input)
 {

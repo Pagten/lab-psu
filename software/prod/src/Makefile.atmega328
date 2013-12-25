@@ -1,0 +1,13 @@
+# Target config
+MCU=atmega328
+F_CPU=16000000UL
+CC = avr-gcc
+LD = avr-gcc
+AS = avr-as
+AR = avr-ar
+ELF_SIZE = avr-size -C --mcu=$(MCU)
+OBJCOPY = avr-objcopy
+STRIP = avr-strip
+CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
+LDFLAGS = -mmcu=$(MCU)
+

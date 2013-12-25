@@ -8,19 +8,13 @@ usage:
 
 #TODO: link-time optimization
 
-# Target config
-MCU=atmega328
-F_CPU=16000000UL
-CC = avr-gcc
-LD = avr-gcc
-AS = avr-as
-AR = avr-ar
-ELF_SIZE = avr-size -C --mcu=$(MCU)
-OBJCOPY = avr-objcopy
-STRIP = avr-strip
-CFLAGS = -Wall -mmcu=$(MCU) -fno-strict-aliasing
-LDFLAGS = -mmcu=$(MCU)
+ifndef TARGET
+TARGET = atmega328
+endif
 
+include $(FW_ROOT)/Makefile.$(TARGET)
+
+CFLAGS += -std=c99 -Wall 
 OBJECTDIR = build
 
 #LOWERCASE = -abcdefghijklmnopqrstuvwxyz
@@ -29,7 +23,7 @@ OBJECTDIR = build
 #CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 
 SOURCEDIRS  = ${addprefix $(FW_ROOT)/, core hal utils}
-SOURCEFILES = rotary.c spi_master.c
+SOURCEFILES = rotary.c scheduler.c spi_master.c
 OBJECTFILES = ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
 vpath %.c $(SOURCEDIRS)
@@ -77,10 +71,7 @@ rm -f $(@:.o=.$$$$)
 endef
 
 clean:
-	-rm -f *~ *core core *.srec \
-	*.lst *.map \
-	*.cprg *.bin *.data contiki*.a *.firmware core-labels.S *.ihex *.ini \
-	*.ce *.co
+	-rm -f *~  \
 	rm -rf $(CLEAN)
 	-rm -rf $(OBJECTDIR)
 
@@ -130,7 +121,7 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-$(APP_NAME): $(OBJECTFILES)
+$(APP_NAME): $(OBJECTDIR)/$(APP_NAME).o $(OBJECTFILES)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} -o $@

@@ -65,8 +65,7 @@ PC_INTERRUPT_VECT(ROT0A)
 //ISR(PCINT_VECTOR(ROT0B), ISR_ALIASOF(PCINT_VECTOR(ROT0A)));
 
 
-void main(void) __attribute__((noreturn));
-void main(void)
+int main(void)
 {
   rot_init(&rot0);
   init_pin_directions();

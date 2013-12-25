@@ -54,10 +54,7 @@ typedef enum
  * be initialized before it can be used with the other functions defined in
  * this file.
  */
-void rot_init(rotary* rot)
-{
-  rot->state = 0;
-}
+void rot_init(rotary* rot);
 
 
 /**

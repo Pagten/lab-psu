@@ -189,4 +189,5 @@ spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
       trx->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
     }
   }
+  return SPIM_OK;
 }
