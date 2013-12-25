@@ -31,10 +31,10 @@
 #include <stdint.h>
 #include <check.h>
 
+#include "config.h"
 #include "hal/spi.h"
 #include "hal/timer2.h"
-#include "spi_master.h"
-#include "config.h"
+#include "core/spi_master.h"
 
 #include "spi_master_test.h"
 
@@ -344,7 +344,7 @@ static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
       ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
     }
     test_trx_multiple_cb0_rx_executed = true;
-  } else if (status = SPIM_TX_DONE) {
+  } else if (status == SPIM_TX_DONE) {
     for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0; ++i) {
       ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0-i-1]);
     }
@@ -363,7 +363,7 @@ static size_t test_trx_multiple_cb1(spim_cb_status status, void *trx_cb_data)
       ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
     }
     test_trx_multiple_cb1_rx_executed = true;
-  } else if (status = SPIM_TX_DONE) {
+  } else if (status == SPIM_TX_DONE) {
     for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1; ++i) {
       ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1-i-1]);
     } 

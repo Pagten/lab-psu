@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "core/scheduler.h"
+
 typedef enum
 {
   SPIM_OK,

@@ -8,11 +8,10 @@ usage:
 
 #TODO: link-time optimization
 
-ifndef TARGET
-TARGET = atmega328
+ifndef CUSTOM_TARGET
+include $(FW_ROOT)/Makefile.atmega328
 endif
 
-include $(FW_ROOT)/Makefile.$(TARGET)
 
 CFLAGS += -std=c99 -Wall 
 OBJECTDIR = build
@@ -22,9 +21,9 @@ OBJECTDIR = build
 #TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
 #CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 
-SOURCEDIRS  = ${addprefix $(FW_ROOT)/, core hal utils}
-SOURCEFILES = rotary.c scheduler.c spi_master.c
-OBJECTFILES = ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
+SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core hal utils}
+SOURCEFILES += rotary.c scheduler.c spi_master.c
+OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
 vpath %.c $(SOURCEDIRS)
 
@@ -111,7 +110,7 @@ endif
 #endif
 
 #ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-#$(APP_NAME).a: $(OBJECTFILES)
+#$(PROJECT_NAME).a: $(OBJECTFILES)
 #	$(TRACE_AR)
 #	$(Q)$(AR) $(AROPTS) $@ $^
 #endif
@@ -121,21 +120,21 @@ ifndef LD
 endif
 
 ifndef CUSTOM_RULE_LINK
-$(APP_NAME): $(OBJECTDIR)/$(APP_NAME).o $(OBJECTFILES)
+$(PROJECT_NAME): $(OBJECTDIR)/$(PROJECT_NAME).o $(OBJECTFILES)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) ${filter-out %.a,$^} \
-	    ${filter %.a,$^} -o $@
+	    ${filter %.a,$^} $(LIBS) -o $@
 endif
 
-%.ramprof: %.fw
-	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
+#%.ramprof: %.fw
+#	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
 
-%.flashprof: %.fw
-	$(NM) -S -td --size-sort $< | grep -i " [t] " | cut -d' ' -f2,4
+#%.flashprof: %.fw
+#	$(NM) -S -td --size-sort $< | grep -i " [t] " | cut -d' ' -f2,4
 
-# Don't treat %.$(TARGET) as an intermediate file because it is
+# Don't treat $(PROJECT_NAME) as an intermediate file because it is
 # in fact the primary target.
-.PRECIOUS: %.fw
+.PRECIOUS: $(PROJECT_NAME)
 
 # Cancel the predefined implict rule for compiling and linking
 # a single C source into a binary to force GNU make to consider

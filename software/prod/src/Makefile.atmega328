@@ -1,13 +1,15 @@
 # Target config
-MCU=atmega328
-F_CPU=16000000UL
+MCU = atmega328
+F_CPU = 16000000UL
+
+
 CC = avr-gcc
 LD = avr-gcc
-AS = avr-as
-AR = avr-ar
-ELF_SIZE = avr-size -C --mcu=$(MCU)
-OBJCOPY = avr-objcopy
-STRIP = avr-strip
-CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
-LDFLAGS = -mmcu=$(MCU)
-
+#AS = avr-as
+#AR = avr-ar
+#ELF_SIZE = avr-size -C --mcu=$(MCU)
+#OBJCOPY = avr-objcopy
+#STRIP = avr-strip
+CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing -DF_CPU=$(F_CPU)
+LDFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
+#TODO: link-time optimization

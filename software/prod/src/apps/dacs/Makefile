@@ -1,5 +1,5 @@
-APP_NAME = dacs
-all: $(APP_NAME)
+PROJECT_NAME = dacs
+all: $(PROJECT_NAME)
 
 #OPTI=s
 

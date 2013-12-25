@@ -32,9 +32,9 @@
 #include <stdlib.h>
 #include <check.h>
 
-#include <hal/timer2.h>
-#include "scheduler.h"
 #include "config.h"
+#include "hal/timer2.h"
+#include "core/scheduler.h"
 
 #include "scheduler_test.h"
 
@@ -259,7 +259,6 @@ static void task_schedule_max_tasks_delayed(void* data)
 START_TEST(test_schedule_max_tasks_delayed)
 {
   sched_schedule_status task_scheduled;
-  sched_exec_status task_executed;
   int i;
   for (i = 0; i < SCHED_TASKS_MAX; ++i) { 
     task_scheduled = sched_schedule(1, task_schedule_max_tasks_delayed, NULL);
