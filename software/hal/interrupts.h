@@ -1,5 +1,5 @@
 /*
- * iopanel.h
+ * interrupt.h
  *
  * Copyright 2013 Pieter Agten
  *
@@ -19,9 +19,21 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef IO_PANEL_H
-#define IO_PANEL_H
+#ifndef INTERRUPT_H
+#define INTERRUPT_H
 
+/**
+ * @file interrupt.h
+ * @author Pieter Agten <pieter.agten@gmail.com>
+ * @date 17 dec 2013
+ */
 
+#include <avr/interrupt.h>
+
+#define DEF_CONST(b_const) DEF_CONST_##b_const
+#define DEF_CONST_true const
+#define DEF_CONST_false
+
+#define _ISR_ALIAS(defined_isr, new_isr)  
 
 #endif
