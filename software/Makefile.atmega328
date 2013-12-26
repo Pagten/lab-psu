@@ -5,11 +5,8 @@ F_CPU = 16000000UL
 
 CC = avr-gcc
 LD = avr-gcc
-#AS = avr-as
-#AR = avr-ar
-#ELF_SIZE = avr-size -C --mcu=$(MCU)
-#OBJCOPY = avr-objcopy
-#STRIP = avr-strip
+NM = avr-nm
+ELF_SIZE = @avr-size -C --mcu=$(MCU)
 CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing -DF_CPU=$(F_CPU)
 LDFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
 #TODO: link-time optimization

@@ -4,22 +4,22 @@ ifndef FW_ROOT
 endif
 
 usage:
-	@echo "TODO: come up with usage string"
+	@echo "usage:"
+	@echo "\tmake <PROJECT_NAME>            Compile the project into an ELF file"
+	@echo "\tmake <PROJECT_NAME>.size       Show project memory usage"
+	@echo "\tmake <PROJECT_NAME>.flashprof  Show detailed project flash usage"
+	@echo "\tmake <PROJECT_NAME>.ramprof    Show detailed project ram usage"
 
-#TODO: link-time optimization
+help: usage
+	@
 
 ifndef CUSTOM_TARGET
 include $(FW_ROOT)/Makefile.atmega328
 endif
 
-
 CFLAGS += -std=c99 -Wall 
 OBJECTDIR = build
 
-#LOWERCASE = -abcdefghijklmnopqrstuvwxyz
-#UPPERCASE = _ABCDEFGHIJKLMNOPQRSTUVWXYZ
-#TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERCASE)!}}
-#CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 
 SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core hal utils}
 SOURCEFILES += rotary.c scheduler.c spi_master.c
@@ -29,21 +29,17 @@ vpath %.c $(SOURCEDIRS)
 
 # Create $(OBJECTDIR) if it has been removed by make clean
 $(OBJECTDIR):
-	mkdir $@
+	@mkdir $@
 
 
 ### Verbosity control. Use  make V=1  to get verbose builds.
 ifeq ($(V),1)
   TRACE_CC =
   TRACE_LD =
-  TRACE_AR =
-  TRACE_AS =
   Q=
 else
-  TRACE_CC = @echo "  CC       " $<
-  TRACE_LD = @echo "  LD       " $@
-  TRACE_AR = @echo "  AR       " $@
-  TRACE_AS = @echo "  AS       " $<
+  TRACE_CC    = @echo "  CC       " $<
+  TRACE_LD    = @echo "  LD       " $@
   Q=@
 endif
 
@@ -75,14 +71,7 @@ clean:
 	-rm -rf $(OBJECTDIR)
 
 distclean: clean
-	-rm -rf $(CONTIKI_PROJECT).$(TARGET)
-
-#ifndef CUSTOM_RULE_C_TO_CE
-#%.ce: %.c
-#	$(TRACE_CC)
-#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
-#	$(STRIP) --strip-unneeded -g -x $@
-#endif
+	-rm -rf $(PROJECT_NAME)
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
@@ -91,29 +80,6 @@ $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
 	@$(FINALIZE_DEPENDENCY)
 endif
 
-
-#ifndef CUSTOM_RULE_C_TO_O
-#%.o: %.c
-#	$(TRACE_CC)
-#	$(Q)$(CC) $(CFLAGS) -c $< -o $@
-#endif
-
-
-#ifndef CUSTOM_RULE_C_TO_CO
-#%.co: %.c
-#	$(TRACE_CC)
-#	$(Q)$(CC) $(CFLAGS) -DAUTOSTART_ENABLE -c $< -o $@
-#endif
-
-#ifndef AROPTS
-#  AROPTS = rcf
-#endif
-
-#ifndef CUSTOM_RULE_ALLOBJS_TO_TARGETLIB
-#$(PROJECT_NAME).a: $(OBJECTFILES)
-#	$(TRACE_AR)
-#	$(Q)$(AR) $(AROPTS) $@ $^
-#endif
 
 ifndef LD
   LD = $(CC)
@@ -124,25 +90,25 @@ $(PROJECT_NAME): $(OBJECTDIR)/$(PROJECT_NAME).o $(OBJECTFILES)
 	$(TRACE_LD)
 	$(Q)$(LD) $(LDFLAGS) ${filter-out %.a,$^} \
 	    ${filter %.a,$^} $(LIBS) -o $@
+ifdef ELF_SIZE
+	$(ELF_SIZE) $@
+endif
 endif
 
-#%.ramprof: %.fw
-#	$(NM) -S -td --size-sort $< | grep -i " [abdrw] " | cut -d' ' -f2,4
+ifdef ELF_SIZE
+%.size: $(PROJECT_NAME)
+	$(ELF_SIZE) $<
+endif
 
-#%.flashprof: %.fw
-#	$(NM) -S -td --size-sort $< | grep -i " [t] " | cut -d' ' -f2,4
+%.ramprof: $(PROJECT_NAME)
+	$(NM) -S -td --size-sort $< --reverse-sort | grep -i " [abdrw] " | cut -d' ' -f2,4
+
+%.flashprof: $(PROJECT_NAME)
+	$(NM) -S -td --size-sort $< --reverse-sort | grep -i " [t] " | cut -d' ' -f2,4
 
 # Don't treat $(PROJECT_NAME) as an intermediate file because it is
 # in fact the primary target.
 .PRECIOUS: $(PROJECT_NAME)
 
-# Cancel the predefined implict rule for compiling and linking
-# a single C source into a binary to force GNU make to consider
-# the match-anything rule below instead.
-%: %.c
 
-# Match-anything pattern rule to allow the project makefiles to
-# abstract from the actual binary name. It needs to contain some
-# command in order to be a rule, not just a prerequisite.
-%: %.fw
-	@
+
