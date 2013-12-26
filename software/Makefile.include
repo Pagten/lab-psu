@@ -16,6 +16,9 @@ usage:
 	@echo "\tmake upload            Upload project code to MCU flash"
 	@echo "\tmake eeupload          Upload project data to MCU EEPROM"
 	@echo "\tmake fuseupload        Program MCU fuses"
+	@echo "\tmake clean             Remove the build directory"
+	@echo "\tmake distclean         Remove the build directory and the compiled ELF file"
+	@echo "\tmake help|usage        Show this usage information"
 
 help: usage
 	@
