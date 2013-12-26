@@ -3,19 +3,23 @@ ifndef FW_ROOT
   ${error FW_ROOT not defined! You must specify the root dir of the firmware}
 endif
 
+ifndef CUSTOM_TARGET
+include $(FW_ROOT)/Makefile.target
+endif
+
 usage:
 	@echo "usage:"
-	@echo "\tmake <PROJECT_NAME>            Compile the project into an ELF file"
-	@echo "\tmake <PROJECT_NAME>.size       Show project memory usage"
-	@echo "\tmake <PROJECT_NAME>.flashprof  Show detailed project flash usage"
-	@echo "\tmake <PROJECT_NAME>.ramprof    Show detailed project ram usage"
+	@echo "\tmake <PROJECT_NAME>    Compile the project into an ELF file"
+	@echo "\tmake sizeinfo          Show project memory usage"
+	@echo "\tmake flashprof         Show detailed project flash usage"
+	@echo "\tmake ramprof           Show detailed project ram usage"
+	@echo "\tmake upload            Upload project code to MCU flash"
+	@echo "\tmake eeupload          Upload project data to MCU EEPROM"
+	@echo "\tmake fuseupload        Program MCU fuses"
 
 help: usage
 	@
 
-ifndef CUSTOM_TARGET
-include $(FW_ROOT)/Makefile.atmega328
-endif
 
 CFLAGS += -std=c99 -Wall 
 OBJECTDIR = build
@@ -96,19 +100,26 @@ endif
 endif
 
 ifdef ELF_SIZE
-%.size: $(PROJECT_NAME)
+sizeinfo: $(PROJECT_NAME)
 	$(ELF_SIZE) $<
 endif
 
-%.ramprof: $(PROJECT_NAME)
+ramprof: $(PROJECT_NAME)
 	$(NM) -S -td --size-sort $< --reverse-sort | grep -i " [abdrw] " | cut -d' ' -f2,4
 
-%.flashprof: $(PROJECT_NAME)
+flashprof: $(PROJECT_NAME)
 	$(NM) -S -td --size-sort $< --reverse-sort | grep -i " [t] " | cut -d' ' -f2,4
+
+upload: $(PROJECT_NAME)
+	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U flash:w:$<:e
+
+eeupload:
+	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U eeprom:w:$<:e
+
+fuseupload:
+	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U lfuse:w:$<:e -U hfuse:w:$<:e -U efuse:w:$<:e
 
 # Don't treat $(PROJECT_NAME) as an intermediate file because it is
 # in fact the primary target.
 .PRECIOUS: $(PROJECT_NAME)
-
-
 

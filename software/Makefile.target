@@ -1,0 +1,29 @@
+### Basic target and upload configuration ##
+MCU                ?= atmega328
+AVRDUDE_MCU        ?= m328
+F_CPU              ?= 16000000UL
+AVRDUDE_PORT       ?= /dev/ttyUSB0
+AVRDUDE_PROGRAMMER ?= usbasp
+# Note: at least version 6.0.1 of avrdude is needed
+
+### Advanced configuration ###
+CC = avr-gcc
+LD = avr-gcc
+NM = avr-nm
+ELF_SIZE = @avr-size -C --mcu=$(MCU)
+CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing -DF_CPU=$(F_CPU)
+LDFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
+#TODO: link-time optimization
+
+AVRDUDE ?= avrdude
+ifdef AVRDUDE_MCU
+AVRDUDE_MCU := -p $(AVRDUDE_MCU)
+endif
+ifdef AVRDUDE_PORT
+AVRDUDE_PORT := -P $(AVRDUDE_PORT)
+endif
+ifdef AVRDUDE_PROGRAMMER
+AVRDUDE_PROGRAMMER := -c $(AVRDUDE_PROGRAMMER)
+endif
+AVRDUDE_OPTIONS += $(AVRDUDE_MCU) $(AVRDUDE_PORT) $(AVRDUDE_PROGRAMMER)
+
