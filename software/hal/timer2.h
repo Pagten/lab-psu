@@ -2,8 +2,6 @@
 #define TIMER2_H
 
 #include <avr/io.h>
-#include <avr/interrupt.h>
-
 #include "timers.h"
 
 #define timer2_INIT 
@@ -24,6 +22,6 @@
 #define timer2_cntr_REG     TCNT2
 #define timer2_cntr_REG_MAX 255
 
-#define timer2_oca_INTERRUPT_VECT ISR(TIMER2_COMPA_vect)
+#define timer2_oca_INTERRUPT_VECT TIMER2_COMPA_vect
 
 #endif

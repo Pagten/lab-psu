@@ -28,7 +28,7 @@
 #include "config.h"
 #include "core/scheduler.h"
 #include "hal/spi.h"
-#include "utils/log.h"
+#include "util/log.h"
 
 #include "spi_master.h"
 

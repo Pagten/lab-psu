@@ -53,8 +53,9 @@
 
 #include "config.h"
 #include "hal/timer2.h"
-#include "utils/math.h"
-#include "utils/log.h"
+#include "hal/interrupt.h"
+#include "util/math.h"
+#include "util/log.h"
 
 #include "scheduler.h"
 
@@ -166,7 +167,7 @@ sched_schedule_status sched_schedule(ticks_t ticks, sched_task_t task, void* dat
 //  - ready_queue_put: ready_head, ready_tail
 //  - TMR_REG(TMR, TMR_CHANNEL)
 //  - TMR_REG(TMR, cntr)
-TMR_INTERRUPT_VECT(TMR,TMR_CHANNEL)
+INTERRUPT(TMR_INTERRUPT_VECT(TMR,TMR_CHANNEL))
 {
   uint16_t current_tick = next_interrupt_tick;
 

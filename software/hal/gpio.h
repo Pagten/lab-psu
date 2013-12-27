@@ -34,18 +34,16 @@
  * For instance:
  * #define MYSYMBOL  C,1   //defines MYSYMBOL as pin 1 of port C
  *
- * SET_PIN_DIRECTION_INPUT(MYSYMBOL);
+ * SET_PIN_DIR_INPUT(MYSYMBOL);
  * char val = GET_PIN(MYSYMBOL);
  *
- * SET_PIN_DIRECTION_OUTPUT(MYSYMBOL);
+ * SET_PIN_DIR_OUTPUT(MYSYMBOL);
  * SET_PIN(MYSYMBOL);  
  */
 
 #include "devices.h"
 #include <avr/io.h>
-#include <avr/interrupt.h>
 
-//#define PS(...) __VA_ARGS__
 
 #define GET_PIN(pb)     GET_PORT_BIT(PIN(pb),B(pb))
 #define SET_PIN(pb)     SET_PORT_BIT(PORT(pb),B(pb))
@@ -57,17 +55,20 @@
 #define SET_PIN_DIR_INPUT(pb)  CLR_PORT_BIT(DDR(pb),B(pb))
 #define TGL_PIN_DIR(pb)        TGL_PORT_BIT(DDR(pb),B(pb))
 
-#define PC_INTERRUPT_VECT(pb)     ISR(PCINT1_vect)
-//#define PCINT_VECTOR(pb)        PCINT1_vect //PCINT ## PS(PCI_VEC(PCINT(pb)), _vect)
-#define PC_INTERRUPT_ENABLE(pb)  SET_PORT_BIT(PCICR,PCIE1) //SET_PORT_BIT(PCICR, PCIE ## PCI_VEC(PCINT(pb)))
-#define PC_INTERRUPT_DISABLE(pb) 
-//#define PCINT_ENABLE_PIN(pb)    SET_PORT_BIT(PCMSK1, 3)//SET_PORT_BIT(PCMSK ## PCI_VEC(PCINT(pb)), B(pb))
+#define PC_INTERRUPT_VECT(pb)   PCINT_vect(pb)
+#define PC_INTERRUPT_ENABLE(pb) \
+  SET_PORT_BIT(PCICR,PCIE(pb)); \
+  SET_PORT_BIT(PCMSK(pb),PCINT(pb))
+#define PC_INTERRUPT_DISABLE(pb) \
+  CLR_PORT_BIT(PCMSK(pb),PCINT(pb))
 
 
 //*****************************************************************************
 // THE MACROS BELOW ARE FOR INTERNAL USAGE ONLY, THEY ARE NOT TO BE USED
 // DIRECTLY IN USER CODE
 //*****************************************************************************
+//#define LOOKUP(...) __VA_ARGS__
+
 #define P(p,b)                  (p)
 #define B(p,b)                  (b)
  
@@ -75,13 +76,15 @@
 #define PIN(p,b)                (PIN ## p) 
 #define DDR(p,b)                (DDR ## p)
 
-#define PCINT(p,b)              PCINT_ ## p ## b
-#define PCI_VEC(pcint)          PCI_PCINT ## pcint 
-
 #define GET_PORT_BIT(p,b)       (((p) & _BV(b)) != 0) 
 #define SET_PORT_BIT(p,b)       ((p) |= _BV(b)) 
 #define CLR_PORT_BIT(p,b)       ((p) &= ~_BV(b)) 
 #define TGL_PORT_BIT(p,b)       ((p) ^= _BV(b))
 
+// Lookups in devices.h
+#define PCINT(p,b)              PCINT_ ## p ## b
+#define PCINT_vect(p,b)         PCINT_vect_ ## p ## b
+#define PCIE(p,b)               PCIE_ ## p ## b
+#define PCMSK(p,b)              PCMSK_ ## p ## b
 
 #endif

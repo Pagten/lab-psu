@@ -32,8 +32,19 @@
 #include "config.h"
 
 #include "hal/gpio.h" 
+#include "hal/fuses.h"
+#include "hal/interrupt.h"
 #include "core/scheduler.h"
 #include "core/rotary.h"
+
+// NOTE: the default fuse values defined in avr-libc are incorrect (see the 
+// ATmega328p datasheet)
+FUSES = 
+{
+  .extended = 0xFF, // BOD disabled
+  .high = FUSE_SPIEN, // SPIEN enabled
+  .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
+};
 
 
 #define ROT0A C,3
@@ -45,12 +56,11 @@ static inline
 void init_pin_directions(void)
 {
   SET_PIN_DIR_INPUT(ROT0A);
-  SET_PIN_DIR_OUTPUT(ROT0B);
+  SET_PIN_DIR_INPUT(ROT0B);
 }
 
 
-//ISR(PCINT_VECTOR(ROT0A))
-PC_INTERRUPT_VECT(ROT0A)
+INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
 {
   uint8_t input = (GET_PIN(ROT0A) << 1 | GET_PIN(ROT0B));
   switch (rot_process_step(&rot0, input)) {
@@ -62,8 +72,9 @@ PC_INTERRUPT_VECT(ROT0A)
     break;
   }
 }
-//ISR(PCINT_VECTOR(ROT0B), ISR_ALIASOF(PCINT_VECTOR(ROT0A)));
-
+#if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
+INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
+#endif
 
 int main(void)
 {
@@ -73,7 +84,7 @@ int main(void)
 
   PC_INTERRUPT_ENABLE(ROT0A);
   PC_INTERRUPT_ENABLE(ROT0B);
-  sei(); // Enable interrupts
+  ENABLE_INTERRUPTS();
 
   while (1) {
     sched_exec();
