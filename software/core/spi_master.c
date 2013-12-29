@@ -29,6 +29,7 @@
 #include "core/scheduler.h"
 #include "hal/spi.h"
 #include "util/log.h"
+#include "hal/gpio.h" //For debugging only
 
 #include "spi_master.h"
 
@@ -61,6 +62,7 @@ void spim_init()
   trx_queue_tail = 0;
   trx_queue_count = 0;
 
+  SPI_SET_PIN_DIRS_MASTER;
   SPI_SET_ROLE_MASTER;
   SPI_SET_DATA_ORDER_MSB;
   SPI_SET_MODE(0,0);
@@ -68,10 +70,17 @@ void spim_init()
   SPI_ENABLE;
 }
 
-static inline void tx_byte(struct transfer *trx)
+
+#define DEBUG0 B,1
+#define DEBUG1 B,2
+
+
+static inline 
+void tx_byte(struct transfer *trx)
 {
   if (trx->tx_remaining > 0) {
     SET_SPI_DATA_REG(*(trx->tx_pos));
+    SET_PIN(DEBUG0);
     trx->tx_pos += 1;
     trx->tx_remaining -= 1;
     if (trx->tx_remaining == 0 && trx->cb != 0) {
@@ -83,9 +92,11 @@ static inline void tx_byte(struct transfer *trx)
   }
 }
 
-static inline void rx_byte(struct transfer *trx)
+static inline 
+void rx_byte(struct transfer *trx)
 {
   if (trx->rx_remaining > 0) {
+    SET_PIN(DEBUG1);
     *(trx->rx_pos) = GET_SPI_DATA_REG;
     trx->rx_pos += 1;
     trx->rx_remaining -= 1;
@@ -94,6 +105,7 @@ static inline void rx_byte(struct transfer *trx)
     }
   }
 }
+
 
 static void task_trx_byte(void *data);
 static void task_trx_start(void *data)
@@ -109,7 +121,7 @@ static void task_trx_start(void *data)
   sched_schedule_status task_scheduled;
   task_scheduled = sched_schedule(trx->delay, task_trx_byte, NULL);
   if (task_scheduled != SCHED_OK) {
-    LOG_ERROR("SPIM: couldn't shedule first task_trx_byte";)
+    LOG_ERROR("SPIM: couldn't shedule first task_trx_byte");
     trx->cb(SPIM_ERR_SCHED_FAILED, trx->cb_data);
   }
 }
@@ -180,7 +192,7 @@ spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
   trx->cb = trx_cb;
   trx->cb_data = trx_cb_data;
 
-  // Schedule new transfer if no transfer in progress
+  // Schedule new transfer if no transfer was in progress
   if (trx_queue_count == 1) {
     sched_schedule_status task_scheduled;
     task_scheduled = sched_schedule(0, task_trx_start, NULL);

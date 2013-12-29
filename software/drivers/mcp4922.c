@@ -36,7 +36,7 @@
 #define SHDN 12
 #define GA   13
 #define BUF  14
-#define CHB  15 
+#define CHB  15
 
 
 #ifndef MCP4922_PACKET_QUEUE_SIZE
@@ -44,7 +44,7 @@
 #endif
 
 struct packet {
-  uint16_t data;
+  uint8_t data[2];
   mcp4922_set_callback cb;
   void* cb_data;
 };
@@ -78,23 +78,29 @@ size_t _callback(spim_cb_status status, void *data)
 
 
 mcp4922_status mcp4922_set(volatile uint8_t *cs_port, uint8_t cs_pin,
-			   uint16_t ch_value,mcp4922_set_callback cb, 
-			   void* cb_data)
+			   bool channel_b, uint16_t value,
+			   mcp4922_set_callback cb, void* cb_data)
 {
   struct packet *p = &packet_queue[packet_queue_tail];
   packet_queue_tail = (packet_queue_tail + 1) % MCP4922_PACKET_QUEUE_SIZE;
   packet_queue_count += 1;
 
-  p->data = (ch_value & 0x8FFF) | _BV(GA) | _BV(SHDN);
+  // This assumes MSB-first data transfer
+  p->data[0] = (value >> 8) & 0x0F;
+  p->data[0] |= (_BV(GA) | _BV(SHDN)) >> 8;
+  if (channel_b) {
+    p->data[0] |= _BV(CHB) >> 8;
+  }
+  p->data[1] = value & 0x00FF;
   p->cb = cb;
   p->cb_data = cb_data;
 
   // Schedule new SPI transfer 
   spim_trx_status spim_status;
-  spim_status = spim_trx((uint8_t*)&p->data, 2, 0, // TX_BUF, TX_SIZE, TX_DELAY
-			 cs_port, bv8(cs_pin),     // SS_PORT, SS_MASK
-			 NULL, 0,                  // RX_BUF, RX_SIZE
-			 _callback, NULL);         // CB, CB_DATA
+  spim_status = spim_trx(p->data, 2, 0,         // TX_BUF, TX_SIZE, TX_DELAY
+			 cs_port, bv8(cs_pin),  // SS_PORT, SS_MASK
+			 NULL, 0,               // RX_BUF, RX_SIZE
+			 _callback, NULL);      // CB, CB_DATA
   if (spim_status != SPIM_OK) {
     return MCP4922_ERROR;
   }

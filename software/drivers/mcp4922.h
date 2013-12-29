@@ -22,7 +22,6 @@
 #ifndef MCP4922_H
 #define MCP4922_H
 
-
 /**
  * @file mcp4922.h
  * @author Pieter Agten (pieter.agten@gmail.com)
@@ -37,6 +36,7 @@
  * * ~SHDN is always set to 1, hence the output buffer cannot be shut down
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
@@ -71,19 +71,19 @@ void mcp4922_init(void);
 /**
  * Set the output value of one of the DAC's output channels
  *
- * @arg cs_port  The slave select port to which the DAC is connected
- * @arg cs_pin   The pin of cs_port to which the DAC is connected
- * @arg ch_value Indicates the channel to set and the value to set it to. If
- *               the MSB is 0, channel A is selected, otherwise channel B is 
- *               selected. The lowest 12 bits indicate the value to set.
- * @arg cb       Callback function that will be called after the DAC value has
- *               been set, or if an error occurs during transmission
- * @arg cb_data  Opaque pointer that will be passed on to the cb callback
+ * @arg cs_port   The slave select port to which the DAC is connected
+ * @arg cs_pin    The pin of cs_port to which the DAC is connected
+ * @arg channel_b Indicates the channel to set. Use false for channel A and
+ *                true for channel B
+ * @arg value     The value to set the channel to. Only the 12 LSBs are used
+ * @arg cb        Function that will be called after the DAC value has been
+ *                set, or if an error occurs during transmission
+ * @arg cb_data   Opaque pointer that will be passed on to the cb callback
  * @return MCP4922_OK if the SPI data transfer to set the output value was
  *         scheduled succesfully, MCP4922_ERROR otherwise.
  */
 mcp4922_status mcp4922_set(volatile uint8_t *cs_port, uint8_t cs_pin,
-			   uint16_t ch_value, mcp4922_set_callback cb, 
-			   void* cb_data);
+			   bool channel_b, uint16_t value, 
+			   mcp4922_set_callback cb, void* cb_data);
 
 #endif

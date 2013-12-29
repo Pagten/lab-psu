@@ -50,9 +50,13 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
+#define DEBUG0 B,1
+#define DEBUG1 B,2
+
 
 #define ROT0A C,3
 #define ROT0B C,2
+#define DAC_CS B,0
 #define DAC_CS_PORT &PORTB
 #define DAC_CS_PIN  0 
 
@@ -62,10 +66,18 @@ FUSES =
 static rotary rot0;
 
 static inline
-void init_pin_directions(void)
+void init_pins(void)
 {
+  SET_PIN_DIR_OUTPUT(DEBUG0);
+  SET_PIN_DIR_OUTPUT(DEBUG1);
+  CLR_PIN(DEBUG0);
+  CLR_PIN(DEBUG1);
+
   SET_PIN_DIR_INPUT(ROT0A);
   SET_PIN_DIR_INPUT(ROT0B);
+
+  SET_PIN_DIR_OUTPUT(DAC_CS);
+  SET_PIN(DAC_CS);
 }
 
 
@@ -76,6 +88,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
   uint8_t input = (GET_PIN(ROT0A) << 1 | GET_PIN(ROT0B));
   switch (rot_process_step(&rot0, input)) {
   case ROT_STEP_CW:
+    //    TGL_PIN(DEBUG0);
     if (dac_value <= DAC_MAX - DAC_STEP) {
       dac_value += DAC_STEP;
     } else {
@@ -83,6 +96,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
     }
     break;
   case ROT_STEP_CCW:
+    //    TGL_PIN(DEBUG1);
     if (dac_value >= DAC_STEP) {
       dac_value -= DAC_STEP;
     } else {
@@ -92,7 +106,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
   default:
     return;
   }
-  mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, dac_value & 0x0FFF, NULL, NULL);
+  mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, false, dac_value, NULL, NULL);
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
 INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
@@ -100,7 +114,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
 
 int main(void)
 {
-  init_pin_directions();
+  init_pins();
   sched_init();
   rot_init(&rot0);
   spim_init();
@@ -110,6 +124,8 @@ int main(void)
   PC_INTERRUPT_ENABLE(ROT0B);
   ENABLE_INTERRUPTS();
 
+  //  SET_PIN(DEBUG0);
+  // SET_PIN(DEBUG1);
   while (1) {
     sched_exec();
   }
