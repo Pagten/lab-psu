@@ -28,8 +28,8 @@ CFLAGS += -std=gnu99 -Wall
 OBJECTDIR = build
 
 
-SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core hal utils}
-SOURCEFILES += rotary.c scheduler.c spi_master.c
+SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core drivers hal utils}
+SOURCEFILES += mcp4922.c rotary.c scheduler.c spi_master.c
 OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
 vpath %.c $(SOURCEDIRS)

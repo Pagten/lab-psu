@@ -34,7 +34,7 @@
 
 #ifndef SPIM_TRX_QUEUE_SIZE
 #warning "SPIM_TRX_QUEUE_SIZE undefined in config file, using default value"
-#define SCHED_TASKS_MAX  4
+#define SCHED_TRX_QUEUE_SIZE  4
 #endif
 
 

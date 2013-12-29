@@ -96,7 +96,7 @@ typedef size_t (*spim_trx_callback)(spim_cb_status status, void *rx_cb_data);
  * @param rx_buf       The buffer to place the received bytes into
  * @param rx_size      The number of bytes to receive before calling cb_rx
  * @param trx_cb       Callback for handling a received data packet
- * @param trx_cb_data  Pointer to be passed on to the rx_cb callback
+ * @param trx_cb_data  Opaque pointer to be passed on to the rx_cb callback
  * @return SPIM_OK when the request was queued succesfully or SPIM_QUEUE_FULL
  *         if the transceive request queue is full.
  */

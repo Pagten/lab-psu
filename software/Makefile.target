@@ -2,8 +2,8 @@
 MCU                ?= atmega328
 AVRDUDE_MCU        ?= m328
 F_CPU              ?= 16000000UL
-AVRDUDE_PORT       ?= /dev/ttyUSB0
-AVRDUDE_PROGRAMMER ?= usbasp
+AVRDUDE_PORT       ?= 
+AVRDUDE_PROGRAMMER ?= usbasp-clone
 # Note: at least version 6.0.1 of avrdude is needed
 
 ### Advanced configuration ###

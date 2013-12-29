@@ -29,13 +29,17 @@
  * the DAC outputs using a rotary encoder.
  */
 
+#include <stdlib.h>
+
 #include "config.h"
 
 #include "hal/gpio.h" 
 #include "hal/fuses.h"
 #include "hal/interrupt.h"
 #include "core/scheduler.h"
+#include "core/spi_master.h"
 #include "core/rotary.h"
+#include "drivers/mcp4922.h"
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -49,6 +53,11 @@ FUSES =
 
 #define ROT0A C,3
 #define ROT0B C,2
+#define DAC_CS_PORT &PORTB
+#define DAC_CS_PIN  0 
+
+#define DAC_MAX 0x0FFF
+#define DAC_STEP 4
 
 static rotary rot0;
 
@@ -62,15 +71,28 @@ void init_pin_directions(void)
 
 INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
 {
+  static uint16_t dac_value = 0;
+
   uint8_t input = (GET_PIN(ROT0A) << 1 | GET_PIN(ROT0B));
   switch (rot_process_step(&rot0, input)) {
   case ROT_STEP_CW:
+    if (dac_value <= DAC_MAX - DAC_STEP) {
+      dac_value += DAC_STEP;
+    } else {
+      dac_value = DAC_MAX;
+    }
     break;
   case ROT_STEP_CCW:
+    if (dac_value >= DAC_STEP) {
+      dac_value -= DAC_STEP;
+    } else {
+      dac_value = 0;
+    }
     break;
   default:
-    break;
+    return;
   }
+  mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, dac_value & 0x0FFF, NULL, NULL);
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
 INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
@@ -78,9 +100,11 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
 
 int main(void)
 {
-  rot_init(&rot0);
   init_pin_directions();
   sched_init();
+  rot_init(&rot0);
+  spim_init();
+  mcp4922_init();
 
   PC_INTERRUPT_ENABLE(ROT0A);
   PC_INTERRUPT_ENABLE(ROT0B);
