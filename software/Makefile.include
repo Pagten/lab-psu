@@ -52,6 +52,12 @@ endif
 
 CFLAGS += -I. -I$(FW_ROOT)
 
+OPTI ?= s
+ifndef NO_LTO
+CFLAGS += -flto
+LDFLAGS += -flto -fuse-linker-plugin -O$(OPTI)
+endif
+
 ### Check for a git repo and pass version if found
 RELSTR=${shell git describe --tags 2>/dev/null}
 ifneq ($(RELSTR),)
