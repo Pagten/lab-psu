@@ -50,9 +50,9 @@ else
   Q=@
 endif
 
-CFLAGS += -I. -I$(FW_ROOT)
-
 OPTI ?= s
+CFLAGS += -I. -I$(FW_ROOT) -O$(OPTI)
+
 ifndef NO_LTO
 CFLAGS += -flto
 LDFLAGS += -flto -fuse-linker-plugin -O$(OPTI)
