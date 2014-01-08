@@ -30,6 +30,7 @@
  */
 
 #include <stdlib.h>
+#include <util/delay.h>
 
 #include "config.h"
 
@@ -52,6 +53,7 @@ FUSES =
 
 #define DEBUG0 B,1
 #define DEBUG1 B,2
+#define DEBUG2 D,0
 
 
 #define ROT0A C,3
@@ -61,7 +63,7 @@ FUSES =
 #define DAC_CS_PIN  0 
 
 #define DAC_MAX 0x0FFF
-#define DAC_STEP 4
+#define DAC_STEP 32
 
 static rotary rot0;
 
@@ -70,7 +72,9 @@ void init_pins(void)
 {
   SET_PIN_DIR_OUTPUT(DEBUG0);
   SET_PIN_DIR_OUTPUT(DEBUG1);
+  SET_PIN_DIR_OUTPUT(DEBUG2);
   CLR_PIN(DEBUG0);
+  CLR_PIN(DEBUG1);
   CLR_PIN(DEBUG1);
 
   SET_PIN_DIR_INPUT(ROT0A);
@@ -85,10 +89,10 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
 {
   static uint16_t dac_value = 0;
 
-  uint8_t input = (GET_PIN(ROT0A) << 1 | GET_PIN(ROT0B));
+  uint8_t input = ((GET_PIN(ROT0A) << 1) | GET_PIN(ROT0B));
   switch (rot_process_step(&rot0, input)) {
   case ROT_STEP_CW:
-    //    TGL_PIN(DEBUG0);
+    TGL_PIN(DEBUG0);
     if (dac_value <= DAC_MAX - DAC_STEP) {
       dac_value += DAC_STEP;
     } else {
@@ -96,7 +100,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
     }
     break;
   case ROT_STEP_CCW:
-    //    TGL_PIN(DEBUG1);
+    TGL_PIN(DEBUG1);
     if (dac_value >= DAC_STEP) {
       dac_value -= DAC_STEP;
     } else {
@@ -105,7 +109,7 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
     break;
   default:
     return;
-  }
+    }
   mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, false, dac_value, NULL, NULL);
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
