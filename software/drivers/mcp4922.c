@@ -26,8 +26,6 @@
  * @date 27 dec 2013
  */
 
-#include <avr/sfr_defs.h>
-
 #include "core/spi_master.h"
 #include "util/bit.h"
 

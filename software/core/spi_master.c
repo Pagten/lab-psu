@@ -29,7 +29,6 @@
 #include "core/scheduler.h"
 #include "hal/spi.h"
 #include "util/log.h"
-#include "hal/gpio.h" //For debugging only
 
 #include "spi_master.h"
 
@@ -71,16 +70,11 @@ void spim_init()
 }
 
 
-#define DEBUG0 B,1
-#define DEBUG1 B,2
-
-
 static inline 
 void tx_byte(struct transfer *trx)
 {
   if (trx->tx_remaining > 0) {
     SET_SPI_DATA_REG(*(trx->tx_pos));
-    SET_PIN(DEBUG0);
     trx->tx_pos += 1;
     trx->tx_remaining -= 1;
     if (trx->tx_remaining == 0 && trx->cb != 0) {
@@ -96,7 +90,6 @@ static inline
 void rx_byte(struct transfer *trx)
 {
   if (trx->rx_remaining > 0) {
-    SET_PIN(DEBUG1);
     *(trx->rx_pos) = GET_SPI_DATA_REG;
     trx->rx_pos += 1;
     trx->rx_remaining -= 1;
