@@ -4,6 +4,7 @@
 
 #include "scheduler_test.h"
 #include "spi_master_test.h"
+#include "rotary_test.h"
 
 int main(void)
 {
@@ -11,6 +12,7 @@ int main(void)
 
   SRunner *sr = srunner_create(schedule_suite());
   srunner_add_suite (sr, spi_master_suite());
+  srunner_add_suite (sr, rotary_suite());
 
   srunner_run_all(sr, CK_NORMAL);
   number_failed = srunner_ntests_failed(sr);
