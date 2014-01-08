@@ -71,6 +71,7 @@ void rot_init(rotary* rot)
 inline
 rot_step_status rot_process_step(rotary* rot, uint8_t input)
 {
-  rot->state = ttable[rot->state][input];
-  return rot->state & 0xF0; 
+  uint8_t r = ttable[rot->state][input & 0x03];
+  rot->state = r & 0x0F;
+  return r & 0xF0; 
 }
