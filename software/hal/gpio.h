@@ -48,7 +48,7 @@
 #define GET_PIN(pb)     GET_PORT_BIT(PIN(pb),B(pb))
 #define SET_PIN(pb)     SET_PORT_BIT(PORT(pb),B(pb))
 #define CLR_PIN(pb)     CLR_PORT_BIT(PORT(pb),B(pb)) 
-#define TGL_PIN(pb)     TGL_PORT_BIT(PORT(pb),B(pb)) 
+#define TGL_PIN(pb)     TGL_PORT_BIT(PIN(pb),B(pb)) 
 
 #define GET_PIN_DIR(pb)        GET_PORT_BIT(DDR(pb),B(pb))
 #define SET_PIN_DIR_OUTPUT(pb) SET_PORT_BIT(DDR(pb),B(pb))
@@ -79,7 +79,7 @@
 #define GET_PORT_BIT(p,b)       (((p) & _BV(b)) != 0) 
 #define SET_PORT_BIT(p,b)       ((p) |= _BV(b)) 
 #define CLR_PORT_BIT(p,b)       ((p) &= ~_BV(b)) 
-#define TGL_PORT_BIT(p,b)       ((p) ^= _BV(b))
+#define TGL_PORT_BIT(p,b)       ((p) |= _BV(b))
 
 // Lookups in devices.h
 #define PCINT(p,b)              PCINT_ ## p ## b

@@ -66,7 +66,7 @@ static bool test_send_single_byte_cb_executed = false;
 static size_t test_send_single_byte_cb(spim_cb_status status, void *trx_cb_data)
 {
   ck_assert(status == SPIM_TX_DONE);
-  ck_assert((unsigned int)trx_cb_data == 1);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 1);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   ck_assert(spi_mock_get_last_transmitted_data(0) == test_send_single_byte_tx_buf);
@@ -99,7 +99,7 @@ static bool test_receive_single_byte_cb_executed = false;
 static size_t test_receive_single_byte_cb(spim_cb_status status, void *trx_cb_data)
 {
   ck_assert(status == SPIM_RX_DONE);
-  ck_assert((unsigned int)trx_cb_data == 2);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 2);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   ck_assert(test_receive_single_byte_rx_buf == 22);
@@ -133,7 +133,7 @@ static bool test_send_bytes_cb_executed = false;
 static size_t test_send_bytes_cb(spim_cb_status status, void *trx_cb_data)
 {
   ck_assert(status == SPIM_TX_DONE);
-  ck_assert((unsigned int)trx_cb_data == 3);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 3);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   unsigned int i;
@@ -173,7 +173,7 @@ static bool test_receive_bytes_cb_executed = false;
 static size_t test_receive_bytes_cb(spim_cb_status status, void *trx_cb_data)
 {
   ck_assert(status == SPIM_RX_DONE);
-  ck_assert((unsigned int)trx_cb_data == 4);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 4);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   unsigned int i;
@@ -234,7 +234,7 @@ static size_t test_send_receive_cb(spim_cb_status status, void *trx_cb_data)
      ck_abort_msg("Unexpected value for test_send_receive_cb_executed");
      break;
   }
-  ck_assert((unsigned int)trx_cb_data == 5);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 5);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   test_send_receive_cb_executed += 1;
@@ -277,7 +277,7 @@ static int test_receive_bytes_cont_cb_executed = 0;
 static size_t test_receive_bytes_cont_cb(spim_cb_status status, void *trx_cb_data)
 {
   ck_assert(status == SPIM_RX_DONE);
-  ck_assert((unsigned int)trx_cb_data == 6);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 6);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
 
@@ -335,7 +335,7 @@ static bool test_trx_multiple_cb1_tx_executed = false;
 
 static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
 {
-  ck_assert((unsigned int)trx_cb_data == 6);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 6);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   unsigned int i;
@@ -354,7 +354,7 @@ static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
 }
 static size_t test_trx_multiple_cb1(spim_cb_status status, void *trx_cb_data)
 {
-  ck_assert((unsigned int)trx_cb_data == 7);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 7);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   unsigned int i;
@@ -438,7 +438,7 @@ static size_t test_trx_delay_cb(spim_cb_status status, void *trx_cb_data)
      ck_abort_msg("Unexpected status in test_trx_delay_cb");
      break;
   }
-  ck_assert((unsigned int)trx_cb_data == 8);
+  ck_assert_uint_eq((uintptr_t)trx_cb_data, 8);
   ck_assert(! (dummy_port & dummy_pin_mask));
   ck_assert(dummy_port == 0);
   test_trx_delay_cb_executed += 1;

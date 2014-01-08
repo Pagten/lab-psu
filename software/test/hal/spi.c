@@ -39,6 +39,11 @@ uint8_t spi_mock_get_last_transmitted_data(unsigned int index)
   return ring_buffer_get_latest(&transmitted_data_buffer, index);
 }
 
+void spi_mock_set_pin_dirs_master()
+{
+ // Not yet implemented
+}
+
 void spi_mock_set_role(spi_role role)
 {
   // Not yet implemented

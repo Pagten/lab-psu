@@ -30,6 +30,7 @@
 #ifndef BIT_H
 #define BIT_H
 
+#define _BV(bit)   (1 << (bit))
 
 inline static 
 uint8_t bv8(uint8_t v) {

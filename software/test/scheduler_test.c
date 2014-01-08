@@ -55,7 +55,7 @@ static bool task_schedule_one_immediately_executed = false;
 static void task_schedule_one_immediately(void* data)
 {
   task_schedule_one_immediately_executed = true;
-  ck_assert_uint_eq((unsigned int)data, 42);
+  ck_assert_uint_eq((uintptr_t)data, 42);
 }
 
 
@@ -63,7 +63,7 @@ START_TEST(test_schedule_one_immediately)
 {
   sched_schedule_status task_scheduled;
   sched_exec_status task_executed;
-  unsigned int data = 42;
+  uintptr_t data = 42;
   task_scheduled = sched_schedule(0, task_schedule_one_immediately, (void*)data);
   ck_assert(task_scheduled == SCHED_OK);
   ck_assert(task_schedule_one_immediately_executed == false);
@@ -86,7 +86,7 @@ static int task_schedule_multiple_immediately_executed = 0;
 static void task_schedule_multiple_immediately(void* data)
 {
   task_schedule_multiple_immediately_executed += 1;
-  ck_assert_int_eq((int)data, task_schedule_multiple_immediately_executed);
+  ck_assert_int_eq((uintptr_t)data, task_schedule_multiple_immediately_executed);
 }
 
 
@@ -135,7 +135,7 @@ static bool task_schedule_one_delayed_executed = false;
 static void task_schedule_one_delayed(void* data)
 {
   task_schedule_one_delayed_executed = true;
-  ck_assert_uint_eq((unsigned int)data, 88);
+  ck_assert_uint_eq((uintptr_t)data, 88);
 }
 
 
@@ -143,7 +143,7 @@ START_TEST(test_schedule_one_delayed)
 {
   sched_schedule_status task_scheduled;
   sched_exec_status task_executed;
-  unsigned int data = 88;
+  uintptr_t data = 88;
   task_scheduled = sched_schedule(3, task_schedule_one_delayed, (void*)data);
   ck_assert(task_scheduled == SCHED_OK);
   ck_assert(task_schedule_one_delayed_executed == false);
@@ -187,7 +187,7 @@ static int task_schedule_multiple_delayed_executed = 0;
 static void task_schedule_multiple_delayed(void* data)
 {
   task_schedule_multiple_delayed_executed += 1;
-  ck_assert_int_eq((int)data, task_schedule_multiple_delayed_executed);
+  ck_assert_int_eq((uintptr_t)data, task_schedule_multiple_delayed_executed);
 }
 
 
@@ -253,7 +253,7 @@ static bool task_schedule_max_tasks_delayed_executed = false;
 static void task_schedule_max_tasks_delayed(void* data)
 {
   task_schedule_max_tasks_delayed_executed = true;
-  ck_assert_uint_eq((unsigned int)data, NULL);
+  ck_assert_ptr_eq(data, NULL);
 }
 
 START_TEST(test_schedule_max_tasks_delayed)
@@ -276,10 +276,10 @@ END_TEST
 // ****************************************************************************
 //                       test_schedule_recursive
 // ****************************************************************************
-static int task_schedule_recursive_executed = 0;
+static uintptr_t task_schedule_recursive_executed = 0;
 static void task_schedule_recursive(void* data)
 {
-  ck_assert_int_eq((int)data, task_schedule_recursive_executed);
+  ck_assert_int_eq((uintptr_t)data, task_schedule_recursive_executed);
   task_schedule_recursive_executed += 1;
   if (task_schedule_recursive_executed < 3) {
     sched_schedule_status task_scheduled = sched_schedule(0, task_schedule_recursive, (void*)task_schedule_recursive_executed);
@@ -320,7 +320,7 @@ static bool task_schedule_one_long_delay_executed = false;
 static void task_schedule_one_long_delay(void* data)
 {
   task_schedule_one_long_delay_executed = true;
-  ck_assert_uint_eq((unsigned int)data, NULL);
+  ck_assert_ptr_eq(data, NULL);
 }
 
 START_TEST(test_schedule_one_long_delay)
