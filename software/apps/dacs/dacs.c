@@ -62,6 +62,7 @@ FUSES =
 #define DAC_CS_PORT &PORTB
 #define DAC_CS_PIN  0 
 
+#define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
 #define DAC_STEP 32
 
@@ -75,7 +76,7 @@ void init_pins(void)
   SET_PIN_DIR_OUTPUT(DEBUG2);
   CLR_PIN(DEBUG0);
   CLR_PIN(DEBUG1);
-  CLR_PIN(DEBUG1);
+  CLR_PIN(DEBUG2);
 
   SET_PIN_DIR_INPUT(ROT0A);
   SET_PIN_DIR_INPUT(ROT0B);
@@ -84,13 +85,12 @@ void init_pins(void)
   SET_PIN(DAC_CS);
 }
 
-
-INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
-{
-  static uint16_t dac_value = 0;
-
-  uint8_t input = ((GET_PIN(ROT0A) << 1) | GET_PIN(ROT0B));
-  switch (rot_process_step(&rot0, input)) {
+static
+void rotary_stepped(void* direction) {
+  static uint16_t dac_value = DAC_MIN;
+  rot_step_status step = (rot_step_status)direction;
+  
+  switch (step) {
   case ROT_STEP_CW:
     TGL_PIN(DEBUG0);
     if (dac_value <= DAC_MAX - DAC_STEP) {
@@ -101,16 +101,26 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
     break;
   case ROT_STEP_CCW:
     TGL_PIN(DEBUG1);
-    if (dac_value >= DAC_STEP) {
+    if (dac_value >= DAC_MIN + DAC_STEP) {
       dac_value -= DAC_STEP;
     } else {
-      dac_value = 0;
+      dac_value = DAC_MIN;
     }
     break;
   default:
     return;
-    }
+  }
   mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, false, dac_value, NULL, NULL);
+}
+
+
+INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
+{
+  uint8_t input = ((GET_PIN(ROT0A) << 1) | GET_PIN(ROT0B));
+  rot_step_status step = rot_process_step(&rot0, input);
+  if (step == ROT_STEP_CW || step == ROT_STEP_CCW) {
+    sched_schedule(0, rotary_stepped, (void*)step);
+  }
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
 INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
@@ -128,8 +138,6 @@ int main(void)
   PC_INTERRUPT_ENABLE(ROT0B);
   ENABLE_INTERRUPTS();
 
-  //  SET_PIN(DEBUG0);
-  // SET_PIN(DEBUG1);
   while (1) {
     sched_exec();
   }
