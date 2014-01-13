@@ -33,77 +33,94 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "core/scheduler.h"
+#include "core/timer.h"
 
-typedef enum
-{
-  SPIM_OK,
-  SPIM_QUEUE_FULL,
+typedef enum {
+  SPIM_TRX_INIT_OK,
+  SPIM_TRX_INIT_INVALID,
+} spim_trx_init_status;
+
+typedef enum {
+  SPIM_TRX_QUEUE_OK,
+  SPIM_TRX_QUEUE_INVALID_STATUS,
+} spim_trx_queue_status;
+
+typedef enum {
+  SPIM_TRX_STATUS_INVALID,
+  SPIM_TRX_STATUS_INITIAL,
+  SPIM_TRX_STATUS_QUEUED,
+  SPIM_TRX_STATUS_IN_TRANSMISSION,
+  SPIM_TRX_STATUS_COMPLETED,
 } spim_trx_status;
 
-typedef enum
-{
-  SPIM_RX_DONE,
-  SPIM_TX_DONE,
-  SPIM_ERR_SCHED_FAILED,
-} spim_cb_status;
+/**
+ * The SPI transfer data structure.
+ */
+typedef struct _spi_trx {
+  spim_trx_status status;
+  uint8_t ss_mask;
+  volatile uint8_t *ss_port;
+  uint8_t *tx_buf;
+  size_t tx_remaining;
+  uint8_t *rx_buf;
+  size_t rx_remaining;
+  ticks_t delay;
+  struct _spi_trx *next;
+} spi_trx;
 
-
-extern uint8_t spim_receive_buf;
 
 /**
  * Initializes the SPI master module.
- *
- * Dependencies that need to be initialized first:
- *  * scheduler
- *
  */
-void spim_init();
-
-/**
- * The type of the callback the SPI module calls when a data
- * packet was received in response to a transmitted data packet.
- */
-typedef size_t (*spim_trx_callback)(spim_cb_status status, void *rx_cb_data);
+void spim_init(void);
 
 
 /**
- * Asynchronously transmit a data buffer and return the received response
- * through a callback. The transceive request will be queued and will be
- * handled as soon as the SPI hardware becomes available. The specified slave
- * select pin(s) will be pulled low during the data transfer and pulled high
- * afterwards. The caller must keep the given transmit/receive buffer intact
- * until all bytes are sent/received.
- *
- * The rx_cb_callback will be called with SPIM_TX_DONE as its first argument
- * when all tx_size bytes have been transmitted from tx_buf. The return value
- * of the callback is ignored in this case. The rx_cb_callback will be called
- * with SPIM_RX_DONE as its first argument when all rx_size bytes have been
- * received and written into rx_buf. The return value of the callback is the
- * number of bytes to receive next. The transfer ends when this value is 0 and
- * all bytes have been transmitted. In each case, the second argument is the
- * opaque rx_cb_data pointer. 
- *
- * A minimum time of trx_delay scheduler timer ticks is waited before
- * sending/receiving each byte and before starting a new transfer, to give the
- * slave device time to prepare the next byte to be sent.
+ * Initialize an SPI transfer data structure.
  * 
- * @param tx_buf       The data to be sent
- * @param tx_size      The number of bytes to be sent
- * @param trx_delay    Scheduler timer ticks to wait between each byte
- * @param ss_port      The slave select port
- * @param ss_mask      The slave select pin mask
- * @param rx_buf       The buffer to place the received bytes into
- * @param rx_size      The number of bytes to receive before calling cb_rx
- * @param trx_cb       Callback for handling a received data packet
- * @param trx_cb_data  Opaque pointer to be passed on to the rx_cb callback
- * @return SPIM_OK when the request was queued succesfully or SPIM_QUEUE_FULL
- *         if the transceive request queue is full.
+ * @param trx      The transfer data structure to initialize
+ * @param ss_pin   The number of the pin connected to the SPI slave to address
+ * @param ss_port  The port of the pin connected to the SPI slave to address
+ * @param tx_buf   The data to be transmitted (can be NULL if tx_size is NULL)
+ * @param tx_size  The number of bytes to be transmitted
+ * @param rx_buf   The buffer into which to store the received data (can be 
+ *                 NULL if rx_size is 0)
+ * @param rx_size  The number of bytes to be received
+ * @param delay    The minimum time to wait before transmitting each byte, to
+ *                 give the SPI slave time to prepare its response
+ * @return SPIM_TRX_INIT_OK if the transfer data structure was initialized
+ *         succesfully or SPIM_TRX_INIT_EMPTY if both tx_size and rx_size are
+ *         0.
  */
-spim_trx_status spim_trx(uint8_t *tx_buf, size_t tx_size, ticks_t trx_delay,
-                         volatile uint8_t *ss_port, uint8_t ss_mask,
-                         uint8_t *rx_buf, size_t rx_size,
-                         spim_trx_callback trx_cb, void *trx_cb_data);
+spim_trx_init_status
+spim_trx_init(spi_trx *trx, uint8_t ss_pin, volatile uint8_t *ss_port,
+	      uint8_t *tx_buf, size_t tx_size, uint8_t *rx_buf, size_t rx_size,
+	      ticks_t delay);
+
+
+/**
+ * Get the status of an SPI transfer.
+ * 
+ * @param trx  The transfer data structure of which to get the status
+ * @return The status of the given SPI transfer data structure.
+ */
+spim_trx_status spim_trx_get_status(spim_trx *trx);
+
+
+/**
+ * Queue an SPI transfer for execution.
+ *
+ * The transfer will be executed as soon as all previously queued transfers
+ * have finished. The transfer must first be initialized with the 
+ * spim_trx_init() function.
+ *
+ * @param trx  The SPI transfer to queue
+ * @return SPIM_TRX_QUEUE_OK if the transfer was queued succesfully,
+ *         SPIM_TRX_QUEUE_STATUS_INVALID if the status of the transfer is not
+ *         SPIM_TRX_STATUS_INITIALIZED (hence the transfer is invalid or was
+ *         already queued before).
+ */
+spim_trx_queue_status spim_trx_queue(spi_transfer *trx);
 
 
 #endif
