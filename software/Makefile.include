@@ -30,7 +30,7 @@ OBJECTDIR = build
 
 SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core drivers hal utils}
 #SOURCEFILES += mcp4922.c rotary.c scheduler.c spi_master.c
-SOURCEFILES += clock.c
+SOURCEFILES += clock.c timer.c
 OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
 vpath %.c $(SOURCEDIRS)

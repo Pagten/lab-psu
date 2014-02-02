@@ -20,10 +20,10 @@
  */
 
 
-/**
- * @file scheduler_test.c
+ /**
+ * @file clock_test.c
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 21 jul 2013
+ * @date 23 jan 2014
  *
  * Unit test for the clock.
  */

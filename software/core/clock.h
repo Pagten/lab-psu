@@ -37,6 +37,7 @@ typedef uint16_t clock_time_t;
 #define CLOCK_MSEC   (CLOCK_SEC/1000.0)                   /** 1 millisecond */
 #define CLOCK_USEC   (CLOCK_SEC/1000000.0)                /** 1 microsecond */
 
+#define CLOCK_TIME_MAX UINT16_MAX
 
 /**
  * Initialize the clock.

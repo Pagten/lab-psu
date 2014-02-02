@@ -6,12 +6,14 @@
 //#include "spi_master_test.h"
 //#include "rotary_test.h"
 #include "clock_test.h"
+#include "timer_test.h"
 
 int main(void)
 {
   int number_failed;
 
   SRunner *sr = srunner_create(clock_suite());
+  srunner_add_suite(sr, timer_suite());
   //  srunner_add_suite (sr, spi_master_suite());
   // srunner_add_suite (sr, rotary_suite());
 
