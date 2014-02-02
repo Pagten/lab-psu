@@ -1,9 +1,9 @@
 PROJECT_NAME = tests
 
 # Source files
-HAL_SOURCEFILES = timer2.c spi.c
+HAL_SOURCEFILES = mock_timer.c mock_timers.c #timer2.c spi.c
 UTIL_SOURCEFILES = ring_buffer.c
-TEST_SOURCEFILES = rotary_test.c scheduler_test.c spi_master_test.c 
+TEST_SOURCEFILES = clock_test.c #rotary_test.c scheduler_test.c spi_master_test.c 
 SOURCEDIRS = hal util
 SOURCEFILES = $(HAL_SOURCEFILES) $(UTIL_SOURCEFILES) $(TEST_SOURCEFILES)
 
@@ -11,9 +11,10 @@ SOURCEFILES = $(HAL_SOURCEFILES) $(UTIL_SOURCEFILES) $(TEST_SOURCEFILES)
 CUSTOM_TARGET = 1
 CC = gcc
 LD = gcc
-CFLAGS = `pkg-config --cflags check`
+CFLAGS = -g `pkg-config --cflags check`
 LIBS   = `pkg-config --libs check` -lpthread
 
+NO_LTO = 1
 
 all: $(PROJECT_NAME)
 
