@@ -33,7 +33,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "core/timer.h"
+#include "core/clock.h"
+#include "core/process.h"
+
 
 typedef enum {
   SPIM_TRX_INIT_OK,
@@ -56,21 +58,27 @@ typedef enum {
 /**
  * The SPI transfer data structure.
  */
-typedef struct _spi_trx {
+typedef struct _spim_trx {
   spim_trx_status status;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;
-  uint8_t *tx_buf;
+  uint8_t* tx_buf;
   size_t tx_remaining;
-  uint8_t *rx_buf;
+  uint8_t* rx_buf;
   size_t rx_remaining;
-  ticks_t delay;
-  struct _spi_trx *next;
-} spi_trx;
+  clock_time_t delay;
+  struct _spim_trx* next;
+} spim_trx;
 
+
+PROCESS_NAME(spim_trx_process);
 
 /**
  * Initializes the SPI master module.
+ *
+ * Dependencies that must be initialized first:
+ *  * process
+ *  * clock
  */
 void spim_init(void);
 
@@ -78,6 +86,9 @@ void spim_init(void);
 /**
  * Initialize an SPI transfer data structure.
  * 
+ * The transfer's status will be set to INITIAL on success or INVALID on
+ * failure.
+ *
  * @param trx      The transfer data structure to initialize
  * @param ss_pin   The number of the pin connected to the SPI slave to address
  * @param ss_port  The port of the pin connected to the SPI slave to address
@@ -89,13 +100,13 @@ void spim_init(void);
  * @param delay    The minimum time to wait before transmitting each byte, to
  *                 give the SPI slave time to prepare its response
  * @return SPIM_TRX_INIT_OK if the transfer data structure was initialized
- *         succesfully or SPIM_TRX_INIT_EMPTY if both tx_size and rx_size are
- *         0.
+ *         succesfully or SPIM_TRX_INIT_INVALID if both tx_size and rx_size are
+ *         0. 
  */
 spim_trx_init_status
-spim_trx_init(spi_trx *trx, uint8_t ss_pin, volatile uint8_t *ss_port,
-	      uint8_t *tx_buf, size_t tx_size, uint8_t *rx_buf, size_t rx_size,
-	      ticks_t delay);
+spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+	      uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
+	      clock_time_t delay);
 
 
 /**
@@ -104,7 +115,7 @@ spim_trx_init(spi_trx *trx, uint8_t ss_pin, volatile uint8_t *ss_port,
  * @param trx  The transfer data structure of which to get the status
  * @return The status of the given SPI transfer data structure.
  */
-spim_trx_status spim_trx_get_status(spim_trx *trx);
+spim_trx_status spim_trx_get_status(spim_trx* trx);
 
 
 /**
@@ -120,7 +131,7 @@ spim_trx_status spim_trx_get_status(spim_trx *trx);
  *         SPIM_TRX_STATUS_INITIALIZED (hence the transfer is invalid or was
  *         already queued before).
  */
-spim_trx_queue_status spim_trx_queue(spi_transfer *trx);
+spim_trx_queue_status spim_trx_queue(spim_trx* trx);
 
 
 #endif

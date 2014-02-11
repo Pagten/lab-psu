@@ -32,7 +32,7 @@
 
 #define _BV(bit)   (1 << (bit))
 
-inline static 
+static inline
 uint8_t bv8(uint8_t v) {
   return 1 << v; //TODO: check whether this gets optimized
 }

@@ -15,6 +15,7 @@ struct {
 static uint8_t* incoming_data;
 static size_t incoming_data_remaining;
 static struct ring_buffer transmitted_data_buffer;
+static unsigned int nb_bytes_transmitted;
 
 void spi_mock_init(size_t transmitted_data_buffer_size)
 {
@@ -26,6 +27,7 @@ void spi_mock_init(size_t transmitted_data_buffer_size)
   ring_buffer_init(&transmitted_data_buffer, transmitted_data_buffer_size);
   incoming_data = 0;
   incoming_data_remaining = 0;
+  nb_bytes_transmitted = 0;
 }
 
 void spi_mock_set_incoming_data(uint8_t* data, size_t size)
@@ -37,6 +39,11 @@ void spi_mock_set_incoming_data(uint8_t* data, size_t size)
 uint8_t spi_mock_get_last_transmitted_data(unsigned int index)
 {
   return ring_buffer_get_latest(&transmitted_data_buffer, index);
+}
+
+unsigned int spi_mock_get_nb_bytes_transmitted(void)
+{
+  return nb_bytes_transmitted;
 }
 
 void spi_mock_set_pin_dirs_master()
@@ -69,7 +76,8 @@ void spi_mock_write_data_reg(uint8_t val)
 {
   if (spi_mock.enabled) {
     ring_buffer_put(&transmitted_data_buffer, val);
-    
+    nb_bytes_transmitted += 1;
+  
     if (incoming_data_remaining > 0) {
       spi_mock.data_reg = *incoming_data;
       incoming_data += 1;

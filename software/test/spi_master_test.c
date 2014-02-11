@@ -31,94 +31,139 @@
 #include <stdint.h>
 #include <check.h>
 
-#include "config.h"
-#include "hal/spi.h"
-#include "hal/timer2.h"
+#include <stdio.h> // for testing, temporary
+
+#include "core/process.h"
 #include "core/spi_master.h"
+#include "hal/mock_timer.h"
+#include "hal/spi.h"
+#include "util/math.h"
 
 #include "spi_master_test.h"
 
 #define SPI_MOCK_TX_DATA_BUFFER_SIZE 32
+#define SPI_DUMMY_PIN 2
+#define DUMMY_DATA_SIZE 16
+#define DUMMY_DELAY 5
+#define PROC_CALL_MARGIN 4
+#define NO_DELAY 0
 
 static uint8_t dummy_port;
-static uint8_t dummy_pin_mask;
+static uint8_t dummy_data[DUMMY_DATA_SIZE] = { 
+  0x42, 0x84, 0x21, 0x11, 0x44, 0x88, 0xBB, 0xFF,
+  0x12, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89, 0x9A
+};
 
 static void setup(void)
 {
   spi_mock_init(SPI_MOCK_TX_DATA_BUFFER_SIZE);
-  sched_init();
+  spi_mock_set_incoming_data(dummy_data, 16);
+  clock_init();
+  process_init();
   spim_init();
-  dummy_pin_mask = 1;
-  dummy_port = dummy_pin_mask;
+  dummy_port = 0xFF;
 }
 
 static void teardown(void)
-{
-
-}
+{ }
 
 // ****************************************************************************
-//                       test_send_single_byte
+//                       test_trx_init_invalid
 // ****************************************************************************
-static uint8_t test_send_single_byte_tx_buf;
-static bool test_send_single_byte_cb_executed = false;
-
-static size_t test_send_single_byte_cb(spim_cb_status status, void *trx_cb_data)
+START_TEST(test_trx_init_invalid)
 {
-  ck_assert(status == SPIM_TX_DONE);
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 1);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  ck_assert(spi_mock_get_last_transmitted_data(0) == test_send_single_byte_tx_buf);
-  test_send_single_byte_cb_executed = true;
-  return 0;
-}
-
-START_TEST(test_send_single_byte)
-{
-  sched_exec_status task_executed;
-  test_send_single_byte_tx_buf = 11;
-  spim_trx(&test_send_single_byte_tx_buf, 1, 0,
-           &dummy_port, dummy_pin_mask, NULL, 0,
-           test_send_single_byte_cb, (void*)1U);
-  
-  do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(test_send_single_byte_cb_executed);
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    NULL, 0,   // transmit
+			    NULL, 0,   // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_INVALID);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INVALID);
 }
 END_TEST
 
 // ****************************************************************************
+//                       test_trx_queue_invalid_status
+// ****************************************************************************
+START_TEST(test_trx_queue_invalid_status)
+{
+  spim_trx trx;
+
+  trx.status = SPIM_TRX_STATUS_INVALID;
+  ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_INVALID_STATUS);
+
+  trx.status = SPIM_TRX_STATUS_QUEUED;
+  ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_INVALID_STATUS);
+
+  trx.status = SPIM_TRX_STATUS_IN_TRANSMISSION;
+  ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_INVALID_STATUS);
+
+  trx.status = SPIM_TRX_STATUS_COMPLETED;
+  ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_INVALID_STATUS);
+}
+END_TEST
+
+
+// ****************************************************************************
+//                       test_send_single_byte
+// ****************************************************************************
+START_TEST(test_send_single_byte)
+{
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, 1, // transmit
+			    NULL, 0,       // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
+
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
+
+  int i = 0;
+  do {
+    if (i > PROC_CALL_MARGIN) ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  ck_assert(spi_mock_get_last_transmitted_data(0) == dummy_data[0]);
+}
+END_TEST
+
+
+// ****************************************************************************
 //                       test_receive_single_byte
 // ****************************************************************************
-static uint8_t test_receive_single_byte_input;
-static uint8_t test_receive_single_byte_rx_buf;
-static bool test_receive_single_byte_cb_executed = false;
-
-static size_t test_receive_single_byte_cb(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert(status == SPIM_RX_DONE);
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 2);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  ck_assert(test_receive_single_byte_rx_buf == 22);
-  test_receive_single_byte_cb_executed = true;
-  return 0;
-}
-
 START_TEST(test_receive_single_byte)
 {
-  sched_exec_status task_executed;
-  test_receive_single_byte_input = 22;
-  spi_mock_set_incoming_data(&test_receive_single_byte_input, 1);
-  spim_trx(NULL, 0, 0,
-           &dummy_port, dummy_pin_mask, &test_receive_single_byte_rx_buf, 1,
-           test_receive_single_byte_cb, (void*)2U);
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  uint8_t rx_buf;
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    NULL, 0,    // transmit
+			    &rx_buf, 1, // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
+
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
+
+  int i = 0;
   do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(test_receive_single_byte_cb_executed);
+    if (i > PROC_CALL_MARGIN) ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  ck_assert(rx_buf == dummy_data[0]);
 }
 END_TEST
 
@@ -126,38 +171,33 @@ END_TEST
 // ****************************************************************************
 //                       test_send_bytes
 // ****************************************************************************
-#define TEST_SEND_BYTES_LEN 16
-static uint8_t test_send_bytes_tx_buf[TEST_SEND_BYTES_LEN];
-static bool test_send_bytes_cb_executed = false;
-
-static size_t test_send_bytes_cb(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert(status == SPIM_TX_DONE);
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 3);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  unsigned int i;
-  for (i = 0; i < TEST_SEND_BYTES_LEN; ++i) {
-    ck_assert(spi_mock_get_last_transmitted_data(i) == test_send_bytes_tx_buf[TEST_SEND_BYTES_LEN-i-1]);
-  }
-  test_send_bytes_cb_executed = true;
-  return 0;
-}
-
 START_TEST(test_send_bytes)
-{ 
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_SEND_BYTES_LEN; ++i) {
-    test_send_bytes_tx_buf[i] = (uint8_t)i;
-  }
-  spim_trx(test_send_bytes_tx_buf, TEST_SEND_BYTES_LEN, 0,
-           &dummy_port, dummy_pin_mask, NULL, 0,
-           test_send_bytes_cb, (void*)3U);
+{
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, DUMMY_DATA_SIZE, // transmit
+			    NULL, 0,                     // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
+
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
+
+  int i = 0;
   do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(test_send_bytes_cb_executed);
+    if (i > DUMMY_DATA_SIZE + PROC_CALL_MARGIN)
+      ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(spi_mock_get_last_transmitted_data(DUMMY_DATA_SIZE-1 - j) == dummy_data[j]);
+  }
 }
 END_TEST
 
@@ -165,320 +205,188 @@ END_TEST
 // ****************************************************************************
 //                       test_receive_bytes
 // ****************************************************************************
-#define TEST_RECEIVE_BYTES_LEN 16
-static uint8_t test_receive_bytes_rx_buf[TEST_RECEIVE_BYTES_LEN];
-static uint8_t test_receive_bytes_mock[TEST_RECEIVE_BYTES_LEN];
-static bool test_receive_bytes_cb_executed = false;
-
-static size_t test_receive_bytes_cb(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert(status == SPIM_RX_DONE);
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 4);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  unsigned int i;
-  for (i = 0; i < TEST_RECEIVE_BYTES_LEN; ++i) {
-    ck_assert(test_receive_bytes_mock[i] == test_receive_bytes_rx_buf[i]);
-  }
-  test_receive_bytes_cb_executed = true;
-  return 0;
-}
-
 START_TEST(test_receive_bytes)
 {
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_RECEIVE_BYTES_LEN; ++i) {
-    test_receive_bytes_mock[i] = (uint8_t)i;
-  }
-  spi_mock_set_incoming_data(test_receive_bytes_mock, TEST_RECEIVE_BYTES_LEN);
-  spim_trx(NULL, 0, 0,
-           &dummy_port, dummy_pin_mask,
-	   test_receive_bytes_rx_buf, TEST_RECEIVE_BYTES_LEN,
-           test_receive_bytes_cb, (void*)4U);
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  uint8_t rx_buf[DUMMY_DATA_SIZE];
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    NULL, 0,                 // transmit
+			    rx_buf, DUMMY_DATA_SIZE, // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
+
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
+
+  int i = 0;
   do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
- 
-  ck_assert(test_receive_bytes_cb_executed);
+    if (i > DUMMY_DATA_SIZE + PROC_CALL_MARGIN)
+      ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(rx_buf[j] == dummy_data[j]);
+  }
 }
 END_TEST
+
+
 
 // ****************************************************************************
 //                       test_send_receive
 // ****************************************************************************
-#define TEST_SEND_RECEIVE_TX_LEN 20
-#define TEST_SEND_RECEIVE_RX_LEN 10
-static uint8_t test_send_receive_tx_buf[TEST_SEND_RECEIVE_TX_LEN];
-static uint8_t test_send_receive_rx_buf[TEST_SEND_RECEIVE_RX_LEN];
-static uint8_t test_send_receive_mock[TEST_SEND_RECEIVE_RX_LEN];
-static int test_send_receive_cb_executed = 0;
-
-static size_t test_send_receive_cb(spim_cb_status status, void *trx_cb_data)
-{
-   unsigned int i;
-   switch(test_send_receive_cb_executed) {
-   case 0:
-     ck_assert(status == SPIM_RX_DONE);
-     for (i = 0; i < TEST_SEND_RECEIVE_RX_LEN; ++i) {
-       ck_assert(test_send_receive_mock[i] == test_send_receive_rx_buf[i]);
-     }
-     break;
-   case 1:
-     ck_assert(status == SPIM_TX_DONE);
-     for (i = 0; i < TEST_SEND_RECEIVE_RX_LEN; ++i) {
-      ck_assert(spi_mock_get_last_transmitted_data(i) == test_send_receive_tx_buf[TEST_SEND_RECEIVE_TX_LEN-i-1]);
-     }
-     break;
-   default:
-     ck_abort_msg("Unexpected value for test_send_receive_cb_executed");
-     break;
-  }
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 5);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  test_send_receive_cb_executed += 1;
-  return 0;
-}
-
 START_TEST(test_send_receive)
 {
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_SEND_RECEIVE_TX_LEN; ++i) {
-    test_send_receive_tx_buf[i] = (uint8_t)i;
-  }
-  for (i = 0; i < TEST_SEND_RECEIVE_RX_LEN; ++i) {
-    test_send_receive_mock[i] = (uint8_t)i;
-  }
-  spi_mock_set_incoming_data(test_send_receive_mock, TEST_SEND_RECEIVE_RX_LEN);
-  spim_trx(test_send_receive_tx_buf, TEST_SEND_RECEIVE_TX_LEN, 0,
-           &dummy_port, dummy_pin_mask,
-	   test_send_receive_rx_buf, TEST_SEND_RECEIVE_RX_LEN,
-           test_send_receive_cb, (void*)5U);
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  uint8_t rx_buf[DUMMY_DATA_SIZE];
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, DUMMY_DATA_SIZE/2, // transmit
+			    rx_buf, DUMMY_DATA_SIZE,       // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
+
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
+
+  int i = 0;
   do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
- 
-  ck_assert(test_send_receive_cb_executed == 2);
+    if (i > DUMMY_DATA_SIZE + PROC_CALL_MARGIN)
+      ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(rx_buf[j] == dummy_data[j]);
+    ck_assert(spi_mock_get_last_transmitted_data(DUMMY_DATA_SIZE - j) == (j < DUMMY_DATA_SIZE/2 ? dummy_data[j] : 0));
+  }
+  ck_assert(spi_mock_get_last_transmitted_data(0) == 0);
 }
 END_TEST
 
 
-// ****************************************************************************
-//                       test_receive_bytes_cont
-// ****************************************************************************
-#define TEST_RECEIVE_BYTES_CONT_LEN 16
-#define TEST_RECEIVE_BYTES_CONT_COUNT 4
-static uint8_t test_receive_bytes_cont_rx_buf[TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT];
-static uint8_t test_receive_bytes_cont_mock[TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT];
-static int test_receive_bytes_cont_cb_executed = 0;
-
-static size_t test_receive_bytes_cont_cb(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert(status == SPIM_RX_DONE);
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 6);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-
-  test_receive_bytes_cont_cb_executed += 1;
-  if (test_receive_bytes_cont_cb_executed <= 0 ||
-      test_receive_bytes_cont_cb_executed > TEST_RECEIVE_BYTES_CONT_COUNT) {
-    ck_abort_msg("Unexpected value for test_receive_bytes_cont_cb_executed");
-  }
-
-  unsigned int i;
-  for (i = 0; i < TEST_RECEIVE_BYTES_CONT_LEN * test_receive_bytes_cont_cb_executed; ++i) {
-    ck_assert(test_receive_bytes_cont_mock[i] == test_receive_bytes_cont_rx_buf[i]);
-  }
-  if (test_receive_bytes_cont_cb_executed < TEST_RECEIVE_BYTES_CONT_COUNT) {
-    return TEST_RECEIVE_BYTES_CONT_LEN;
-  } else {
-    return 0;
-  }
-}
-
-START_TEST(test_receive_bytes_cont)
-{
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT; ++i) {
-    test_receive_bytes_cont_mock[i] = (uint8_t)i;
-  }
-  spi_mock_set_incoming_data(test_receive_bytes_cont_mock, TEST_RECEIVE_BYTES_CONT_LEN * TEST_RECEIVE_BYTES_CONT_COUNT);
-  spim_trx(NULL, 0, 0,
-           &dummy_port, dummy_pin_mask,
-	   test_receive_bytes_cont_rx_buf, TEST_RECEIVE_BYTES_CONT_LEN,
-           test_receive_bytes_cont_cb, (void*)6U);
-  do {
-    task_executed = sched_exec();
-  } while(task_executed == SCHED_TASK_EXECUTED);
- 
-  ck_assert(test_receive_bytes_cont_cb_executed == 4);
-}
-END_TEST
 
 // ****************************************************************************
 //                       test_trx_multiple
 // ****************************************************************************
-#define TEST_TRX_MULTIPLE_TX_LEN0 1
-#define TEST_TRX_MULTIPLE_TX_LEN1 2
-#define TEST_TRX_MULTIPLE_RX_LEN0 3
-#define TEST_TRX_MULTIPLE_RX_LEN1 4
-static uint8_t test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1];
-static uint8_t test_trx_multiple_rx_buf[TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1];
-static uint8_t test_trx_multiple_mock[TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1];
-static bool test_trx_multiple_cb0_rx_executed = false;
-static bool test_trx_multiple_cb0_tx_executed = false;
-static bool test_trx_multiple_cb1_rx_executed = false;
-static bool test_trx_multiple_cb1_tx_executed = false;
-
-static size_t test_trx_multiple_cb0(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 6);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  unsigned int i;
-  if (status == SPIM_RX_DONE) {
-    for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0; ++i) {
-      ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
-    }
-    test_trx_multiple_cb0_rx_executed = true;
-  } else if (status == SPIM_TX_DONE) {
-    for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0; ++i) {
-      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0-i-1]);
-    }
-    test_trx_multiple_cb0_tx_executed = true;
-  }
-  return 0;
-}
-static size_t test_trx_multiple_cb1(spim_cb_status status, void *trx_cb_data)
-{
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 7);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  unsigned int i;
-  if (status == SPIM_RX_DONE) {
-    for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1; ++i) {
-      ck_assert(test_trx_multiple_mock[i] == test_trx_multiple_rx_buf[i]);
-    }
-    test_trx_multiple_cb1_rx_executed = true;
-  } else if (status == SPIM_TX_DONE) {
-    for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1; ++i) {
-      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1-i-1]);
-    } 
-    test_trx_multiple_cb1_tx_executed = true;
-  }
-  return 0;
-}
-
 START_TEST(test_trx_multiple)
 {
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_TRX_MULTIPLE_TX_LEN0+TEST_TRX_MULTIPLE_TX_LEN1; ++i) {
-    test_trx_multiple_tx_buf[i] = (uint8_t)i;
-  }
-  for (i = 0; i < TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1; ++i) {
-    test_trx_multiple_mock[i] = (uint8_t)i;
-  }
-  spi_mock_set_incoming_data(test_trx_multiple_mock, TEST_TRX_MULTIPLE_RX_LEN0+TEST_TRX_MULTIPLE_RX_LEN1);
-  spim_trx(test_trx_multiple_tx_buf, TEST_TRX_MULTIPLE_TX_LEN0, 0,
-           &dummy_port, dummy_pin_mask,
-	   test_trx_multiple_rx_buf, TEST_TRX_MULTIPLE_RX_LEN0,
-           test_trx_multiple_cb0, (void*)6U);
+  spim_trx trx0, trx1;
+  spim_trx_init_status init_stat;
+  spim_trx_queue_status queue_stat;
+  uint8_t rx_buf0[DUMMY_DATA_SIZE], rx_buf1[DUMMY_DATA_SIZE];
 
-  spim_trx(&test_trx_multiple_tx_buf[TEST_TRX_MULTIPLE_TX_LEN0], 
-           TEST_TRX_MULTIPLE_TX_LEN1, 0,
-           &dummy_port, dummy_pin_mask,
-	   &test_trx_multiple_rx_buf[TEST_TRX_MULTIPLE_RX_LEN0],
-           TEST_TRX_MULTIPLE_RX_LEN1,
-           test_trx_multiple_cb1, (void*)7U);
+  // init trx0
+  init_stat = spim_trx_init(&trx0, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, DUMMY_DATA_SIZE, // transmit
+			    rx_buf0, DUMMY_DATA_SIZE,    // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx0) == SPIM_TRX_STATUS_INITIAL);
+
+  // init trx1
+  init_stat = spim_trx_init(&trx1, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, DUMMY_DATA_SIZE, // transmit
+			    rx_buf1, DUMMY_DATA_SIZE,    // receive
+			    NO_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx1) == SPIM_TRX_STATUS_INITIAL);
+
+  // queue trx0
+  queue_stat = spim_trx_queue(&trx0);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx0) == SPIM_TRX_STATUS_QUEUED);
+
+  // queue trx1
+  queue_stat = spim_trx_queue(&trx1);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx1) == SPIM_TRX_STATUS_QUEUED);
+
+  // transmit trx0
+  int i = 0;
   do {
-    task_executed = sched_exec();
-  } while(!test_trx_multiple_cb0_rx_executed && task_executed == SCHED_TASK_EXECUTED);
-  sched_exec();
-  ck_assert(dummy_port & dummy_pin_mask);
-  do {
-    task_executed = sched_exec();
-  } while( task_executed == SCHED_TASK_EXECUTED);
+    if (i > DUMMY_DATA_SIZE + PROC_CALL_MARGIN)
+      ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx0) == SPIM_TRX_STATUS_IN_TRANSMISSION);
   
-  ck_assert(test_trx_multiple_cb0_tx_executed);
-  ck_assert(test_trx_multiple_cb0_rx_executed);
-  ck_assert(test_trx_multiple_cb1_tx_executed);
-  ck_assert(test_trx_multiple_cb1_rx_executed);
+  ck_assert(spim_trx_get_status(&trx0) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(rx_buf0[j] == dummy_data[j]);
+    ck_assert(spi_mock_get_last_transmitted_data(DUMMY_DATA_SIZE - j) == dummy_data[j]);
+  }
+  ck_assert(spi_mock_get_last_transmitted_data(0) == 0);
+
+
+  // transmit trx1
+  spi_mock_set_incoming_data(dummy_data, 16);
+  ck_assert(spim_trx_get_status(&trx1) == SPIM_TRX_STATUS_QUEUED);
+  i = 0;
+  do {
+    if (i > DUMMY_DATA_SIZE + PROC_CALL_MARGIN)
+      ck_abort_msg("Transmission timeout");
+    PROCESS_CALL(&spim_trx_process);
+    i += 1;
+  } while (spim_trx_get_status(&trx1) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+  
+  ck_assert(spim_trx_get_status(&trx1) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(rx_buf1[j] == dummy_data[j]);
+    ck_assert(spi_mock_get_last_transmitted_data(DUMMY_DATA_SIZE - j) == dummy_data[j]);
+  }
+  ck_assert(spi_mock_get_last_transmitted_data(0) == 0);
 }
 END_TEST
+
 
 // ****************************************************************************
 //                       test_trx_delay
 // ****************************************************************************
-#define TEST_TRX_DELAY_TRX_LEN 10
-#define TEST_TRX_DELAY_DELAY 200
-static uint8_t test_trx_delay_tx_buf[TEST_TRX_DELAY_TRX_LEN];
-static uint8_t test_trx_delay_rx_buf[TEST_TRX_DELAY_TRX_LEN];
-static uint8_t test_trx_delay_mock[TEST_TRX_DELAY_TRX_LEN];
-static int test_trx_delay_cb_executed = 0;
-
-static size_t test_trx_delay_cb(spim_cb_status status, void *trx_cb_data)
-{
-   unsigned int i;
-   switch(status) {
-   case SPIM_RX_DONE:
-     for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
-       ck_assert(test_trx_delay_mock[i] == test_trx_delay_rx_buf[i]);
-     }
-     break;
-   case SPIM_TX_DONE:
-     for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
-      ck_assert(spi_mock_get_last_transmitted_data(i) == test_trx_delay_tx_buf[TEST_TRX_DELAY_TRX_LEN-i-1]);
-     }
-     break;
-   default:
-     ck_abort_msg("Unexpected status in test_trx_delay_cb");
-     break;
-  }
-  ck_assert_uint_eq((uintptr_t)trx_cb_data, 8);
-  ck_assert(! (dummy_port & dummy_pin_mask));
-  ck_assert(dummy_port == 0);
-  test_trx_delay_cb_executed += 1;
-  return 0;
-}
-
 START_TEST(test_trx_delay)
 {
-  sched_exec_status task_executed;
-  unsigned int i;
-  for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
-    test_trx_delay_tx_buf[i] = (uint8_t)i;
-  }
-  for (i = 0; i < TEST_TRX_DELAY_TRX_LEN; ++i) {
-    test_trx_delay_mock[i] = (uint8_t)i;
-  }
-  spi_mock_set_incoming_data(test_trx_delay_mock, TEST_TRX_DELAY_TRX_LEN);
-  spim_trx(test_trx_delay_tx_buf, TEST_TRX_DELAY_TRX_LEN, TEST_TRX_DELAY_DELAY,
-           &dummy_port, dummy_pin_mask,
-	   test_trx_delay_rx_buf, TEST_TRX_DELAY_TRX_LEN,
-           test_trx_delay_cb, (void*)8U);
+  spim_trx trx;
+  spim_trx_init_status init_stat;
+  uint8_t rx_buf[DUMMY_DATA_SIZE];
+  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			    dummy_data, DUMMY_DATA_SIZE/2, // transmit
+			    rx_buf, DUMMY_DATA_SIZE,       // receive
+			    DUMMY_DELAY);
+  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_INITIAL);
 
-  unsigned int bytes_trxed = 0;
-  for (bytes_trxed = 0; bytes_trxed < TEST_TRX_DELAY_TRX_LEN; ++bytes_trxed) {
-    do {
-      task_executed = sched_exec();
-    } while(task_executed == SCHED_TASK_EXECUTED);
-    
-    ck_assert(test_send_receive_cb_executed == 0);
-    ck_assert(spi_mock_get_last_transmitted_data(0) == test_trx_delay_tx_buf[bytes_trxed]);
-    for (i = 0; i < bytes_trxed; ++i) {
-      ck_assert(test_trx_delay_mock[i] == test_trx_delay_rx_buf[i]);
-    }
+  spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
+  ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_QUEUED);
 
-    timer2_mock_ffw_to_oca();
-  }
+  int i = 0;
   do {
-      task_executed = sched_exec();
-    } while(task_executed == SCHED_TASK_EXECUTED);
-  ck_assert(test_trx_delay_cb_executed == 2);
+    for (int j = 0; j < DUMMY_DELAY*2; ++j) {
+      PROCESS_CALL(&spim_trx_process);
+    }
+    ck_assert(spi_mock_get_nb_bytes_transmitted() == MIN(i, DUMMY_DATA_SIZE+1));
+    for (int j = 0; j < DUMMY_DELAY*3; ++j) {
+      MOCK_TIMER_TICK(CLOCK_TMR);
+    }
+    i += 1;
+  } while (spim_trx_get_status(&trx) == SPIM_TRX_STATUS_IN_TRANSMISSION);
+   
+  ck_assert(spim_trx_get_status(&trx) == SPIM_TRX_STATUS_COMPLETED);
+  for (int j = 0; j < DUMMY_DATA_SIZE; ++j) {
+    ck_assert(rx_buf[j] == dummy_data[j]);
+    ck_assert(spi_mock_get_last_transmitted_data(DUMMY_DATA_SIZE - j) == (j < DUMMY_DATA_SIZE/2 ? dummy_data[j] : 0));
+  }
+  ck_assert(spi_mock_get_last_transmitted_data(0) == 0);
 }
 END_TEST
 
@@ -487,49 +395,27 @@ END_TEST
 // ****************************************************************************
 //                           Test suite setup
 // ****************************************************************************
+static void add_tcase(Suite* s, TFun tf, const char* name)
+{
+  TCase *tc = tcase_create(name);
+  tcase_add_checked_fixture(tc, setup, teardown);
+  tcase_add_test(tc, tf);
+  suite_add_tcase(s, tc);
+}
+
 Suite *spi_master_suite(void)
 {
   Suite *s = suite_create("Spi master");
 
-  TCase *tc_send_single_byte = tcase_create("Send single byte");
-  tcase_add_checked_fixture(tc_send_single_byte, setup, teardown);
-  tcase_add_test(tc_send_single_byte, test_send_single_byte);
-  suite_add_tcase(s, tc_send_single_byte);
-
-  TCase *tc_receive_single_byte = tcase_create("Receive single byte");
-  tcase_add_checked_fixture(tc_receive_single_byte, setup, teardown);
-  tcase_add_test(tc_receive_single_byte, test_receive_single_byte);
-  suite_add_tcase(s, tc_receive_single_byte);
-
-  TCase *tc_send_bytes = tcase_create("Send bytes");
-  tcase_add_checked_fixture(tc_send_bytes, setup, teardown);
-  tcase_add_test(tc_send_bytes, test_send_bytes);
-  suite_add_tcase(s, tc_send_bytes);
-
-  TCase *tc_receive_bytes = tcase_create("Receive bytes");
-  tcase_add_checked_fixture(tc_receive_bytes, setup, teardown);
-  tcase_add_test(tc_receive_bytes, test_receive_bytes);
-  suite_add_tcase(s, tc_receive_bytes);
-
-  TCase *tc_send_receive = tcase_create("Send/receive");
-  tcase_add_checked_fixture(tc_send_receive, setup, teardown);
-  tcase_add_test(tc_send_receive, test_send_receive);
-  suite_add_tcase(s, tc_send_receive);
-
-  TCase *tc_receive_bytes_cont = tcase_create("Receive bytes cont");
-  tcase_add_checked_fixture(tc_receive_bytes_cont, setup, teardown);
-  tcase_add_test(tc_receive_bytes_cont, test_receive_bytes_cont);
-  suite_add_tcase(s, tc_receive_bytes_cont);
-
-  TCase *tc_trx_multiple = tcase_create("Trx multiple");
-  tcase_add_checked_fixture(tc_trx_multiple, setup, teardown);
-  tcase_add_test(tc_trx_multiple, test_trx_multiple);
-  suite_add_tcase(s, tc_trx_multiple);
-
-  TCase *tc_trx_delay = tcase_create("Trx delay");
-  tcase_add_checked_fixture(tc_trx_delay, setup, teardown);
-  tcase_add_test(tc_trx_delay, test_trx_delay);
-  suite_add_tcase(s, tc_trx_delay);
+  add_tcase(s, test_trx_init_invalid,         "Trx init invalid");
+  add_tcase(s, test_trx_queue_invalid_status, "Trx queue invalid status");
+  add_tcase(s, test_send_single_byte,         "Send single byte");
+  add_tcase(s, test_receive_single_byte,      "Receive single byte");
+  add_tcase(s, test_send_bytes,               "Send bytes");
+  add_tcase(s, test_receive_bytes,            "Receive bytes");
+  add_tcase(s, test_send_receive,             "Send/receive bytes");
+  add_tcase(s, test_trx_multiple,             "Send/receive multiple trx");
+  add_tcase(s, test_trx_delay,                "Send/receive with delay");
 
   return s;
 }

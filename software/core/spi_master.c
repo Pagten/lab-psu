@@ -25,18 +25,23 @@
  * @date 6 jun 2013
  */
 
-#include "lib/pt/pt.h"
-#include "hal/spi.h"
-#include "util/log.h"
-
 #include "spi_master.h"
 
-//TODO: declare timer
+#include "core/process.h"
+#include "core/timer.h"
+#include "hal/spi.h"
+#include "util/bit.h"
+#include "util/log.h"
 
-static uint8_t trx_queue_head;
-static uint8_t trx_queue_tail;
 
-void spim_init()
+PROCESS(spim_trx_process);
+
+static timer trx_timer;
+static spim_trx* trx_queue_head;
+static spim_trx* trx_queue_tail;
+
+
+void spim_init(void)
 {
   trx_queue_head = NULL;
   trx_queue_tail = NULL;
@@ -47,34 +52,23 @@ void spim_init()
   SPI_SET_MODE(0,0);
   SPI_SET_CLOCK_RATE_DIV_4();
   SPI_ENABLE();
+
+  process_start(&spim_trx_process);
 }
-
-typedef struct _spi_trx {
-  spim_trx_status status;
-  uint8_t ss_mask;
-  volatile uint8_t *ss_port;
-  uint8_t *tx_buf;
-  size_t tx_remaining;
-  uint8_t *rx_buf;
-  size_t rx_remaining;
-  ticks_t delay;
-  struct _spi_trx *next;
-} spi_trx;
-
 
 
 spim_trx_init_status
-spim_trx_init(spim_trx *trx, uint8_t ss_pin, volatile uint8_t *ss_port,
-	      uint8_t *tx_buf, size_t tx_size, uint8_t *rx_buf, size_t rx_size,
-	      ticks_t delay);
+spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+	      uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
+	      clock_time_t delay)
 {
   if (tx_size == 0 && rx_size == 0) {
     trx->status = SPIM_TRX_STATUS_INVALID;
-    return SPIM_TRX_INIT_EMPTY;
+    return SPIM_TRX_INIT_INVALID;
   }
 
   trx->status = SPIM_TRX_STATUS_INITIAL;
-  trx->ss_mask = _bv8(ss_pin & 0x07);
+  trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
   trx->tx_buf = tx_buf;
   trx->tx_remaining = tx_size;
@@ -85,12 +79,12 @@ spim_trx_init(spim_trx *trx, uint8_t ss_pin, volatile uint8_t *ss_port,
 }
 
 inline
-spim_trx_status spim_trx_get_status(spim_trx *trx)
+spim_trx_status spim_trx_get_status(spim_trx* trx)
 {
   return trx->status;
 }
 
-spim_trx_queue_status spim_trx_queue(spi_transfer *trx)
+spim_trx_queue_status spim_trx_queue(spim_trx* trx)
 {
   if (trx->status != SPIM_TRX_STATUS_INITIAL) {
     return SPIM_TRX_QUEUE_INVALID_STATUS;
@@ -108,24 +102,46 @@ spim_trx_queue_status spim_trx_queue(spi_transfer *trx)
   return SPIM_TRX_QUEUE_OK;
 }
 
-
-PT_THREAD(spim_trx_thread(struct pt *pt))
+static inline 
+void rx_byte(spim_trx* trx)
 {
-  PT_BEGIN(pt);
+  if (trx->rx_remaining > 0) {
+    *(trx->rx_buf) = SPI_GET_DATA_REG();
+    trx->rx_buf += 1;
+    trx->rx_remaining -= 1;
+  }
+}
+
+static inline
+void tx_byte(spim_trx* trx)
+{
+  if (trx->tx_remaining > 0) {
+    SPI_SET_DATA_REG(*(trx->tx_buf));
+    trx->tx_buf += 1;
+    trx->tx_remaining -= 1;
+  } else {
+    // Transmit null byte
+    SPI_SET_DATA_REG(0);
+  }
+}
+
+PROCESS_THREAD(spim_trx_process)
+{
+  PROCESS_BEGIN();
 
   while (true) {
     // Wait until there's something in the queue
-    PT_WAIT_WHILE(pt, trx_queue_head == NULL);
+    PROCESS_WAIT_WHILE(trx_queue_head == NULL);
 
     // Update transfer status
     trx_queue_head->status = SPIM_TRX_STATUS_IN_TRANSMISSION;
 
     // Start transfer by pulling the slave select pin low
-    *(trx_queue_head->ss_port) &= ~bv8(trx_queue_head->flags_ss_pin & 0x07);
+    *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
 
     // Wait before sending first byte 
     timer_set(&trx_timer, trx_queue_head->delay);
-    PT_WAIT_UNTIL(pt, timer_expired(&trx_timer));
+    PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
     
     // Send first byte
     tx_byte(trx_queue_head);
@@ -134,25 +150,28 @@ PT_THREAD(spim_trx_thread(struct pt *pt))
     while (trx_queue_head->tx_remaining > 0 || 
 	   trx_queue_head->rx_remaining > 0) {
       // Wait before sending/receiving each byte
-      timer_set(&trx_timer, trx_queue_head->delay);
-      PT_WAIT_UNTIL(pt, timer_expired(&trx_timer));
+      timer_restart(&trx_timer);
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       
       // Make sure previous transfer is complete
-      while (! SPI_INTERRUPT_FLAG_SET);
+      while (! IS_SPI_INTERRUPT_FLAG_SET());
 
       rx_byte(trx_queue_head);
       tx_byte(trx_queue_head);
     }
 
     // Wait before ending transfer
-    timer_set(&trx_timer, trx_queue_head->delay);
-    PT_WAIT_UNTIL(pt, timer_expired(&trx_timer));
+    timer_restart(&trx_timer);
+    PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 
     // Make sure the transfer is complete
-    while (! SPI_INTERRUPT_FLAG_SET);
+    while (! IS_SPI_INTERRUPT_FLAG_SET());
 
     // End transfer by making the slave select pin high again
-    *(trx_queue_head->ss_port) |= bv8(trx_queue_head->flags_ss_pin & 0x07);
+    *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
+
+    // Update transfer status
+    trx_queue_head->status = SPIM_TRX_STATUS_COMPLETED;
 
     // Shift queue
     trx_queue_head = trx_queue_head->next;
@@ -160,15 +179,12 @@ PT_THREAD(spim_trx_thread(struct pt *pt))
       trx_queue_tail = NULL;
     }
 
-    // Update transfer status
-    trx_queue_head->status = SPIM_TRX_STATUS_COMPLETED;
-
     // Yield CPU for other threads to ensure there is some time between making
     // the slave select pin high and pulling it low again for the next
     // transfer, which can be an issue if there are two subsequent transfers
     // to the same slave device.
-    PT_YIELD(pt);
+    PROCESS_YIELD();
   }
 
-  PT_END(pt);
+  PROCESS_END();
 }

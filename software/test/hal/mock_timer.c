@@ -41,7 +41,7 @@ void mock_timer_init(mock_timer* tmr)
 void mock_timer_tick(mock_timer* tmr)
 {
   if (! tmr->clock_enabled) {
-    fputs("warning: mock timer tick while disabled", stderr);
+    fputs("warning: mock timer tick while disabled\n", stderr);
   }
 
   switch (tmr->mode) {
@@ -53,7 +53,7 @@ void mock_timer_tick(mock_timer* tmr)
     fire_interrupts(tmr);
     break;
   default:
-    fputs("error: mock timer mode not implemented yet", stderr);
+    fputs("error: mock timer mode not implemented yet\n", stderr);
     abort();
   }
 }
@@ -74,14 +74,14 @@ void mock_timer_set_intr_enabled(mock_timer* tmr, tmr_interrupt intr, bool val)
     tmr->ovf_intr_enabled = val;
     break;
   default:
-    fputs("error: unknown timer interrupt", stderr);
+    fputs("error: unknown timer interrupt\n", stderr);
     abort();
   }
 }
 void mock_timer_set_mode(mock_timer* tmr, tmr_mode mode)
 {
   if (mode != M_NORMAL) {
-    fputs("error: mock timer mode not implemented yet", stderr);
+    fputs("error: mock timer mode not implemented yet\n", stderr);
     abort();
   }
 
