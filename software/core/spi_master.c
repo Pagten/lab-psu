@@ -63,11 +63,10 @@ spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 	      clock_time_t delay)
 {
   if (tx_size == 0 && rx_size == 0) {
-    trx->status = SPIM_TRX_STATUS_INVALID;
     return SPIM_TRX_INIT_INVALID;
   }
 
-  trx->status = SPIM_TRX_STATUS_INITIAL;
+  trx->in_transmission = false;
   trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
   trx->tx_buf = tx_buf;
@@ -79,15 +78,25 @@ spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 }
 
 inline
-spim_trx_status spim_trx_get_status(spim_trx* trx)
+bool spim_trx_is_in_transmission(spim_trx* trx)
 {
-  return trx->status;
+  return trx->in_transmission;
+}
+
+bool spim_trx_is_queued(spim_trx* trx)
+{
+  spim_trx* t = trx_queue_head;
+  while (t != NULL) {
+    if (t == trx) return true;
+    t = t->next;
+  }
+  return false;
 }
 
 spim_trx_queue_status spim_trx_queue(spim_trx* trx)
 {
-  if (trx->status != SPIM_TRX_STATUS_INITIAL) {
-    return SPIM_TRX_QUEUE_INVALID_STATUS;
+  if (spim_trx_is_queued(trx)) {
+    return SPIM_TRX_QUEUE_ALREADY_QUEUED;
   }
 
   if (trx_queue_tail == NULL) {
@@ -98,7 +107,6 @@ spim_trx_queue_status spim_trx_queue(spim_trx* trx)
     trx_queue_tail->next = trx;
   }
   trx->next = NULL;
-  trx->status = SPIM_TRX_STATUS_QUEUED;
   return SPIM_TRX_QUEUE_OK;
 }
 
@@ -125,6 +133,12 @@ void tx_byte(spim_trx* trx)
   }
 }
 
+
+// As an alternative (more efficient) way of yielding, an event timer can be
+// implemented (using a hardware timer) that posts an event when it expires.
+// The PROCESS_WAIT_EVENT() function can be used to wait for such
+// timers (this function should not post an event before yielding, because the
+// timer will post an event when necessary).
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
@@ -134,7 +148,7 @@ PROCESS_THREAD(spim_trx_process)
     PROCESS_WAIT_WHILE(trx_queue_head == NULL);
 
     // Update transfer status
-    trx_queue_head->status = SPIM_TRX_STATUS_IN_TRANSMISSION;
+    trx_queue_head->in_transmission = true;
 
     // Start transfer by pulling the slave select pin low
     *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
@@ -171,7 +185,7 @@ PROCESS_THREAD(spim_trx_process)
     *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
 
     // Update transfer status
-    trx_queue_head->status = SPIM_TRX_STATUS_COMPLETED;
+    trx_queue_head->in_transmission = false;
 
     // Shift queue
     trx_queue_head = trx_queue_head->next;

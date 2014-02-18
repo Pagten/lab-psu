@@ -30,12 +30,15 @@
  * This file implements SPI master communication.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
+
 
 #include "core/clock.h"
 #include "core/process.h"
 
+#define SPIM_NO_DELAY 0
 
 typedef enum {
   SPIM_TRX_INIT_OK,
@@ -44,22 +47,15 @@ typedef enum {
 
 typedef enum {
   SPIM_TRX_QUEUE_OK,
-  SPIM_TRX_QUEUE_INVALID_STATUS,
+  SPIM_TRX_QUEUE_ALREADY_QUEUED,
 } spim_trx_queue_status;
 
-typedef enum {
-  SPIM_TRX_STATUS_INVALID,
-  SPIM_TRX_STATUS_INITIAL,
-  SPIM_TRX_STATUS_QUEUED,
-  SPIM_TRX_STATUS_IN_TRANSMISSION,
-  SPIM_TRX_STATUS_COMPLETED,
-} spim_trx_status;
 
 /**
  * The SPI transfer data structure.
  */
 typedef struct _spim_trx {
-  spim_trx_status status;
+  bool in_transmission;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;
   uint8_t* tx_buf;
@@ -86,8 +82,8 @@ void spim_init(void);
 /**
  * Initialize an SPI transfer data structure.
  * 
- * The transfer's status will be set to INITIAL on success or INVALID on
- * failure.
+ * This function should not be called on SPI transfers that are in
+ * transmission.
  *
  * @param trx      The transfer data structure to initialize
  * @param ss_pin   The number of the pin connected to the SPI slave to address
@@ -110,12 +106,24 @@ spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 
 
 /**
- * Get the status of an SPI transfer.
+ * Return whether an SPI transfer is in transmission.
  * 
- * @param trx  The transfer data structure of which to get the status
- * @return The status of the given SPI transfer data structure.
+ * The given SPI transfer must have been initialized using the spim_trx_init()
+ * function.
+ *
+ * @param trx  The SPI transfer data structure of which to get the status
+ * @return true if the transfer is in transmission, false otherwise.
  */
-spim_trx_status spim_trx_get_status(spim_trx* trx);
+bool spim_trx_is_in_transmission(spim_trx* trx);
+
+
+/**
+ * Return whether an SPI transfer is in the transfer queue.
+ *
+ * @param trx  The transfer for which to check if it is in the transfer queue
+ * @return true if the transfer is in the queue, false otherwise.
+ */
+bool spim_trx_is_queued(spim_trx* trx);
 
 
 /**
@@ -123,13 +131,12 @@ spim_trx_status spim_trx_get_status(spim_trx* trx);
  *
  * The transfer will be executed as soon as all previously queued transfers
  * have finished. The transfer must first be initialized with the 
- * spim_trx_init() function.
+ * spim_trx_init() function and should not already be in the transfer queue.
  *
  * @param trx  The SPI transfer to queue
- * @return SPIM_TRX_QUEUE_OK if the transfer was queued succesfully,
- *         SPIM_TRX_QUEUE_STATUS_INVALID if the status of the transfer is not
- *         SPIM_TRX_STATUS_INITIALIZED (hence the transfer is invalid or was
- *         already queued before).
+ * @return SPIM_TRX_QUEUE_OK if the transfer was queued succesfully, or
+ *         SPIM_TRX_QUEUE_ALREADY_QUEUED if the packet is already in the
+ *         transfer queue.
  */
 spim_trx_queue_status spim_trx_queue(spim_trx* trx);
 
