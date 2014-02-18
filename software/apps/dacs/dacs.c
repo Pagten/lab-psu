@@ -66,7 +66,12 @@ FUSES =
 #define DAC_MAX 0x0FFF
 #define DAC_STEP 32
 
+PROCESS(dacs_process);
+
 static rotary rot0;
+
+#define EVENT_ROTARY_STEP_TAKEN  0x00
+#define EVENT_MCP4922_WAS_BUSY   0x01
 
 static inline
 void init_pins(void)
@@ -85,60 +90,88 @@ void init_pins(void)
   SET_PIN(DAC_CS);
 }
 
-static
-void rotary_stepped(void* direction) {
-  static uint16_t dac_value = DAC_MIN;
-  rot_step_status step = (rot_step_status)direction;
-  
-  switch (step) {
-  case ROT_STEP_CW:
-    TGL_PIN(DEBUG0);
-    if (dac_value <= DAC_MAX - DAC_STEP) {
-      dac_value += DAC_STEP;
-    } else {
-      dac_value = DAC_MAX;
-    }
-    break;
-  case ROT_STEP_CCW:
-    TGL_PIN(DEBUG1);
-    if (dac_value >= DAC_MIN + DAC_STEP) {
-      dac_value -= DAC_STEP;
-    } else {
-      dac_value = DAC_MIN;
-    }
-    break;
-  default:
-    return;
-  }
-  mcp4922_set(DAC_CS_PORT, DAC_CS_PIN, false, dac_value, NULL, NULL);
-}
-
 
 INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
 {
   uint8_t input = ((GET_PIN(ROT0A) << 1) | GET_PIN(ROT0B));
   rot_step_status step = rot_process_step(&rot0, input);
   if (step == ROT_STEP_CW || step == ROT_STEP_CCW) {
-    sched_schedule(0, rotary_stepped, (void*)step);
+    process_post_event(&dacs_process, EVENT_ROTARY_STEP_TAKEN, (void*)step);
   }
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
 INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
 #endif
 
+
+
+PROCESS_THREAD(dacs_process)
+{
+  static uint16_t dac_value = DAC_MIN;
+  static mcp4922_packet mcp4922_pkt;
+  PROCESS_BEGIN();
+
+  mcp4922_packet_init(&mcp4922_pkt, 0, NULL, MCP4922_CHANNEL_A, 0);
+
+  while (true) {
+    PROCESS_WAIT_EVENT();
+
+    if (ev == EVENT_ROTARY_STEP_TAKEN) {
+      rot_step_status step = (rot_step_status)data;
+  
+      switch (step) {
+      case ROT_STEP_CW:
+	TGL_PIN(DEBUG0);
+	if (dac_value <= DAC_MAX - DAC_STEP) {
+	  dac_value += DAC_STEP;
+	} else {
+	  dac_value = DAC_MAX;
+	}
+	break;
+      case ROT_STEP_CCW:
+	TGL_PIN(DEBUG1);
+	if (dac_value >= DAC_MIN + DAC_STEP) {
+	  dac_value -= DAC_STEP;
+	} else {
+	  dac_value = DAC_MIN;
+	}
+	break;
+      default:
+	continue;
+      }
+    }
+
+    if (mcp4922_pkt_is_in_transmission(&mcp4922_pkt)) {
+      process_post_event(PROCESS_CURRENT(), EVENT_MCP4922_WAS_BUSY,
+			 PROCESS_DATA_NULL);
+    } else {
+      mcp4922_pkt_init(&mcp4922_pkt, DAC_CS_PIN, DAC_CS_PORT,
+		       MCP4922_CHANNEL_A, dac_value);
+      mcp4922_queue(&mcp4922_pkt);
+    }
+  }
+
+  PROCESS_END();
+}
+
+
+
 int main(void)
 {
   init_pins();
-  sched_init();
-  rot_init(&rot0);
+  clock_init();
+  process_init();
   spim_init();
+  rot_init(&rot0);
   mcp4922_init();
 
   PC_INTERRUPT_ENABLE(ROT0A);
   PC_INTERRUPT_ENABLE(ROT0B);
   ENABLE_INTERRUPTS();
 
+  process_start(&dacs_process);
+
   while (1) {
-    sched_exec();
+    process_schedule();
   }
 }
