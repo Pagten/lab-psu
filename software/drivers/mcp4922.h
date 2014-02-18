@@ -31,9 +31,9 @@
  * converter with SPI interface.
  *
  * Not all features are supported, in particular:
- * * BUF is always set to 0, hence the input buffer amplifier is disabled
- * * ~GA is always set to 1, hence the output voltage doubler is disabled
- * * ~SHDN is always set to 1, hence the output buffer cannot be shut down
+ * - BUF is always set to 0, hence the input buffer amplifier is disabled
+ * - ~GA is always set to 1, hence the output voltage doubler is disabled
+ * - ~SHDN is always set to 1, hence the output buffer cannot be shut down
  */
 
 #include <stdbool.h>
@@ -41,22 +41,23 @@
 
 typedef enum {
   MCP4922_CHANNEL_A,
-  MCP4922_CHANNEL_B
+  MCP4922_CHANNEL_B,
 } mcp4922_channel;
 
 typedef enum {
-  MCP4922_OK,
-  MCP4922_ERROR
-} mcp4922_status;
+  MCP4922_QUEUE_OK,
+  MCP4922_QUEUE_ERROR,
+} mcp4922_queue_status;
 
 
 /**
- * The type of the callback function called after the DAC value has been set.
- * 
- * @arg status  Indicates whether setting the DAC value was succesful
- * @arg data    Opaque data pointer given to mcp4922_set().
+ * The MCP4922 packet data structure.
  */
-typedef void (*mcp4922_set_callback)(mcp4922_status status, void *data);
+typedef struct {
+  uint8_t data[2];
+  spim_trx spim_trx;
+} mcp4922_pkt;
+
 
 
 /**
@@ -69,21 +70,45 @@ void mcp4922_init(void);
 
 
 /**
- * Set the output value of one of the DAC's output channels
+ * Initialize an MCP4922 packet data structure.
  *
- * @arg cs_port   The slave select port to which the DAC is connected
- * @arg cs_pin    The pin of cs_port to which the DAC is connected
- * @arg channel_b Indicates the channel to set. Use false for channel A and
- *                true for channel B
- * @arg value     The value to set the channel to. Only the 12 LSBs are used
- * @arg cb        Function that will be called after the DAC value has been
- *                set, or if an error occurs during transmission
- * @arg cb_data   Opaque pointer that will be passed on to the cb callback
- * @return MCP4922_OK if the SPI data transfer to set the output value was
- *         scheduled succesfully, MCP4922_ERROR otherwise.
+ * This function should not be called on a packet that is in transmission.
+ * 
+ * @param pkt    The MCP4922 packet data structure to initialize
+ * @param pin    The number of the pin connected to the MCP4922's CS pin
+ * @param port   The port of the pin connected to the MCP4922's CS pin
+ * @param ch     The output channel to set
+ * @param value  The output value for the channel (only the 12 LSB's are used)
  */
-mcp4922_status mcp4922_set(volatile uint8_t *cs_port, uint8_t cs_pin,
-			   bool channel_b, uint16_t value, 
-			   mcp4922_set_callback cb, void* cb_data);
+void
+mcp4922_pkt_init(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
+		 mcp4922_channel ch, uint16_t value);
+
+
+/**
+ * Return whether the MCP4922 packet is in transmission.
+ * 
+ * @param pkt  The MCP4922 packet for which to get the transfer status
+ * @return true if the packet is in transmission, false otherwise.
+ */
+bool mcp4922_pkt_is_in_transmission(mcp4922_pkt* pkt);
+
+
+/**
+ * Queue an MCP4922 packet for transmission.
+ *
+ * The packet will be transmitted as soon as all previously queued SPI
+ * transfers have finished and the SPI hardware becomes free. The transfer
+ * must first be initialized using the mcp4922_pkt_init() function.
+ *
+ * @param pkt  The MCP4922 packet to queue
+ * @return MCP4922_QUEUE_OK if the packet was queued succesfully, or
+ *         MCP4922_QUEUE_ERROR if the transfer was not initialized using the
+ *         mcp4922_pkt_init() function before queing it, or if was already
+ *         queued.
+ */
+mcp4922_queue_status mcp4922_queue(mcp4922_pkt* pkt);
+
+
 
 #endif

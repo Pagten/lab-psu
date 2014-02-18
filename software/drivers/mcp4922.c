@@ -37,71 +37,44 @@
 #define CHB  15
 
 
-#ifndef MCP4922_PACKET_QUEUE_SIZE
-#define MCP4922_PACKET_QUEUE_SIZE 4
-#endif
-
-struct packet {
-  uint8_t data[2];
-  mcp4922_set_callback cb;
-  void* cb_data;
-};
-
-static struct packet packet_queue[MCP4922_PACKET_QUEUE_SIZE];
-static uint8_t packet_queue_head;
-static uint8_t packet_queue_tail;
-static uint8_t packet_queue_count;
+void mcp4922_init()
+{ }
 
 
-void mcp4922_init() {
-  packet_queue_head = 0;
-  packet_queue_tail = 0;
-  packet_queue_count = 0;
-}
-
-static
-size_t _callback(spim_cb_status status, void *data)
+void
+mcp4922_pkt_init(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
+		 mcp4922_channel ch, uint16_t value)
 {
-  struct packet *p = &packet_queue[packet_queue_head];
-  mcp4922_status stat = (status == SPIM_TX_DONE) ? MCP4922_OK : MCP4922_ERROR;
+  spim_trx_init(&(pkt->spim_trx), pin, port,
+		pkt->data, 2,      // tx_buf
+		NULL, 0,           // rx_buf
+		SPIM_NO_DELAY);
 
-  packet_queue_head = (packet_queue_head + 1) % MCP4922_PACKET_QUEUE_SIZE;
-  packet_queue_count -= 1;
-  if (p->cb != NULL) {
-    p->cb(stat, p->cb_data);
+  // This assumes MSB-first SPI data transfer
+  pkt->data[0] = (value >> 8) & 0x0F;
+  pkt->data[0] |= (_BV(GA) | _BV(SHDN)) >> 8;
+  if (ch == MCP4922_CHANNEL_B) {
+    pkt->data[0] |= _BV(CHB) >> 8;
   }
-
-  return 0;
+  pkt->data[1] = value & 0x00FF;
 }
 
 
-mcp4922_status mcp4922_set(volatile uint8_t *cs_port, uint8_t cs_pin,
-			   bool channel_b, uint16_t value,
-			   mcp4922_set_callback cb, void* cb_data)
+inline 
+bool mcp4922_pkt_is_in_transmission(mcp4922_pkt* pkt)
 {
-  struct packet *p = &packet_queue[packet_queue_tail];
-  packet_queue_tail = (packet_queue_tail + 1) % MCP4922_PACKET_QUEUE_SIZE;
-  packet_queue_count += 1;
-
-  // This assumes MSB-first data transfer
-  p->data[0] = (value >> 8) & 0x0F;
-  p->data[0] |= (_BV(GA) | _BV(SHDN)) >> 8;
-  if (channel_b) {
-    p->data[0] |= _BV(CHB) >> 8;
-  }
-  p->data[1] = value & 0x00FF;
-  p->cb = cb;
-  p->cb_data = cb_data;
-
-  // Schedule new SPI transfer 
-  spim_trx_status spim_status;
-  spim_status = spim_trx(p->data, 2, 0,         // TX_BUF, TX_SIZE, TX_DELAY
-			 cs_port, bv8(cs_pin),  // SS_PORT, SS_MASK
-			 NULL, 0,               // RX_BUF, RX_SIZE
-			 _callback, NULL);      // CB, CB_DATA
-  if (spim_status != SPIM_OK) {
-    return MCP4922_ERROR;
-  }
-
-  return MCP4922_OK;
+  return spim_trx_is_in_transmission(&(pkt->spim_trx));
 }
+
+
+mcp4922_queue_status mcp4922_queue(mcp4922_pkt* pkt)
+{
+  spim_trx_queue_status stat;
+  stat = spim_trx_queue(&(pkt->spim_trx));
+  if (stat != SPIM_TRX_QUEUE_OK) {
+    return MCP4922_QUEUE_ERROR;
+  }
+
+  return MCP4922_QUEUE_OK;
+}
+
