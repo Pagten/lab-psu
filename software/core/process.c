@@ -25,25 +25,41 @@
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 8 feb 2014
  *
- * This file implements processes, based on protothreads. The code is inspired
- * by the processes implementation of Contiki.
+ * This file implements processes, based on protothreads. It is inspired by the
+ * processes implementation of Contiki.
  *
  * @see http://dunkels.com/adam/pt
- * @see http://www.contiki-os.org/
+ * @see http://www.contiki-os.org
  */
 
 #include <stdlib.h>
 
+#include "util/atomic.h"
 #include "process.h"
+
+// Should preferably be a power of 2
+#define PROCESS_CONF_EVENT_QUEUE_SIZE 16
 
 static process* process_list_head;
 static process* next_process;
 
+struct event {
+  process* p;
+  process_event_t ev;
+  process_data_t data;
+};
+
+static struct event event_queue[PROCESS_CONF_EVENT_QUEUE_SIZE];
+static uint8_t event_queue_count;
+static uint8_t event_queue_first;
 
 void process_init(void)
 {
   process_list_head = NULL;
   next_process = NULL;
+
+  event_queue_count = 0;
+  event_queue_first = 0;
 }
 
 static bool process_list_contains(process* p)
@@ -71,6 +87,9 @@ process_start_status process_start(process* p)
   // Initialize the protothread
   PT_INIT(&p->pt);
 
+  // Send INIT event
+  process_post_event(p, PROCESS_EVENT_INIT, PROCESS_DATA_NULL);
+
   return PROCESS_START_OK;
 }
 
@@ -86,17 +105,38 @@ process_stop_status process_stop(process* p)
   return PROCESS_STOP_NOT_STARTED;
 }
 
+process_post_event_status
+process_post_event(process* p, process_event_t ev, process_data_t data)
+{
+  uint8_t i;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    if (event_queue_count == PROCESS_CONF_EVENT_QUEUE_SIZE) {
+      return PROCESS_POST_EVENT_QUEUE_FULL;
+    }
+
+    i = (event_queue_first + event_queue_count) % PROCESS_CONF_EVENT_QUEUE_SIZE;
+    event_queue_count += 1;  
+  }
+  event_queue[i].p = p;
+  event_queue[i].ev = ev;
+  event_queue[i].data = data;
+  
+  return PROCESS_POST_EVENT_OK;
+}
+
 
 void process_execute(void)
 {
-  if (process_list_head == NULL) {
-    // No processes to execute
+  if (event_queue_count == 0) {
+    // No events to process
     return;
   }
 
-  if (next_process == NULL) {
-    next_process = process_list_head;
+  // Process one event
+  struct event e = event_queue[event_queue_first];
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { 
+    event_queue_count -= 1;
+    event_queue_first = (event_queue_first + 1) % PROCESS_CONF_EVENT_QUEUE_SIZE;
   }
-  PROCESS_CALL(next_process);
-  next_process = next_process->next;
+  e.p->thread(e.p, e.ev, e.data);
 }
