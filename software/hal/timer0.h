@@ -30,9 +30,9 @@
 #define TIMER0_OCB_DISCONNECT   TCCR0A &= ~(_BV(COM0B1) | _BV(COM0B0))
 
 // Interrups
-#define TIMER0_OCA_INT_ENABLE   TIMSK0 |= OCIE0A
-#define TIMER0_OCB_INT_ENABLE   TIMSK0 |= OCIE0B
-#define TIMER0_OVF_INT_ENABLE   TIMSK0 |= TOIE0
+#define TIMER0_OCA_INTR_ENABLE   TIMSK0 |= OCIE0A
+#define TIMER0_OCB_INTR_ENABLE   TIMSK0 |= OCIE0B
+#define TIMER0_OVF_INTR_ENABLE   TIMSK0 |= TOIE0
 
 // Modes
 #define TIMER0_SET_MODE_NORMAL					\
@@ -71,39 +71,39 @@
 
 
 // Clock sources
-#define TIMER0_SET_CLOCK_SRC_DISABLED			\
-  TCCR0B ~= ~(_BV(CS02) | _BV(CS01) | _BV(CS00))
-#define TIMER0_SET_CLOCK_SRC_FULL_SPEED		\
+#define TIMER0_SET_CLOCK_DISABLED			\
+  TCCR0B &= ~(_BV(CS02) | _BV(CS01) | _BV(CS00))
+#define TIMER0_SET_CLOCK_FULL_SPEED		\
   do {						\
-    TCCR0B ~= ~(_BV(CS02) | _BV(CS01));		\
+    TCCR0B &= ~(_BV(CS02) | _BV(CS01));		\
     TCCR0B |= _BV(CS00);			\
   } while (0)
-#define TIMER0_SET_CLOCK_SRC_PRESCALE_8		\
+#define TIMER0_SET_CLOCK_PRESCALE_8		\
   do {						\
-    TCCR0B ~= ~(_BV(CS02) | _BV(CS00));		\
+    TCCR0B &= ~(_BV(CS02) | _BV(CS00));		\
     TCCR0B |= _BV(CS01);			\
-  }
-#define TIMER0_SET_CLOCK_SRC_PRESCALE_64	\
+  } while (0)
+#define TIMER0_SET_CLOCK_PRESCALE_64		\
   do {						\
-    TCCR0B ~= ~(_BV(CS02));			\
+    TCCR0B &= ~(_BV(CS02));			\
     TCCR0B |= (_BV(CS01) | _BV(CS00));		\
   } while (0)
-#define TIMER0_SET_CLOCK_SRC_PRESCALE_256	\
+#define TIMER0_SET_CLOCK_PRESCALE_256		\
   do {						\
     TCCR0B |= _BV(CS02);			\
-    TCCR0B ~= ~(_BV(CS01) | _BV(CS00));		\
+    TCCR0B &= ~(_BV(CS01) | _BV(CS00));		\
   } while (0)
-#define TIMER0_SET_CLOCK_SRC_PRESCALE_1024	\
+#define TIMER0_SET_CLOCK_PRESCALE_1024		\
   do {						\
     TCCR0B |= (_BV(CS02) | _BV(CS00));		\
-    TCCR0B ~= ~(_BV(CS01));			\
+    TCCR0B &= ~(_BV(CS01));			\
   } while (0)
-#define TIMER0_SET_CLOCK_SRC_EXT_FALLING	\
+#define TIMER0_SET_CLOCK_EXT_FALLING		\
   do {						\
     TCCR0B |= (_BV(CS02) | _BV(CS01));		\
-    TCCR0B ~= ~(_BV(CS00));			\
+    TCCR0B &= ~(_BV(CS00));			\
   } while (0)
-#define TIMER0_SET_CLOCK_SRC_EXT_RISING		\
+#define TIMER0_SET_CLOCK_EXT_RISING		\
   TCCR0B |= (_BV(CS02) | _BV(CS01) | _BV(CS00))
 
 #define TIMER0_SET_CNTR(val) TCNT0 = val

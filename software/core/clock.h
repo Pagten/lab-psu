@@ -22,6 +22,8 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
+#include <stdint.h>
+
 #include "hal/timers.h"
 
 #ifndef F_CPU

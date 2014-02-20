@@ -37,7 +37,6 @@
 #include "hal/gpio.h" 
 #include "hal/fuses.h"
 #include "hal/interrupt.h"
-#include "core/scheduler.h"
 #include "core/spi_master.h"
 #include "core/rotary.h"
 #include "drivers/mcp4922.h"
@@ -108,10 +107,10 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
 PROCESS_THREAD(dacs_process)
 {
   static uint16_t dac_value = DAC_MIN;
-  static mcp4922_packet mcp4922_pkt;
+  static mcp4922_pkt mcp4922_pkt;
   PROCESS_BEGIN();
 
-  mcp4922_packet_init(&mcp4922_pkt, 0, NULL, MCP4922_CHANNEL_A, 0);
+  mcp4922_pkt_init(&mcp4922_pkt, 0, NULL, MCP4922_CHANNEL_A, 0);
 
   while (true) {
     PROCESS_WAIT_EVENT();
@@ -172,6 +171,6 @@ int main(void)
   process_start(&dacs_process);
 
   while (1) {
-    process_schedule();
+    process_execute();
   }
 }
