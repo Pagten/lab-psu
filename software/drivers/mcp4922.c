@@ -42,13 +42,13 @@ void mcp4922_init()
 
 
 void
-mcp4922_pkt_init(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
-		 mcp4922_channel ch, uint16_t value)
+mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
+		mcp4922_channel ch, uint16_t value)
 {
-  spim_trx_init(&(pkt->spim_trx), pin, port,
-		pkt->data, 2,      // tx_buf
-		NULL, 0,           // rx_buf
-		SPIM_NO_DELAY);
+  spim_trx_set(&(pkt->spim_trx), pin, port,
+	       pkt->data, 2,      // tx_buf
+	       NULL, 0,           // rx_buf
+	       SPIM_NO_DELAY);
 
   // This assumes MSB-first SPI data transfer
   pkt->data[0] = (value >> 8) & 0x0F;

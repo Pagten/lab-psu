@@ -41,9 +41,9 @@
 #define SPIM_NO_DELAY 0
 
 typedef enum {
-  SPIM_TRX_INIT_OK,
-  SPIM_TRX_INIT_INVALID,
-} spim_trx_init_status;
+  SPIM_TRX_SET_OK,
+  SPIM_TRX_SET_INVALID,
+} spim_trx_set_status;
 
 typedef enum {
   SPIM_TRX_QUEUE_OK,
@@ -80,7 +80,7 @@ void spim_init(void);
 
 
 /**
- * Initialize an SPI transfer data structure.
+ * Set an SPI transfer data structure.
  * 
  * This function should not be called on SPI transfers that are in
  * transmission.
@@ -95,12 +95,12 @@ void spim_init(void);
  * @param rx_size  The number of bytes to be received
  * @param delay    The minimum time to wait before transmitting each byte, to
  *                 give the SPI slave time to prepare its response
- * @return SPIM_TRX_INIT_OK if the transfer data structure was initialized
- *         succesfully or SPIM_TRX_INIT_INVALID if both tx_size and rx_size are
+ * @return SPIM_TRX_SET_OK if the transfer data structure was initialized
+ *         succesfully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are
  *         0. 
  */
-spim_trx_init_status
-spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+spim_trx_set_status
+spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 	      uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
 	      clock_time_t delay);
 
@@ -108,7 +108,7 @@ spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 /**
  * Return whether an SPI transfer is in transmission.
  * 
- * The given SPI transfer must have been initialized using the spim_trx_init()
+ * The given SPI transfer must have been configured using the spim_trx_set()
  * function.
  *
  * @param trx  The SPI transfer data structure of which to get the status
@@ -130,8 +130,8 @@ bool spim_trx_is_queued(spim_trx* trx);
  * Queue an SPI transfer for execution.
  *
  * The transfer will be executed as soon as all previously queued transfers
- * have finished. The transfer must first be initialized with the 
- * spim_trx_init() function and should not already be in the transfer queue.
+ * have finished. The transfer must first be configured with the spim_trx_set()
+ * function and should not already be in the transfer queue.
  *
  * @param trx  The SPI transfer to queue
  * @return SPIM_TRX_QUEUE_OK if the transfer was queued succesfully, or

@@ -68,17 +68,17 @@ static void teardown(void)
 { }
 
 // ****************************************************************************
-//                       test_trx_init_invalid
+//                       test_trx_set_invalid
 // ****************************************************************************
-START_TEST(test_trx_init_invalid)
+START_TEST(test_trx_set_invalid)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    NULL, 0,   // transmit
-			    NULL, 0,   // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_INVALID);
+  spim_trx_set_status set_stat;
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			  NULL, 0,   // transmit
+			  NULL, 0,   // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_INVALID);
 }
 END_TEST
 
@@ -101,12 +101,12 @@ END_TEST
 START_TEST(test_send_single_byte)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, 1, // transmit
-			    NULL, 0,       // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  spim_trx_set_status set_stat;
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			   dummy_data, 1, // transmit
+			   NULL, 0,       // receive
+			   SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
 
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -131,13 +131,13 @@ END_TEST
 START_TEST(test_receive_single_byte)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
+  spim_trx_set_status set_stat;
   uint8_t rx_buf;
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    NULL, 0,    // transmit
-			    &rx_buf, 1, // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			  NULL, 0,    // transmit
+			  &rx_buf, 1, // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
 
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -162,12 +162,12 @@ END_TEST
 START_TEST(test_send_bytes)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, DUMMY_DATA_SIZE, // transmit
-			    NULL, 0,                     // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  spim_trx_set_status set_stat;
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			  dummy_data, DUMMY_DATA_SIZE, // transmit
+			  NULL, 0,                     // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
 
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -195,13 +195,13 @@ END_TEST
 START_TEST(test_receive_bytes)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
+  spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    NULL, 0,                 // transmit
-			    rx_buf, DUMMY_DATA_SIZE, // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			  NULL, 0,                 // transmit
+			  rx_buf, DUMMY_DATA_SIZE, // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
   
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -231,13 +231,13 @@ END_TEST
 START_TEST(test_send_receive)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
+  spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, DUMMY_DATA_SIZE/2, // transmit
-			    rx_buf, DUMMY_DATA_SIZE,       // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			  dummy_data, DUMMY_DATA_SIZE/2, // transmit
+			  rx_buf, DUMMY_DATA_SIZE,       // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
 
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -268,26 +268,26 @@ END_TEST
 START_TEST(test_trx_multiple)
 {
   spim_trx trx0, trx1;
-  spim_trx_init_status init_stat;
+  spim_trx_set_status set_stat;
   spim_trx_queue_status queue_stat;
   uint8_t rx_buf0[DUMMY_DATA_SIZE], rx_buf1[DUMMY_DATA_SIZE];
 
-  // init trx0
-  init_stat = spim_trx_init(&trx0, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, DUMMY_DATA_SIZE, // transmit
-			    rx_buf0, DUMMY_DATA_SIZE,    // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  // set trx0
+  set_stat = spim_trx_set(&trx0, SPI_DUMMY_PIN, &dummy_port, 
+			  dummy_data, DUMMY_DATA_SIZE, // transmit
+			  rx_buf0, DUMMY_DATA_SIZE,    // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx0));
 
-  // init trx1
-  init_stat = spim_trx_init(&trx1, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, DUMMY_DATA_SIZE, // transmit
-			    rx_buf1, DUMMY_DATA_SIZE,    // receive
-			    SPIM_NO_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  // set trx1
+  set_stat = spim_trx_set(&trx1, SPI_DUMMY_PIN, &dummy_port, 
+			  dummy_data, DUMMY_DATA_SIZE, // transmit
+			  rx_buf1, DUMMY_DATA_SIZE,    // receive
+			  SPIM_NO_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx1));
-
+  
   // queue trx0
   queue_stat = spim_trx_queue(&trx0);
   ck_assert(queue_stat == SPIM_TRX_QUEUE_OK);
@@ -340,13 +340,13 @@ END_TEST
 START_TEST(test_trx_delay)
 {
   spim_trx trx;
-  spim_trx_init_status init_stat;
+  spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
-  init_stat = spim_trx_init(&trx, SPI_DUMMY_PIN, &dummy_port, 
-			    dummy_data, DUMMY_DATA_SIZE/2, // transmit
-			    rx_buf, DUMMY_DATA_SIZE,       // receive
-			    DUMMY_DELAY);
-  ck_assert(init_stat == SPIM_TRX_INIT_OK);
+  set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
+			   dummy_data, DUMMY_DATA_SIZE/2, // transmit
+			   rx_buf, DUMMY_DATA_SIZE,       // receive
+			   DUMMY_DELAY);
+  ck_assert(set_stat == SPIM_TRX_SET_OK);
   ck_assert(! spim_trx_is_in_transmission(&trx));
 
   spim_trx_queue_status queue_stat = spim_trx_queue(&trx);
@@ -390,7 +390,7 @@ Suite *spi_master_suite(void)
 {
   Suite *s = suite_create("Spi master");
 
-  add_tcase(s, test_trx_init_invalid,         "Trx init invalid");
+  add_tcase(s, test_trx_set_invalid,          "Trx set invalid");
   add_tcase(s, test_trx_queue_already_queued, "Trx queue already queued");
   add_tcase(s, test_send_single_byte,         "Send single byte");
   add_tcase(s, test_receive_single_byte,      "Receive single byte");

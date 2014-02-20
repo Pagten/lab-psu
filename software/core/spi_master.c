@@ -57,13 +57,13 @@ void spim_init(void)
 }
 
 
-spim_trx_init_status
-spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	      uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
-	      clock_time_t delay)
+spim_trx_set_status
+spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+	     uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
+	     clock_time_t delay)
 {
   if (tx_size == 0 && rx_size == 0) {
-    return SPIM_TRX_INIT_INVALID;
+    return SPIM_TRX_SET_INVALID;
   }
 
   trx->in_transmission = false;
@@ -74,7 +74,7 @@ spim_trx_init(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
   trx->rx_buf = rx_buf;
   trx->rx_remaining = rx_size;
   trx->delay = delay;
-  return SPIM_TRX_INIT_OK;
+  return SPIM_TRX_SET_OK;
 }
 
 inline
