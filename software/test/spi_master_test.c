@@ -25,13 +25,11 @@
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 3 nov 2013
  *
- * Unit test for the spi master module.
+ * Unit tests for the spi master module.
  */
 
 #include <stdint.h>
 #include <check.h>
-
-#include <stdio.h> // for testing, temporary
 
 #include "core/process.h"
 #include "core/spi_master.h"
@@ -74,6 +72,7 @@ START_TEST(test_trx_set_invalid)
 {
   spim_trx trx;
   spim_trx_set_status set_stat;
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			  NULL, 0,   // transmit
 			  NULL, 0,   // receive
@@ -88,7 +87,7 @@ END_TEST
 START_TEST(test_trx_queue_already_queued)
 {
   spim_trx trx;
-
+  spim_trx_init(&trx);
   ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_OK);
   ck_assert(spim_trx_queue(&trx) == SPIM_TRX_QUEUE_ALREADY_QUEUED);
 }
@@ -102,6 +101,7 @@ START_TEST(test_send_single_byte)
 {
   spim_trx trx;
   spim_trx_set_status set_stat;
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			   dummy_data, 1, // transmit
 			   NULL, 0,       // receive
@@ -133,6 +133,7 @@ START_TEST(test_receive_single_byte)
   spim_trx trx;
   spim_trx_set_status set_stat;
   uint8_t rx_buf;
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			  NULL, 0,    // transmit
 			  &rx_buf, 1, // receive
@@ -163,6 +164,7 @@ START_TEST(test_send_bytes)
 {
   spim_trx trx;
   spim_trx_set_status set_stat;
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			  dummy_data, DUMMY_DATA_SIZE, // transmit
 			  NULL, 0,                     // receive
@@ -197,6 +199,7 @@ START_TEST(test_receive_bytes)
   spim_trx trx;
   spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			  NULL, 0,                 // transmit
 			  rx_buf, DUMMY_DATA_SIZE, // receive
@@ -233,6 +236,7 @@ START_TEST(test_send_receive)
   spim_trx trx;
   spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			  dummy_data, DUMMY_DATA_SIZE/2, // transmit
 			  rx_buf, DUMMY_DATA_SIZE,       // receive
@@ -273,6 +277,7 @@ START_TEST(test_trx_multiple)
   uint8_t rx_buf0[DUMMY_DATA_SIZE], rx_buf1[DUMMY_DATA_SIZE];
 
   // set trx0
+  spim_trx_init(&trx0);
   set_stat = spim_trx_set(&trx0, SPI_DUMMY_PIN, &dummy_port, 
 			  dummy_data, DUMMY_DATA_SIZE, // transmit
 			  rx_buf0, DUMMY_DATA_SIZE,    // receive
@@ -281,6 +286,7 @@ START_TEST(test_trx_multiple)
   ck_assert(! spim_trx_is_in_transmission(&trx0));
 
   // set trx1
+  spim_trx_init(&trx1);
   set_stat = spim_trx_set(&trx1, SPI_DUMMY_PIN, &dummy_port, 
 			  dummy_data, DUMMY_DATA_SIZE, // transmit
 			  rx_buf1, DUMMY_DATA_SIZE,    // receive
@@ -342,6 +348,7 @@ START_TEST(test_trx_delay)
   spim_trx trx;
   spim_trx_set_status set_stat;
   uint8_t rx_buf[DUMMY_DATA_SIZE];
+  spim_trx_init(&trx);
   set_stat = spim_trx_set(&trx, SPI_DUMMY_PIN, &dummy_port, 
 			   dummy_data, DUMMY_DATA_SIZE/2, // transmit
 			   rx_buf, DUMMY_DATA_SIZE,       // receive
