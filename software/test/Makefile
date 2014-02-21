@@ -3,7 +3,7 @@ PROJECT_NAME = tests
 # Source files
 HAL_SOURCEFILES = mock_timer.c mock_timers.c spi.c #timer2.c spi.c
 UTIL_SOURCEFILES = ring_buffer.c
-TEST_SOURCEFILES = clock_test.c timer_test.c spi_master_test.c #rotary_test.c scheduler_test.c spi_master_test.c 
+TEST_SOURCEFILES = clock_test.c timer_test.c spi_master_test.c rotary_test.c
 SOURCEDIRS = hal util
 SOURCEFILES = $(HAL_SOURCEFILES) $(UTIL_SOURCEFILES) $(TEST_SOURCEFILES)
 
