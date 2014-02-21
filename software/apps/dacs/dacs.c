@@ -110,7 +110,7 @@ PROCESS_THREAD(dacs_process)
   static mcp4922_pkt mcp4922_pkt;
   PROCESS_BEGIN();
 
-  mcp4922_pkt_set(&mcp4922_pkt, 0, NULL, MCP4922_CHANNEL_A, 0);
+  mcp4922_pkt_init(&mcp4922_pkt);
 
   while (true) {
     PROCESS_WAIT_EVENT();
@@ -146,7 +146,7 @@ PROCESS_THREAD(dacs_process)
     } else {
       mcp4922_pkt_set(&mcp4922_pkt, DAC_CS_PIN, DAC_CS_PORT,
 		      MCP4922_CHANNEL_A, dac_value);
-      mcp4922_queue(&mcp4922_pkt);
+      mcp4922_pkt_queue(&mcp4922_pkt);
     }
   }
 

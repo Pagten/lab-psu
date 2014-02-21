@@ -80,12 +80,24 @@ void spim_init(void);
 
 
 /**
- * Set an SPI transfer data structure.
+ * Initialize an SPI transfer data structure.
+ * 
+ * Every SPI transfer data structure must be initialized at least once before
+ * passing it to one of the other functions of this module. This function
+ * must not be called on transfers that are in the transfer queue.
+ *
+ * @param trx  The transfer data structure to initialize
+ */
+void spim_trx_init(spim_trx* trx);
+
+
+/**
+ * Configure an SPI transfer data structure.
  * 
  * This function should not be called on SPI transfers that are in
  * transmission.
  *
- * @param trx      The transfer data structure to initialize
+ * @param trx      The transfer data structure to configure
  * @param ss_pin   The number of the pin connected to the SPI slave to address
  * @param ss_port  The port of the pin connected to the SPI slave to address
  * @param tx_buf   The data to be transmitted (can be NULL if tx_size is NULL)

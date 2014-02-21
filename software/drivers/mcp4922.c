@@ -41,6 +41,13 @@ void mcp4922_init()
 { }
 
 
+inline
+void mcp4922_pkt_init(mcp4922_pkt* pkt)
+{
+  spim_trx_init(&(pkt->spim_trx));
+}
+
+
 void
 mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
 		mcp4922_channel ch, uint16_t value)
@@ -67,14 +74,15 @@ bool mcp4922_pkt_is_in_transmission(mcp4922_pkt* pkt)
 }
 
 
-mcp4922_queue_status mcp4922_queue(mcp4922_pkt* pkt)
+mcp4922_pkt_queue_status
+mcp4922_pkt_queue(mcp4922_pkt* pkt)
 {
   spim_trx_queue_status stat;
   stat = spim_trx_queue(&(pkt->spim_trx));
   if (stat != SPIM_TRX_QUEUE_OK) {
-    return MCP4922_QUEUE_ERROR;
+    return MCP4922_PKT_QUEUE_ERROR;
   }
 
-  return MCP4922_QUEUE_OK;
+  return MCP4922_PKT_QUEUE_OK;
 }
 

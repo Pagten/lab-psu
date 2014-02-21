@@ -57,6 +57,13 @@ void spim_init(void)
 }
 
 
+void spim_trx_init(spim_trx* trx)
+{
+  trx->in_transmission = false;
+  trx->ss_port = NULL;
+}
+
+
 spim_trx_set_status
 spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 	     uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,

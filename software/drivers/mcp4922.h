@@ -39,15 +39,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/spi_master.h"
+
 typedef enum {
   MCP4922_CHANNEL_A,
   MCP4922_CHANNEL_B,
 } mcp4922_channel;
 
 typedef enum {
-  MCP4922_QUEUE_OK,
-  MCP4922_QUEUE_ERROR,
-} mcp4922_queue_status;
+  MCP4922_PKT_QUEUE_OK,
+  MCP4922_PKT_QUEUE_ERROR,
+} mcp4922_pkt_queue_status;
 
 
 /**
@@ -70,11 +72,23 @@ void mcp4922_init(void);
 
 
 /**
- * Set an MCP4922 packet data structure.
+ * Initialize an MCP4922 packet data structure
+ * 
+ * Every MCP4922 packet must be initialized at least once before passing it to
+ * one of the other functions of this module. This function must not be called
+ * on packets that are in the transfer queue.
+ *
+ * @param pkt      The packet data structure to initialize
+ */
+void mcp4922_pkt_init(mcp4922_pkt* pkt);
+
+
+/**
+ * Configure an MCP4922 packet data structure.
  *
  * This function should not be called on a packet that is in transmission.
  * 
- * @param pkt    The MCP4922 packet data structure to initialize
+ * @param pkt    The MCP4922 packet data structure to configure
  * @param pin    The number of the pin connected to the MCP4922's CS pin
  * @param port   The port of the pin connected to the MCP4922's CS pin
  * @param ch     The output channel to set
@@ -102,12 +116,12 @@ bool mcp4922_pkt_is_in_transmission(mcp4922_pkt* pkt);
  * must first be initialized using the mcp4922_pkt_init() function.
  *
  * @param pkt  The MCP4922 packet to queue
- * @return MCP4922_QUEUE_OK if the packet was queued succesfully, or
- *         MCP4922_QUEUE_ERROR if the transfer was not initialized using the
+ * @return MCP4922_PKT_QUEUE_OK if the packet was queued succesfully, or
+ *         MCP4922_PKT_QUEUE_ERROR if the transfer was not initialized using the
  *         mcp4922_pkt_init() function before queing it, or if was already
  *         queued.
  */
-mcp4922_queue_status mcp4922_queue(mcp4922_pkt* pkt);
+mcp4922_pkt_queue_status mcp4922_pkt_queue(mcp4922_pkt* pkt);
 
 
 
