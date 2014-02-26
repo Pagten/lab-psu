@@ -7,15 +7,16 @@
 #define DD_SCK   5
 #define DD_MISO  4
 #define DD_MOSI  3
+#define DD_SS    2
 
 #define SPI_SET_ROLE_MASTER()      SPCR |= _BV(MSTR)
 #define SPI_SET_DATA_ORDER_LSB()   SPCR |= _BV(DORD)
 #define SPI_SET_DATA_ORDER_MSB()   SPCR &= ~_BV(DORD)
 #define SPI_ENABLE()               SPCR |= _BV(SPE)
-#define SPI_SET_PIN_DIRS_MASTER()	     \
-  do {                                       \
-    DDR_SPI |= (_BV(DD_MOSI) | _BV(DD_SCK)); \
-    DDR_SPI &= ~_BV(DD_MISO);                \
+#define SPI_SET_PIN_DIRS_MASTER()				\
+  do {								\
+    DDR_SPI |= (_BV(DD_MOSI) | _BV(DD_SCK) | _BV(DD_SS));	\
+    DDR_SPI &= ~_BV(DD_MISO);					\
   } while(0)
 #define SPI_SET_MODE(cpol,cpha)                         \
   do {                                                  \

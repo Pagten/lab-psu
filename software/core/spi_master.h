@@ -72,6 +72,9 @@ PROCESS_NAME(spim_trx_process);
 /**
  * Initializes the SPI master module.
  *
+ * Note: This module configure the SS pin as an output, which is required for
+ * the SPI to operate in master mode (see the ATmega datasheet for details).
+ * 
  * Dependencies that must be initialized first:
  *  * process
  *  * clock
