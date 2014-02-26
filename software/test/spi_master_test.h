@@ -28,8 +28,8 @@
  * Units tests for the spi master module.
  */
 
-#ifndef SPI_MASTER_H
-#define SPI_MASTER_H
+#ifndef SPI_MASTER_TEST_H
+#define SPI_MASTER_TEST_H
 
 #include <check.h>
 
