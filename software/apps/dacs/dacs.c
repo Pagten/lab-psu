@@ -50,16 +50,12 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
-#define DEBUG0 B,1
-#define DEBUG1 B,2
-#define DEBUG2 D,0
-
 
 #define ROT0A C,3
 #define ROT0B C,2
 #define DAC_CS B,0
-#define DAC_CS_PORT &PORTB
-#define DAC_CS_PIN  0 
+#define DAC_CS_PORT &PORTB  //TODO: use macro to extract this from DAC_CS
+#define DAC_CS_PIN  0       //TODO: use macro to extract this from DAC_CS
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
@@ -75,13 +71,6 @@ static rotary rot0;
 static inline
 void init_pins(void)
 {
-  SET_PIN_DIR_OUTPUT(DEBUG0);
-  SET_PIN_DIR_OUTPUT(DEBUG1);
-  SET_PIN_DIR_OUTPUT(DEBUG2);
-  CLR_PIN(DEBUG0);
-  CLR_PIN(DEBUG1);
-  CLR_PIN(DEBUG2);
-
   SET_PIN_DIR_INPUT(ROT0A);
   SET_PIN_DIR_INPUT(ROT0B);
 
@@ -106,9 +95,9 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0B), INTERRUPT_ALIAS(PC_INTERRUPT_VECT(ROT0A)));
 
 PROCESS_THREAD(dacs_process)
 {
+  PROCESS_BEGIN();
   static uint16_t dac_value = DAC_MIN;
   static mcp4922_pkt mcp4922_pkt;
-  PROCESS_BEGIN();
 
   mcp4922_pkt_init(&mcp4922_pkt);
 
@@ -120,7 +109,6 @@ PROCESS_THREAD(dacs_process)
   
       switch (step) {
       case ROT_STEP_CW:
-	TGL_PIN(DEBUG0);
 	if (dac_value <= DAC_MAX - DAC_STEP) {
 	  dac_value += DAC_STEP;
 	} else {
@@ -128,7 +116,6 @@ PROCESS_THREAD(dacs_process)
 	}
 	break;
       case ROT_STEP_CCW:
-	TGL_PIN(DEBUG1);
 	if (dac_value >= DAC_MIN + DAC_STEP) {
 	  dac_value -= DAC_STEP;
 	} else {
@@ -170,7 +157,7 @@ int main(void)
 
   process_start(&dacs_process);
 
-  while (1) {
+  while (true) {
     process_execute();
   }
 }
