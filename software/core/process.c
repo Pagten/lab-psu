@@ -40,9 +40,6 @@
 // Should preferably be a power of 2
 #define PROCESS_CONF_EVENT_QUEUE_SIZE 16
 
-static process* process_list_head;
-static process* next_process;
-
 struct event {
   process* p;
   process_event_t ev;
@@ -55,55 +52,20 @@ static uint8_t event_queue_first;
 
 void process_init(void)
 {
-  process_list_head = NULL;
-  next_process = NULL;
-
   event_queue_count = 0;
   event_queue_first = 0;
 }
 
-static bool process_list_contains(process* p)
+
+void process_start(process* p)
 {
-  process* proc = process_list_head;
-  while (proc != NULL) {
-    if (proc == p) {
-      return true;
-    }
-  }
-  return false;
-}
-
-
-process_start_status process_start(process* p)
-{
-  if (process_list_contains(p)) {
-    return PROCESS_START_ALREADY_STARTED;
-  }
-
-  // Add p to the process list
-  p->next = process_list_head;
-  process_list_head = p;
-
   // Initialize the protothread
   PT_INIT(&p->pt);
 
-  // Send INIT event
-  process_post_event(p, PROCESS_EVENT_INIT, PROCESS_DATA_NULL);
-
-  return PROCESS_START_OK;
+  // Synchronously send INIT event
+  p->thread(p, PROCESS_EVENT_INIT, PROCESS_DATA_NULL);
 }
 
-process_stop_status process_stop(process* p)
-{
-  process** proc = &process_list_head;
-  while (*proc != NULL) {
-    if (*proc == p) {
-      *proc = (*proc)->next;
-      return PROCESS_STOP_OK;
-    }
-  }
-  return PROCESS_STOP_NOT_STARTED;
-}
 
 process_post_event_status
 process_post_event(process* p, process_event_t ev, process_data_t data)

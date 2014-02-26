@@ -46,7 +46,6 @@ typedef void* process_data_t;
 typedef struct process {
   struct pt pt;
   PT_THREAD((*thread)(struct process*, process_event_t, process_data_t));
-  struct process* next;
 } process;
 
 
@@ -65,8 +64,7 @@ typedef struct process {
  */
 #define PROCESS(name)				\
   PROCESS_THREAD(name);				\
-  process name = { .next = NULL,		\
-		   .thread = thread_##name }
+  process name = { .thread = thread_##name }
 
 /**
  * Externally declare a process name, to refer to a process created with the
@@ -178,17 +176,6 @@ typedef struct process {
 #define PROCESS_CURRENT()  pc
 
 
-
-typedef enum {
-  PROCESS_START_OK,
-  PROCESS_START_ALREADY_STARTED,
-} process_start_status;
-
-typedef enum {
-  PROCESS_STOP_OK,
-  PROCESS_STOP_NOT_STARTED,
-} process_stop_status;
-
 typedef enum {
   PROCESS_POST_EVENT_OK,
   PROCESS_POST_EVENT_QUEUE_FULL,
@@ -205,20 +192,8 @@ void process_init(void);
  * Start a process. The process will periodically be given CPU time.
  *
  * @param p  The process to start
- * @return PROCESS_START_OK if the process was started successfully, or 
- *         PROCESS_START_ALREADY_STARTED if it had already been started 
- *         
  */
-process_start_status process_start(process* p);
-
-/**
- * Stop a process.
- *
- * @param p  The process to stop
- * @return PROCESS_STOP_OK if the process was stopped successfully, or
- *         PROCESS_STOP_NOT_STARTED if the process was not started before.
- */
-process_stop_status process_stop(process* p);
+void process_start(process* p);
 
 
 /**
