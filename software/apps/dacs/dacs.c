@@ -54,8 +54,6 @@ FUSES =
 #define ROT0A C,3
 #define ROT0B C,2
 #define DAC_CS B,0
-#define DAC_CS_PORT &PORTB  //TODO: use macro to extract this from DAC_CS
-#define DAC_CS_PIN  0       //TODO: use macro to extract this from DAC_CS
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
@@ -131,7 +129,7 @@ PROCESS_THREAD(dacs_process)
       process_post_event(PROCESS_CURRENT(), EVENT_MCP4922_WAS_BUSY,
 			 PROCESS_DATA_NULL);
     } else {
-      mcp4922_pkt_set(&mcp4922_pkt, DAC_CS_PIN, DAC_CS_PORT,
+      mcp4922_pkt_set(&mcp4922_pkt, GET_BIT(DAC_CS), GET_PORT(DAC_CS),
 		      MCP4922_CHANNEL_A, dac_value);
       mcp4922_pkt_queue(&mcp4922_pkt);
     }
