@@ -22,6 +22,10 @@
 #ifndef HD44780_H
 #define HD44780_H
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "hal/gpio.h"
+
 /**
  * @file hd44780.h
  * @author Pieter Agten (pieter.agten@gmail.com)
@@ -38,26 +42,29 @@
  */
 
 typedef struct {
-  port_ptr hnibble_port;
-  uint8_t hnibble_shift;
+  port_ptr data_port;
   port_ptr ctrl_port;
+  uint8_t data_shift;
+  uint8_t data_mask;
+  uint8_t e_mask;
   uint8_t rs_mask;
   uint8_t rw_mask;
 } hd44780_lcd;
 
 typedef enum {
   HD44780_ONE_ROW  = 0,
-  HD44780_TWO_ROWS = 1,
+  HD44780_TWO_ROWS = 8,
 } hd44780_nb_rows;
 
 typedef enum {
   HD44780_LEFT  = 0,
-  HD44780_RIGHT = 1,
+  HD44780_RIGHT = 2,
 } hd44780_direction;
 
 typedef enum {
   HD44780_SETUP_OK,
   HD44780_SETUP_HNIBBLE_PIN_INVALID,
+  HD44780_SETUP_E_PIN_INVALID,
   HD44780_SETUP_RS_PIN_INVALID,
   HD44780_SETUP_RW_PIN_INVALID,
 } hd44780_setup_status;
@@ -81,11 +88,11 @@ void hd44780_init(void);
  * @param lcd          The driver structure to set up
  * @param hnibble_port Address of the IO port connected to the four upper data
  *                     lines of the LCD.
+ * @param ctrl_port    Address of the control port, connected to the E, RS and
+ *                     RW lines of the LCD.
  * @param hnibble_pin  Pin of the hnibble port connected to D4. The next three
  *                     pins are assumed to be connected to the next three data
  *                     lines.
- * @param ctrl_port    Address of the control port, connected to the E, RS and
- *                     RW lines of the LCD.
  * @param rs_pin       Control port pin connected to the RS line.
  * @param rw_pin       Control port pin connected to the RW line.
  * @return HD44780_SETUP_OK if the data structure was set up successfully, or
@@ -93,8 +100,8 @@ void hd44780_init(void);
  *         of range.
  */
 hd44780_setup_status
-hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, uint8_t hnibble_pin,
-		  port_ptr ctrl_port, uint8_t e_pin, uint8_t rs_pin,
+hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
+		  uint8_t hnibble_pin, uint8_t e_pin, uint8_t rs_pin,
 		  uint8_t rw_pin);
 
 
@@ -120,22 +127,31 @@ void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows);
  */
 void hd44780_lcd_clear(hd44780_lcd* lcd);
 
+
+/**
+ * Move the cursor of an HD44780 LCD to the home position.
+ *
+ * @param lcd  The LCD device of which to move the cursor to the home position.
+ */
+void hd44780_lcd_home(hd44780_lcd* lcd);
+
+
 /**
  * Set the character entry mode of an HD44780 LCD.
  *
  * @param lcd            The LCD device of which to set the character
  *                       entry mode.
- * @param shift_display  If this parameter is set true, the entire display
- *                       contents will shift when a character is written, such
- *                       that the cursor stays at the same location.
  * @param cursor_dir     Determines the direction in which the cursor moves
  *                       after writing a character. If shift_display is set
  *                       to true, the entire display shifts in the other
  *                       direction such that the cursor stays at the same
  *                       location.
+ * @param shift_display  If this parameter is set true, the entire display
+ *                       contents will shift when a character is written, such
+ *                       that the cursor stays at the same location.
  */
-void hd44780_lcd_set_entry_mode(hd44780_lcd* lcd, bool shift_display,
-				hd44780_direction cursor_dir);
+void hd44780_lcd_set_entry_mode(hd44780_lcd* lcd, hd44780_direction cursor_dir,
+				bool shift_display);
 
 
 /**
@@ -265,7 +281,7 @@ uint8_t hd44780_lcd_read_address(hd44780_lcd* lcd);
  * @param lcd  The LCD device of which to read data.
  * @return The data read from the DDRAM or CGRAM.
  */
-uint8_t hd44780_lcd_read(hd44780_lcd* lcd)
+uint8_t hd44780_lcd_read(hd44780_lcd* lcd);
 
 
 

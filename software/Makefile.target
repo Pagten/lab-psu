@@ -11,8 +11,8 @@ CC = avr-gcc
 LD = avr-gcc
 NM = avr-nm
 ELF_SIZE = @avr-size -C --mcu=$(MCU)
-CFLAGS = -mmcu=$(MCU) -fno-strict-aliasing -DF_CPU=$(F_CPU)
-LDFLAGS = -mmcu=$(MCU) -fno-strict-aliasing
+CFLAGS += -mmcu=$(MCU) -fno-strict-aliasing -DF_CPU=$(F_CPU)
+LDFLAGS += -mmcu=$(MCU) -fno-strict-aliasing
 #TODO: link-time optimization
 
 AVRDUDE ?= avrdude

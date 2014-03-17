@@ -92,7 +92,11 @@
  */
 typedef volatile uint8_t* port_ptr;
 
+#define P_SET_PINS(port, mask)              *(port) |= (mask)
 #define P_CLR_PINS(port, mask)              *(port) &= ~(mask)
+
+#define P_GET_VAL(port)                     (*GET_PIN_REG(port))
+#define P_SET_VAL(port, value)              *(port) = (value)
 
 #define P_SET_PINS_DIR_OUTPUT(port, mask)   *GET_DDR_REG(port) |= (mask)
 #define P_SET_PINS_DIR_INPUT(port, mask)    *GET_DDR_REG(port) &= ~(mask)
