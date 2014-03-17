@@ -32,8 +32,6 @@
 #include <stdlib.h>
 #include <util/delay.h>
 
-#include "config.h"
-
 #include "hal/gpio.h" 
 #include "hal/fuses.h"
 #include "hal/interrupt.h"
