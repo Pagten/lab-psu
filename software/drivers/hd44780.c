@@ -33,9 +33,6 @@
 #include <util/delay.h>
 #include "util/bit.h"
 
-// Pessimistic bus timing characteristics
-#define DATA_SETUP_TIME_US 0.195 //Time data must be stable before E can go low
-
 
 void hd44780_init(void)
 { }
