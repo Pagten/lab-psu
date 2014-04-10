@@ -80,7 +80,8 @@ INTERRUPT(PC_INTERRUPT_VECT(ROT0A))
   uint8_t input = ((GET_PIN(ROT0A) << 1) | GET_PIN(ROT0B));
   rot_step_status step = rot_process_step(&rot0, input);
   if (step == ROT_STEP_CW || step == ROT_STEP_CCW) {
-    process_post_event(&dacs_process, EVENT_ROTARY_STEP_TAKEN, (void*)step);
+    process_post_event(&dacs_process, EVENT_ROTARY_STEP_TAKEN, 
+		       (process_data_t)step);
   }
 }
 #if PC_INTERRUPT_VECT(ROT0B) != PC_INTERRUPT_VECT(ROT0A)
@@ -127,7 +128,7 @@ PROCESS_THREAD(dacs_process)
       process_post_event(PROCESS_CURRENT(), EVENT_MCP4922_WAS_BUSY,
 			 PROCESS_DATA_NULL);
     } else {
-      mcp4922_pkt_set(&mcp4922_pkt, GET_BIT(DAC_CS), GET_PORT(DAC_CS),
+      mcp4922_pkt_set(&mcp4922_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
 		      MCP4922_CHANNEL_A, dac_value);
       mcp4922_pkt_queue(&mcp4922_pkt);
     }

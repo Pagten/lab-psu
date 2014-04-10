@@ -40,7 +40,7 @@
 #include "lib/pt/pt.h"
 
 typedef uint8_t process_event_t;
-typedef void* process_data_t;
+typedef uintptr_t process_data_t;
 
 #define PACK_PROCESS_DATA(b0,b1)  ((process_data_t)((b1 << 8) | b0))
 #define UNPACK_PROCESS_DATA0(d)   (d & 0xFF)
@@ -57,7 +57,7 @@ typedef struct process {
 #define PROCESS_EVENT_CONTINUE 0x81
 
 // Empty data
-#define PROCESS_DATA_NULL   NULL
+#define PROCESS_DATA_NULL   ((process_data_t)NULL)
 
 
 /**
