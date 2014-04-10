@@ -28,6 +28,7 @@
 
 #include "core/spi_master.h"
 #include "util/bit.h"
+#include "hal/gpio.h"
 
 #include "mcp4922.h"
 
@@ -49,7 +50,7 @@ void mcp4922_pkt_init(mcp4922_pkt* pkt)
 
 
 void
-mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
+mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, port_ptr port,
 		mcp4922_channel ch, uint16_t value)
 {
   spim_trx_set(&(pkt->spim_trx), pin, port,
