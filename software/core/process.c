@@ -23,7 +23,7 @@
 /**
  * @file process.c
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 8 feb 2014
+ * @date 8 Feb 2014
  *
  * This file implements processes, based on protothreads. It is inspired by the
  * processes implementation of Contiki.
@@ -38,7 +38,7 @@
 #include "process.h"
 
 // Should preferably be a power of 2
-#define PROCESS_CONF_EVENT_QUEUE_SIZE 16
+#define PROCESS_CONF_EVENT_QUEUE_SIZE 32
 
 struct event {
   process* p;

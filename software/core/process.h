@@ -25,7 +25,7 @@
 /**
  * @file process.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 8 feb 2014
+ * @date 8 Feb 2014
  *
  * This file implements processes, based on protothreads. It is inspired by the
  * processes implementation of Contiki.
@@ -42,6 +42,9 @@
 typedef uint8_t process_event_t;
 typedef void* process_data_t;
 
+#define PACK_PROCESS_DATA(b0,b1)  ((process_data_t)((b1 << 8) | b0))
+#define UNPACK_PROCESS_DATA0(d)   (d & 0xFF)
+#define UNPACK_PROCESS_DATA1(d)   (d >> 8)
 
 typedef struct process {
   struct pt pt;
