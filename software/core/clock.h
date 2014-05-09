@@ -22,6 +22,17 @@
 #ifndef CLOCK_H
 #define CLOCK_H
 
+/**
+ * @file clock.h
+ * @author Pieter Agten <pieter.agten@gmail.com>
+ * @date 02 Feb 2014
+ *
+ * The clock is a monotic counter that is incremented periodically. It can be
+ * used as a reference for short periods of time (it overflows every 3 to 10
+ * seconds, depending on the MCU's clock speed).
+ */
+
+
 #include <stdint.h>
 
 #include "hal/timers.h"
@@ -42,7 +53,7 @@ typedef uint16_t clock_time_t;
 #define CLOCK_TIME_MAX UINT16_MAX
 
 /**
- * Initialize the clock.
+ * Initialize the clock module.
  */
 void clock_init(void);
 

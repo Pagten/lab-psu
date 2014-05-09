@@ -95,7 +95,7 @@ void mcp4922_pkt_init(mcp4922_pkt* pkt);
  * @param value  The output value for the channel (only the 12 LSB's are used)
  */
 void
-mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, volatile uint8_t* port,
+mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, port_ptr port,
 		mcp4922_channel ch, uint16_t value);
 
 

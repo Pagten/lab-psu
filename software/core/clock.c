@@ -19,6 +19,12 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * @file clock.c
+ * @author Pieter Agten <pieter.agten@gmail.com>
+ * @date 02 Feb 2014
+ */
+
 #include "clock.h"
 #include "hal/interrupt.h"
 
