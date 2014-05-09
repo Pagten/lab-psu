@@ -29,7 +29,7 @@
 #define TIMER0_OCA_DISCONNECT   TCCR0A &= ~(_BV(COM0A1) | _BV(COM0A0))
 #define TIMER0_OCB_DISCONNECT   TCCR0A &= ~(_BV(COM0B1) | _BV(COM0B0))
 
-// Interrups
+// Interrupts
 #define TIMER0_OCA_INTR_ENABLE   TIMSK0 |= OCIE0A
 #define TIMER0_OCB_INTR_ENABLE   TIMSK0 |= OCIE0B
 #define TIMER0_OVF_INTR_ENABLE   TIMSK0 |= TOIE0
@@ -106,6 +106,11 @@
 #define TIMER0_SET_CLOCK_EXT_RISING		\
   TCCR0B |= (_BV(CS02) | _BV(CS01) | _BV(CS00))
 
+
+#define TIMER0_OCA_SET_OCR(val)  OCR0A = val
+#define TIMER0_OCA_GET_OCR       OCR0A
+#define TIMER0_OCB_SET_OCR(val)  OCR0B = val
+#define TIMER0_OCB_GET_OCR       OCR0B
 #define TIMER0_SET_CNTR(val) TCNT0 = val
 #define TIMER0_GET_CNTR      TCNT0
 

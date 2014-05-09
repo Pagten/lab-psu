@@ -23,7 +23,7 @@
 /**
  * @file process.c
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 8 Feb 2014
+ * @date 08 Feb 2014
  *
  * This file implements processes, based on protothreads. It is inspired by the
  * processes implementation of Contiki.
@@ -33,8 +33,7 @@
  */
 
 #include <stdlib.h>
-
-#include "util/atomic.h"
+#include <util/atomic.h>
 #include "process.h"
 
 // Should preferably be a power of 2

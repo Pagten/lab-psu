@@ -22,7 +22,7 @@
 /**
  * @file bit.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 jul 2013
+ * @date 14 Jul 2013
  *
  * Bit-fiddling related helper functions
  */

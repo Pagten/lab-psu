@@ -44,6 +44,7 @@
 #include "devices.h"
 #include <avr/io.h>
 
+#include "util/pp_magic.h"
 
 /**
  * Macros for pin symbols
@@ -63,6 +64,7 @@
 
 #define GET_PORT(pb)             PORT(pb)
 #define GET_BIT(pb)              B(pb)
+#define GET_PIN_MASK(...)        BMSK(__VA_ARGS__)
 
 #define GET_PIN(pb)              GET_PORT_BIT(PIN(pb),B(pb))
 #define SET_PIN(pb)              SET_PORT_BIT(PORT(pb),B(pb))
@@ -131,6 +133,26 @@ typedef volatile uint8_t* port_ptr;
 
 #define GET_DDR_REG(port) ((port) - 1)
 #define GET_PIN_REG(port) ((port) - 2)
+
+
+#define _BMSK1(a) _BV(a)
+#define _BMSK2(a,b) \
+  _BV(a) | _BV(b)
+#define _BMSK3(a,b,c) \
+  _BV(a) | _BV(b) | _BV(c)
+#define _BMSK4(a,b,c,d) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d)
+#define _BMSK5(a,b,c,d,e) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d) | _BV(e)
+#define _BMSK6(a,b,c,d,e,f) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d) | _BV(e) | _BV(f) 
+#define _BMSK7(a,b,c,d,e,f,g) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d) | _BV(e) | _BV(f) | _BV(g)
+#define _BMSK8(a,b,c,d,e,f,g,h) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d) | _BV(e) | _BV(f) | _BV(g) | _BV(h)
+#define _BMSK9(a,b,c,d,e,f,g,h,i) \
+  _BV(a) | _BV(b) | _BV(c) | _BV(d) | _BV(e) | _BV(f) | _BV(g) | _BV(h) | _BV(i)
+#define BMSK(...) _PASTE2(_BMSK, NARG(__VA_ARGS__)(__VA_ARGS__))
 
 
 #endif

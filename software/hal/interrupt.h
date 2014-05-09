@@ -25,7 +25,7 @@
 /**
  * @file interrupt.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 17 dec 2013
+ * @date 17 Dec 2013
  */
 
 #include <avr/interrupt.h>

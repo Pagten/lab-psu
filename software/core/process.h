@@ -25,7 +25,7 @@
 /**
  * @file process.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 8 Feb 2014
+ * @date 08 Feb 2014
  *
  * This file implements processes, based on protothreads. It is inspired by the
  * processes implementation of Contiki.

@@ -79,6 +79,8 @@
 #define TMR_SET_MODE(tmr,mode)          CAT(tmr,_SET_MODE_,mode)
 #define TMR_SET_PRESCALER(tmr,val)      TMR_SET_CLOCK(tmr, CAT(PRESCALE_,val))
 #define TMR_SET_CLOCK(tmr,val)          CAT(tmr,_SET_CLOCK_,val)
+#define TMR_SET_OCR(tmr,ch,val)         CAT(tmr,_,ch,_SET_OCR(val))
+#define TMR_GET_OCR(tmr,ch)             CAT(tmr,_,ch,_GET_OCR)
 #define TMR_SET_CNTR(tmr,val)           CAT(tmr,_SET_CNTR(val))
 #define TMR_GET_CNTR(tmr)               CAT(tmr,_GET_CNTR)
 

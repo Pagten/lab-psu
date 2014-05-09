@@ -23,7 +23,7 @@
 /**
  * @file rotary.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 30 nov 2013
+ * @date 30 Nov 2013
  *
  * This file implements rotary encoder step decoding and debouncing. It is
  * based on code provided by Ben Buxton at his blog
@@ -31,6 +31,7 @@
  */
 
 #include "rotary.h"
+#include "util/bit.h"
 
 #define R_POS0 0x0
 #define R_CCW0 0x1
@@ -42,23 +43,23 @@
 /* 
  * State diagram:
  * 
- * Position A B            
+ * Position B A            
  *    0     0 0   |        ^
- *   1/2    1 0   |       /|\ ccw 
+ *   1/2    0 1   |       /|\ ccw 
  *    1     1 1  \|/ cw    | 
- *   3/2    0 1   v        |
+ *   3/2    1 0   v        |
  *
  * Note that inverting the inputs A and B does not break the algorithm nor
  * does it change the direction of rotation.
  */
 //             00                   01          10         11
 static const uint8_t ttable[6][4] = {
-/*R_POS0 */   {R_POS0,              R_CCW0,     R_CW0,     R_POS1},
-/*R_CCW0 */   {R_POS0,              R_CCW0,     R_POS0,    R_POS1|ROT_STEP_CCW},
-/*R_CW0  */   {R_POS0,              R_POS0,     R_CW0,     R_POS1|ROT_STEP_CW},
-/*R_POS1 */   {R_POS0,              R_CW1,      R_CCW1,    R_POS1},
-/*R_CW1  */   {R_POS0|ROT_STEP_CW,  R_CW1,      R_POS1,    R_POS1},
-/*R_CCW1 */   {R_POS0|ROT_STEP_CCW, R_POS1,     R_CCW1,    R_POS1},
+/*R_POS0 */   {R_POS0,              R_CW0,      R_CCW0,     R_POS1},
+/*R_CCW0 */   {R_POS0,              R_POS0,     R_CCW0,     R_POS1|ROT_STEP_CCW},
+/*R_CW0  */   {R_POS0,              R_CW0,      R_POS0,     R_POS1|ROT_STEP_CW},
+/*R_POS1 */   {R_POS0,              R_CCW1,     R_CW1,      R_POS1},
+/*R_CW1  */   {R_POS0|ROT_STEP_CW,  R_POS1,     R_CW1,      R_POS1},
+/*R_CCW1 */   {R_POS0|ROT_STEP_CCW, R_CCW1,     R_POS1,     R_POS1},
 };
 
 
@@ -67,6 +68,11 @@ void rot_init(rotary* rot)
   rot->state = 0;
 }
 
+inline
+uint8_t rot_input(uint8_t input, uint8_t a, uint8_t b)
+{
+  return ((input & bv8(a)) >> a) | ((input & bv8(b)) >> (b - 1));
+}
 
 inline
 rot_step_status rot_process_step(rotary* rot, uint8_t input)

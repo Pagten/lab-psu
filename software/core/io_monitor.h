@@ -67,9 +67,13 @@ typedef enum {
   IOMON_EVENT_ALREADY_DISABLED,
 } iomon_event_disable_status;
 
+// To extract the debounced and toggled states from the process event data
+#define DEBOUNCED(data)   UNPACK_PROCESS_DATA0(data)
+#define TOGGLED(data)     UNPACK_PROCESS_DATA1(data)
 
 // Non-portable, depends on specific port addresses
-#define PORT_PTR_TO_IOMON_PORT(pptr)  (((pptr) & 0x03) ^ 0x01)
+#define PORT_PTR_TO_IOMON_PORT(pptr)				\
+  ((uint8_t)((uintptr_t)(pptr) & (uintptr_t)0x03) ^ 0x01)
 
 /**
  * Initialize the I/O monitor module.

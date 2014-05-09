@@ -25,7 +25,7 @@
 /**
  * @file rotary.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 30 nov 2013
+ * @date 30 Nov 2013
  *
  * This file provides rotary encoder step decoding and debouncing. The
  * implementation is based on code provided by Ben Buxton at his blog
@@ -56,6 +56,19 @@ typedef enum
  */
 void rot_init(rotary* rot);
 
+/**
+ * Select two bits from a byte and shift them towards the two least significant
+ * positions of the output. This is a convenience function for passing an
+ * arbitrary input to the rot_process_step() function.
+ *
+ * @param input  The raw input
+ * @param bit_a  The bit to shift to the least significant position
+ * @param bit_b  The bit to shift to the second least significant position
+ * @param For an input of 0b'XXAXXBXX (the positions of A and B are arbitrary,
+ *        but specified through the bit_a and bit_b parameters), the result
+ *        will be 0b'000000BA.
+ */
+uint8_t rot_input(uint8_t input, uint8_t bit_a, uint8_t bit_b);
 
 /**
  * Processes a single encoder step
@@ -68,8 +81,8 @@ void rot_init(rotary* rot);
  * interrupt.
  *
  * @param rot   The rotary encoder for which to process a step
- * @param input The rotary encoder input, the LSB must have the value of pin B
- *              and LSB+1 must have the value of pin A (format 0b'000000AB).
+ * @param input The rotary encoder input, the LSB must have the value of pin A
+ *              and LSB+1 must have the value of pin B (format 0b'000000BA).
  *              Inverting both bits has no influence on the outcome of the
  *              algorithm. 
  * @return ROT_STEP_CW if a clockwise step was performed, ROT_STEP_CCW if a

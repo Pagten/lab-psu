@@ -29,10 +29,12 @@
 #include "io_monitor.h"
 
 #include <stdlib.h>
+#include <util/atomic.h>
 
+#include "core/clock.h"
 #include "hal/timers.h"
 #include "hal/interrupt.h"
-#include "clock.h"
+
 
 #define NB_PORTS 3
 
@@ -49,6 +51,7 @@ void iomon_init()
     iomon_event_list_head[p] = NULL;
     port_mask[p] = 0x00;
   }
+  TMR_SET_OCR(CLOCK_TMR, OCA, CLOCK_MSEC); // Interrupt every millisecond
   TMR_INTERRUPT_ENABLE(CLOCK_TMR, OCA); // Enable OCA interrupt
 }
 
@@ -81,10 +84,10 @@ iomon_event_enable_status iomon_event_enable(iomon_event* e)
 
   *ev = e;
   e->next = NULL;
-  //  ATOMIC_BLOCK(ATOMIC_RESTORE_STATE) {
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     //TODO: check asm to see if this block is needed
     port_mask[e->port] |= e->mask;
-    //}
+  }
  
   return IOMON_EVENT_ENABLE_OK;
 }
@@ -111,15 +114,15 @@ iomon_event_disable_status iomon_event_disable(iomon_event* e)
     return IOMON_EVENT_ALREADY_DISABLED;
   }
 
-  //  ATOMIC_BLOCK(ATOMIC_RESTORE_STATE) {
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     //TODO: check asm to see if this block is needed
     port_mask[e->port] = new_port_mask;
-    //}
+  }
   return IOMON_EVENT_DISABLE_OK;
 }
 
 
-
+// Worst case execution time is about 450 cycles (about 28us @ 16Mhz)
 INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OCA))
 {
   // Debouncing based on 2-bit vertical counter: we require 4 identical samples
@@ -128,13 +131,12 @@ INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OCA))
   static uint8_t counter0[NB_PORTS];
   static uint8_t counter1[NB_PORTS];
 
-  //TODO: check if gcc is smart enough to transform these into direct reads:
+  // avr-gcc is smart enough to transform these into direct reads:
   uint8_t sample[NB_PORTS] = {
     P_GET_VAL(&PORTB) & port_mask[0],
     P_GET_VAL(&PORTC) & port_mask[1],
     P_GET_VAL(&PORTD) & port_mask[2]
   };
-
 
   for (uint8_t p = 0; p < NB_PORTS; ++p) {
     uint8_t delta = debounced[p] ^ sample[p];
