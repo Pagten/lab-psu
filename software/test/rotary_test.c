@@ -29,6 +29,8 @@
  */
 
 #include <check.h>
+#include <stdbool.h>
+
 #include "core/rotary.h"
 #include "rotary_test.h"
 
@@ -40,6 +42,33 @@ static void setup(void)
 static void teardown(void)
 {
 }
+
+// ****************************************************************************
+//                               test_rotary_input
+// ****************************************************************************
+static void test_rot_input_values(uint8_t bit_a, uint8_t bit_b)
+{
+  for (int a = 0; a <= 1; ++a) {
+    for (int b = 0; b <= 1; ++b) {
+      uint8_t input = (a << bit_a) | (b << bit_b);
+      uint8_t output = (b << 1) | a;
+      ck_assert_uint_eq(rot_input(input, bit_a, bit_b), output);
+    }
+  }
+}
+
+START_TEST(test_rotary_input)
+{
+  for (uint8_t bit_a = 0; bit_a < 8; ++bit_a) {
+    for (uint8_t bit_b = 0; bit_b < 8; ++bit_b) {
+      if (bit_a == bit_b) {
+	continue;
+      }
+      test_rot_input_values(bit_a, bit_b);      
+    }
+  }
+}
+END_TEST
 
 
 // ****************************************************************************
@@ -211,6 +240,11 @@ END_TEST
 Suite *rotary_suite(void)
 {
   Suite *s = suite_create("Rotary");
+
+  TCase *tc_rotary_input = tcase_create("Rotary input");
+  tcase_add_checked_fixture(tc_rotary_input, setup, teardown);
+  tcase_add_test(tc_rotary_input, test_rotary_input);
+  suite_add_tcase(s, tc_rotary_input);
 
   TCase *tc_rotary_cw0 = tcase_create("Rotary cw0");
   tcase_add_checked_fixture(tc_rotary_cw0, setup, teardown);
