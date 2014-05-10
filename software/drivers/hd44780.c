@@ -23,15 +23,15 @@
 /**
  * @file hd44780.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 13 mar 2014
- *
+ * @date 13 Mar 2014
  */
 
 #include "hd44780.h"
 
-#include <avr/cpufunc.h>
 #include <util/delay.h>
+#include "hal/cpufunc.h"
 #include "util/bit.h"
+
 
 
 void hd44780_init(void)

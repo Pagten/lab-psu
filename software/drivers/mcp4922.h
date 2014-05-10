@@ -40,6 +40,7 @@
 #include <stdint.h>
 
 #include "core/spi_master.h"
+#include "hal/gpio.h"
 
 typedef enum {
   MCP4922_CHANNEL_A,

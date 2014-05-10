@@ -94,6 +94,10 @@
  */
 typedef volatile uint8_t* port_ptr;
 
+#define PORTB_PTR  &PORTB
+#define PORTC_PTR  &PORTC
+#define PORTD_PTR  &PORTD
+
 #define P_SET_PINS(port, mask)              *(port) |= (mask)
 #define P_CLR_PINS(port, mask)              *(port) &= ~(mask)
 

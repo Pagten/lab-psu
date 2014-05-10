@@ -93,7 +93,61 @@ void mock_timer_set_clock(mock_timer* tmr, tmr_clock_src cs)
   tmr->clock_enabled = (cs != CS_DISABLED);
 }
 
-void mock_timer_set_cntr(mock_timer* tmr, uint16_t val)
+void mock_timer_set_ocr8(mock_timer* tmr, tmr_channel ch, uint8_t val)
+{
+  switch(ch) {
+  case CH_OCA:
+    tmr->ocra = val;
+    break;
+  case CH_OCB:
+    tmr->ocrb = val;
+    break;
+  }
+}
+
+void mock_timer_set_ocr16(mock_timer* tmr, tmr_channel ch, uint16_t val)
+{
+  switch(ch) {
+  case CH_OCA:
+    tmr->ocra = val;
+    break;
+  case CH_OCB:
+    tmr->ocrb = val;
+    break;
+  }
+}
+
+
+uint8_t mock_timer_get_ocr8(mock_timer* tmr, tmr_channel ch)
+{
+  switch(ch) {
+  case CH_OCA:
+    return (uint8_t)tmr->ocra;
+  case CH_OCB:
+    return (uint8_t)tmr->ocrb;
+  default:
+    return 0;
+  }
+}
+
+uint16_t mock_timer_get_ocr16(mock_timer* tmr, tmr_channel ch)
+{
+  switch(ch) {
+  case CH_OCA:
+    return tmr->ocra;
+  case CH_OCB:
+    return tmr->ocrb;
+  default:
+    return 0;
+  }
+}
+
+void mock_timer_set_cntr8(mock_timer* tmr, uint8_t val)
+{
+  tmr->cntr = val;
+}
+
+void mock_timer_set_cntr16(mock_timer* tmr, uint16_t val)
 {
   tmr->cntr = val;
 }

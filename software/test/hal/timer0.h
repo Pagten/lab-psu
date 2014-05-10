@@ -76,7 +76,13 @@ extern mock_timer MOCK_TMR;
 #define TIMER0_SET_CLOCK_EXT_RISING		\
   mock_timer_set_clock(&MOCK_TMR, CS_EXT_RISING)
 
-#define TIMER0_SET_CNTR(val)  mock_timer_set_cntr(&MOCK_TMR, val)
+#define TIMER0_OCA_SET_OCR(val)  mock_timer_set_ocr8(&MOCK_TMR, CH_OCA, val)
+#define TIMER0_OCA_GET_OCR       mock_timer_get_ocr8(&MOCK_TMR, CH_OCA)
+
+#define TIMER0_OCB_SET_OCR(val)  mock_timer_set_ocr8(&MOCK_TMR, CH_OCB, val)
+#define TIMER0_OCB_GET_OCR       mock_timer_get_ocr8(&MOCK_TMR, CH_OCB)
+
+#define TIMER0_SET_CNTR(val)  mock_timer_set_cntr8(&MOCK_TMR, val)
 #define TIMER0_GET_CNTR       mock_timer_get_cntr8(&MOCK_TMR)
 
 // Constants

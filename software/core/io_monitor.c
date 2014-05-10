@@ -133,9 +133,9 @@ INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OCA))
 
   // avr-gcc is smart enough to transform these into direct reads:
   uint8_t sample[NB_PORTS] = {
-    P_GET_VAL(&PORTB) & port_mask[0],
-    P_GET_VAL(&PORTC) & port_mask[1],
-    P_GET_VAL(&PORTD) & port_mask[2]
+    P_GET_VAL(PORTB_PTR) & port_mask[0],
+    P_GET_VAL(PORTC_PTR) & port_mask[1],
+    P_GET_VAL(PORTD_PTR) & port_mask[2]
   };
 
   for (uint8_t p = 0; p < NB_PORTS; ++p) {

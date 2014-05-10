@@ -82,8 +82,13 @@ void mock_timer_tick(mock_timer* tmr);
 void mock_timer_channel_disconnect(mock_timer* tmr, tmr_channel ch);
 void mock_timer_set_intr_enabled(mock_timer* tmr, tmr_interrupt intr, bool val);
 void mock_timer_set_mode(mock_timer* tmr, tmr_mode mode);
-void mock_timer_set_clock(mock_timer* tmr, tmr_clock_src cs); 
-void mock_timer_set_cntr(mock_timer* tmr, uint16_t val);
+void mock_timer_set_clock(mock_timer* tmr, tmr_clock_src cs);
+void mock_timer_set_ocr8(mock_timer* tmr, tmr_channel ch, uint8_t val);
+void mock_timer_set_ocr16(mock_timer* tmr, tmr_channel ch, uint16_t val);
+uint8_t mock_timer_get_ocr8(mock_timer* tmr, tmr_channel ch);
+uint16_t mock_timer_get_ocr16(mock_timer* tmr, tmr_channel ch); 
+void mock_timer_set_cntr8(mock_timer* tmr, uint8_t val);
+void mock_timer_set_cntr16(mock_timer* tmr, uint16_t val);
 uint8_t mock_timer_get_cntr8(mock_timer* tmr);
 uint16_t mock_timer_get_cntr16(mock_timer* tmr);
 
