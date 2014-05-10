@@ -56,7 +56,7 @@ START_TEST(test_rotary_cw0)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
-  input = 0b10;
+  input = 0b01;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
@@ -80,7 +80,7 @@ START_TEST(test_rotary_cw1)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
-  input = 0b01;
+  input = 0b10;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
@@ -104,7 +104,7 @@ START_TEST(test_rotary_cw_full)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
   
-  input = 0b10;
+  input = 0b01;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
   
@@ -112,7 +112,7 @@ START_TEST(test_rotary_cw_full)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_STEP_CW);
 
-  input = 0b01;
+  input = 0b10;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
@@ -137,7 +137,7 @@ START_TEST(test_rotary_ccw0)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
-  input = 0b01;
+  input = 0b10;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
@@ -161,7 +161,7 @@ START_TEST(test_rotary_ccw1)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
-  input = 0b10;
+  input = 0b01;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
@@ -185,7 +185,7 @@ START_TEST(test_rotary_ccw_full)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
   
-  input = 0b01;
+  input = 0b10;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
   
@@ -193,7 +193,7 @@ START_TEST(test_rotary_ccw_full)
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_STEP_CCW);
 
-  input = 0b10;
+  input = 0b01;
   result = rot_process_step(&rot, input);
   ck_assert(result == ROT_NO_STEP);
 
