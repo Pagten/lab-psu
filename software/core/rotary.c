@@ -71,7 +71,9 @@ void rot_init(rotary* rot)
 inline
 uint8_t rot_input(uint8_t input, uint8_t a, uint8_t b)
 {
-  return ((input & bv8(a)) >> a) | ((input & bv8(b)) >> (b - 1));
+  uint8_t a_val = input & bv8(a);
+  uint8_t b_val = input & bv8(b);
+  return (a_val >> a) | (b == 0 ? b_val << 1 : b_val >> (b - 1));
 }
 
 inline
