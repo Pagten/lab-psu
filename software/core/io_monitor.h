@@ -80,6 +80,7 @@ typedef enum {
  *
  * Module that must be initialized first:
  *  - clock
+ *  - process
  */
 void iomon_init();
 

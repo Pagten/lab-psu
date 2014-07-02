@@ -35,10 +35,13 @@
 #include "hal/timers.h"
 #include "hal/interrupt.h"
 
+#include "util/debug.h"
 
 #define NB_PORTS 3
 
 PROCESS(event_dispatcher);
+
+#define READ_INTERVAL CLOCK_MSEC // Interrupt every millisecond
 
 #define INT_TO_PORT_CHANGED_EVENT(i) ((process_event_t)i)
 
@@ -51,7 +54,8 @@ void iomon_init()
     iomon_event_list_head[p] = NULL;
     port_mask[p] = 0x00;
   }
-  TMR_SET_OCR(CLOCK_TMR, OCA, CLOCK_MSEC); // Interrupt every millisecond
+  process_start(&event_dispatcher);
+  TMR_SET_OCR(CLOCK_TMR, OCA, READ_INTERVAL);
   TMR_INTERRUPT_ENABLE(CLOCK_TMR, OCA); // Enable OCA interrupt
 }
 
@@ -125,18 +129,23 @@ iomon_event_disable_status iomon_event_disable(iomon_event* e)
 // Worst case execution time is about 450 cycles (about 28us @ 16Mhz)
 INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OCA))
 {
+  // Set up OCRA for next tick
+  TMR_SET_OCR(CLOCK_TMR, OCA, TMR_GET_OCR(CLOCK_TMR, OCA) + READ_INTERVAL);
+
   // Debouncing based on 2-bit vertical counter: we require 4 identical samples
   // before we signal a pin change
   static uint8_t debounced[NB_PORTS];
   static uint8_t counter0[NB_PORTS];
   static uint8_t counter1[NB_PORTS];
 
+  SET_DEBUG_LED(0);
   // avr-gcc is smart enough to transform these into direct reads:
   uint8_t sample[NB_PORTS] = {
     P_GET_VAL(PORTB_PTR) & port_mask[0],
     P_GET_VAL(PORTC_PTR) & port_mask[1],
     P_GET_VAL(PORTD_PTR) & port_mask[2]
   };
+  CLR_DEBUG_LED(0);
 
   for (uint8_t p = 0; p < NB_PORTS; ++p) {
     uint8_t delta = debounced[p] ^ sample[p];
