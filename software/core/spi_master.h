@@ -27,7 +27,81 @@
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 29 oct 2013
  *
- * This file implements SPI master communication.
+ * This file provides SPI master communication. It provides two kinds of
+ * transfers. The first is a simple data exchange in which a transmit buffer
+ * is sent to a device and a receive buffer is simultaneously filled with the
+ * the device's response (if any). The receive buffer is filled starting with
+ * the first byte returned by the slave device, up to a pre-specified number
+ * of bytes. The number of bytes to send can differ from the number of bytes
+ * to receive, but both sizes have to be specified upfront.
+ *
+ * The other kind of transfer implements a simple link layer protocol designed
+ * for request-response type messages. The protocol allows the slave device to
+ * specify the length of its response (up to a pre-specified maximum). It also
+ * allows the slave device to delay its response for up to 16 bytes after the
+ * master has sent its data, which can be useful if the slave needs some time
+ * to generate its response. The protocol works as follows from the viewpoint
+ * of the master.
+ *  1) The master initiates the transfer by pulling the slave's SS pin low.
+ *  2) The master sends a two-byte header. The first byte of which is a user-
+ *     specified identifier indicating the type of message being sent, and the
+ *     second byte of which indicates the length of the payload that follows.
+ *  3) The master sends the user-specified payload.
+ *  4) The master sends a two-byte CRC checksum footer calculated over the
+ *     two-byte header and the payload.
+ *
+ *  During this entire process, the slave can send its response, which should
+ *  have the following format:
+ *  1) The slave sends the value 0x87 as long it is not yet ready to send its
+ *     actual response (the value indicates the slave is still calculating the
+ *     response). The master will ignore these values (i.e., not copy them 
+ *     into the receive buffer). If the slave has the response available
+ *     immediately, it can skip this step.
+ *  2) The slave sends a two-byte response header. The first byte of which is
+ *     an identifier indicating the type of the response being sent. This byte
+ *     MUST NOT be 0x87. A response type of 0x88 indicates a CRC checksum 
+ *     failure on the data sent by the master and a response type of 0x89 
+ *     indicates the master payload is too large for the slave's receive
+ *     buffer. The second header byte indicates the length of the response
+ *     payload that follows.
+ *  3) The slave sends the response payload.
+ *  4) The slave sends a two-byte CRC checksum footer calculated over the
+ *     two-byte response header and the response payload.
+ *  The transfer ends successfully when (1) the master has sent its data
+ *  according to the scheme above, (2) the master has received the slave's
+ *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
+ *  response type is not 0x88 or 0x89.
+ *
+ *  From the viewpoint of the master, the following exceptions can occur
+ *  during this process:
+ *   * The slave delays its response for more than 16 bytes after the master
+ *     has sent its footer (by continually sending 0x87 times from the start
+ *     of transfer).
+ *   * The slave indicates a CRC checksum failure.
+ *   * The slave indicates its receive buffer it too small for the payload
+ *     sent by the master.
+ *   * The response size indicated by the slave is larger than the maximum
+ *     response size specified by the user.
+ *   * The CRC checksum fails, indicating the response is corrupt.
+ *  In each of these cases, the master will abort the transfer as soon as it
+ *  detects the exception.
+ *
+ *
+ * The follow figure depicts the packet format used by both the master and the
+ * slave for the link layer protocol:
+ *
+ *          +--------------------------------------+
+ *  byte 0  |   message/response type identifier   |
+ *          +--------------------------------------+
+ *  byte 1  |   message/response payload size (n)  |
+ *          +--------------------------------------+
+ *  byte 2  |                                      |
+ *          /           payload (n bytes)          /
+ *          |                                      |
+ *          +--------------------------------------+
+ * byte 2+n |           CRC16 (byte 1/2)           |
+ *          |           CRC16 (byte 2/2)           |
+ *          +--------------------------------------+
  */
 
 #include <stdbool.h>
@@ -95,7 +169,7 @@ void spim_trx_init(spim_trx* trx);
 
 
 /**
- * Configure an SPI transfer data structure.
+ * Configure an SPI transfer data structure for a simple data exchange.
  * 
  * This function should not be called on SPI transfers that are in
  * transmission.
@@ -103,21 +177,37 @@ void spim_trx_init(spim_trx* trx);
  * @param trx      The transfer data structure to configure
  * @param ss_pin   The number of the pin connected to the SPI slave to address
  * @param ss_port  The port of the pin connected to the SPI slave to address
- * @param tx_buf   The data to be transmitted (can be NULL if tx_size is NULL)
+ * @param tx_buf   The data to be transmitted (can be NULL if tx_size is 0)
  * @param tx_size  The number of bytes to be transmitted
- * @param rx_buf   The buffer into which to store the received data (can be 
- *                 NULL if rx_size is 0)
+ * @param rx_buf   The buffer into which to store the received data (must be
+ *                 at least rx_size bytes, but can be NULL if rx_size is 0)
  * @param rx_size  The number of bytes to be received
- * @param delay    The minimum time to wait before transmitting each byte, to
- *                 give the SPI slave time to prepare its response
- * @return SPIM_TRX_SET_OK if the transfer data structure was initialized
- *         succesfully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are
- *         0. 
+ * @return SPIM_TRX_SET_OK if the transfer structure was initialized succes-
+ *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0. 
  */
 spim_trx_set_status
-spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	      uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
-	      clock_time_t delay);
+spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+		uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
+		size_t rx_size);
+
+/**
+ * Configure an SPI transfer data structure for a data exchange using the link
+ * layer protocol describe at the top of this file.
+ *
+ * @param trx      The transfer data structure to configure
+ * @param ss_pin   The number of the pin connected to the SPI slave to address
+ * @param ss_port  The port of the pin connected to the SPI slave to address
+ * @param tx_buf   The payload to be transmitted (can be NULL if tx_size is 0)
+ * @param tx_size  The size (in bytes) of the payload to transmit
+ * @param rx_buf   The buffer into which to store the received data (must be
+ *                 at least rx_size bytes, but can be NULL if rx_size is 0)
+ * @param rx_max   The maximum size (in bytes) of the payload to receive
+ * @return SPIM_TRX_SET_OK if the transfer structure was initialized success-
+ *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0.
+ */
+spim_trx_set_status
+spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+	     uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_max);
 
 
 /**
@@ -149,7 +239,7 @@ bool spim_trx_is_queued(spim_trx* trx);
  * function and should not already be in the transfer queue.
  *
  * @param trx  The SPI transfer to queue
- * @return SPIM_TRX_QUEUE_OK if the transfer was queued succesfully, or
+ * @return SPIM_TRX_QUEUE_OK if the transfer was queued successfully, or
  *         SPIM_TRX_QUEUE_ALREADY_QUEUED if the packet is already in the
  *         transfer queue.
  */
