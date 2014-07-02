@@ -22,7 +22,7 @@
 /**
  * @file spi_master.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 6 jun 2013
+ * @date 6 Jun 2013
  */
 
 #include "spi_master.h"
@@ -40,6 +40,8 @@ static timer trx_timer;
 static spim_trx* trx_queue_head;
 static spim_trx* trx_queue_tail;
 
+#include "hal/gpio.h"
+
 
 void spim_init(void)
 {
@@ -50,7 +52,7 @@ void spim_init(void)
   SPI_SET_ROLE_MASTER();
   SPI_SET_DATA_ORDER_MSB();
   SPI_SET_MODE(0,0);
-  SPI_SET_CLOCK_RATE_DIV_4();
+  SPI_SET_CLOCK_RATE_DIV_32();
   SPI_ENABLE();
 
   process_start(&spim_trx_process);
