@@ -51,10 +51,9 @@ else
   Q=@
 endif
 
+DEBUG ?= 0
 OPTI ?= s
-CFLAGS += -I. -I$(FW_ROOT) -O$(OPTI)
-
-CFLAGS += -DF_CPU=$(F_CPU)
+CFLAGS += -I. -I$(FW_ROOT) -O$(OPTI) -DF_CPU=$(F_CPU) -DDEBUG=$(DEBUG)
 
 ifndef NO_LTO
 CFLAGS += -flto
