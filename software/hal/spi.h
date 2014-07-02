@@ -28,6 +28,35 @@
     SPCR &= ~(_BV(SPR1) | _BV(SPR0)); \
     SPSR &= ~_BV(SPI2X);              \
   } while(0)
+#define SPI_SET_CLOCK_RATE_DIV_8()    \
+  do {                                \
+    SPCR |= _BV(SPR0);		      \
+    SPCR &= ~_BV(SPR1);		      \
+    SPSR |= _BV(SPI2X);		      \
+  } while(0)
+#define SPI_SET_CLOCK_RATE_DIV_16()   \
+  do {                                \
+    SPCR |= _BV(SPR0);		      \
+    SPCR &= ~_BV(SPR1);		      \
+    SPSR &= ~_BV(SPI2X);	      \
+  } while(0)
+#define SPI_SET_CLOCK_RATE_DIV_32()   \
+  do {                                \
+    SPCR &= ~_BV(SPR0);		      \
+    SPCR |= _BV(SPR1);		      \
+    SPSR |= _BV(SPI2X);		      \
+  } while(0)
+#define SPI_SET_CLOCK_RATE_DIV_64()   \
+  do {                                \
+    SPCR |= (_BV(SPR1) | _BV(SPR0));  \
+    SPSR |= _BV(SPI2X);		      \
+  } while(0)
+#define SPI_SET_CLOCK_RATE_DIV_128()  \
+  do {                                \
+    SPCR |= (_BV(SPR1) | _BV(SPR0));  \
+    SPSR &= ~_BV(SPI2X);	      \
+  } while(0)
+
 
 #define SPI_SET_DATA_REG(val)  SPDR = val
 #define SPI_GET_DATA_REG()     SPDR
