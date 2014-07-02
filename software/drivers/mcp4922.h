@@ -43,8 +43,8 @@
 #include "hal/gpio.h"
 
 typedef enum {
-  MCP4922_CHANNEL_A,
-  MCP4922_CHANNEL_B,
+  MCP4922_CHANNEL_A = 0,
+  MCP4922_CHANNEL_B = 1,
 } mcp4922_channel;
 
 typedef enum {
