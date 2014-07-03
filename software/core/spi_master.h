@@ -25,7 +25,7 @@
 /**
  * @file spi_master.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 29 oct 2013
+ * @date 29 Oct 2013
  *
  * This file provides SPI master communication. It provides two kinds of
  * transfers. The first is a simple data exchange in which a transmit buffer
@@ -39,9 +39,8 @@
  * for request-response type messages. The protocol allows the slave device to
  * specify the length of its response (up to a pre-specified maximum). It also
  * allows the slave device to delay its response for up to 16 bytes after the
- * master has sent its data, which can be useful if the slave needs some time
- * to generate its response. The protocol works as follows from the viewpoint
- * of the master.
+ * master has sent its message, which can be useful if the slave needs some
+ * time to generate its response. The protocol works as follows.
  *  1) The master initiates the transfer by pulling the slave's SS pin low.
  *  2) The master sends a two-byte header. The first byte of which is a user-
  *     specified identifier indicating the type of message being sent, and the
@@ -99,8 +98,8 @@
  *          /           payload (n bytes)          /
  *          |                                      |
  *          +--------------------------------------+
- * byte 2+n |           CRC16 (byte 1/2)           |
- *          |           CRC16 (byte 2/2)           |
+ * byte 2+n |           CRC16 (high byte)          |
+ *          |           CRC16 (low byte)           |
  *          +--------------------------------------+
  */
 
@@ -129,6 +128,7 @@ typedef enum {
  * The SPI transfer data structure.
  */
 typedef struct _spim_trx {
+  uint8_t flags_rx_delay_remaining;
   bool in_transmission;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;
@@ -136,7 +136,6 @@ typedef struct _spim_trx {
   size_t tx_remaining;
   uint8_t* rx_buf;
   size_t rx_remaining;
-  clock_time_t delay;
   struct _spim_trx* next;
 } spim_trx;
 
@@ -181,6 +180,7 @@ void spim_trx_init(spim_trx* trx);
  * @param tx_size  The number of bytes to be transmitted
  * @param rx_buf   The buffer into which to store the received data (must be
  *                 at least rx_size bytes, but can be NULL if rx_size is 0)
+ * @param p        The process to notify when the transfer is complete
  * @param rx_size  The number of bytes to be received
  * @return SPIM_TRX_SET_OK if the transfer structure was initialized succes-
  *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0. 
@@ -188,7 +188,7 @@ void spim_trx_init(spim_trx* trx);
 spim_trx_set_status
 spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 		uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-		size_t rx_size);
+		size_t rx_size, process* p);
 
 /**
  * Configure an SPI transfer data structure for a data exchange using the link
@@ -197,17 +197,20 @@ spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
  * @param trx      The transfer data structure to configure
  * @param ss_pin   The number of the pin connected to the SPI slave to address
  * @param ss_port  The port of the pin connected to the SPI slave to address
+ * @param id       The message type identifier
  * @param tx_buf   The payload to be transmitted (can be NULL if tx_size is 0)
  * @param tx_size  The size (in bytes) of the payload to transmit
  * @param rx_buf   The buffer into which to store the received data (must be
  *                 at least rx_size bytes, but can be NULL if rx_size is 0)
  * @param rx_max   The maximum size (in bytes) of the payload to receive
+ * @param p        The process to notify when the transfer is complete
  * @return SPIM_TRX_SET_OK if the transfer structure was initialized success-
- *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0.
+ *         fully or SPIM_TRX_SET_INVALID if TODO
  */
 spim_trx_set_status
 spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	     uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_max);
+	     uint8_t id, uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
+	     size_t rx_max, process* p);
 
 
 /**

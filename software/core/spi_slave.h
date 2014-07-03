@@ -27,7 +27,13 @@
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 30 Jun 2014
  *
- * This file implements SPI slave communication.
+ * This file provides SPI slave communication using a simple link layer
+ * protocol designed for request-response type messages. The protocol allows
+ * the slave device to specify the length of its response. It also allows the
+ * slave device to delay its response for up to 16 bytes after the master has
+ * sent its message, which can be useful if the slave needs some time to
+ * generate its response. The detailed description of the protocol can be
+ * found in spi_master.h.
  */
 
 #include "core/process.h"
@@ -39,11 +45,22 @@ void spis_init();
 
 /**
  * Set the process to notify on incoming data
+ *
+ * @param p  The process to notify when a message from the SPI master was
+ *           received
  */
-void spis_set_rx_callback(process* p, process_event_t ev, uint8_t* buffer,
-			  uint8_t hdr_size);
+void spis_set_rx_callback(process* p);
 
-void spis_set_tx_buffer()
+/**
+ * Send a response in reply to a message from the SPI master. This function
+ * should be called within 16 SPI clock periods after the process set using
+ * the spis_set_rx_callback() function was notified of an incoming message.
+ *
+ * @param r  The response to send
+ * @return TODO
+ */
+spis_send_response_status
+spis_send_response(spis_response* r);
 
 
 #endif
