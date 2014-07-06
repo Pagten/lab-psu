@@ -114,9 +114,12 @@
 #define SPIM_NO_DELAY 0
 
 typedef enum {
-  SPIM_TRX_SET_OK,
-  SPIM_TRX_SET_INVALID,
-} spim_trx_set_status;
+  SPIM_TRX_LLP_OK,
+  SPIM_TRX_LLP_TX_BUF_IS_NULL,
+  SPIM_TRX_LLP_RX_BUF_IS_NULL,
+  SPIM_TRX_LLP_RX_BUF_TOO_SMALL,
+} spim_trx_llp_status;
+
 
 typedef enum {
   SPIM_TRX_QUEUE_OK,

@@ -26,8 +26,7 @@
  */
 
 #include "spi_master.h"
-
-#include <util/crc16.h>
+#include "core/crc16.h"
 #include "core/process.h"
 #include "core/timer.h"
 #include "hal/spi.h"
@@ -43,6 +42,9 @@ static spim_trx* trx_queue_tail;
 
 #include "hal/gpio.h"
 
+#define RX_DELAY_REMAINING_MASK   ((1 << 4) - 1)
+#define TRX_QUEUED_BIT           7
+#define TRX_IN_TRANSMISSION_BIT  6
 
 void spim_init(void)
 {
@@ -53,7 +55,7 @@ void spim_init(void)
   SPI_SET_ROLE_MASTER();
   SPI_SET_DATA_ORDER_MSB();
   SPI_SET_MODE(0,0);
-  SPI_SET_CLOCK_RATE_DIV_32();
+  SPI_SET_CLOCK_RATE_DIV_4();
   SPI_ENABLE();
 
   process_start(&spim_trx_process);
@@ -62,8 +64,8 @@ void spim_init(void)
 
 void spim_trx_init(spim_trx* trx)
 {
-  trx->in_transmission = false;
-  trx->ss_port = NULL;
+  trx->flags_rx_delay_remaining &= ~_BV(TX_IN_TRANSMISSION_BIT);
+  trx->flags_rx_delay_remaining &= ~_BV(TX_QUEUED_BIT);
 }
 
 
@@ -88,31 +90,19 @@ spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 }
 
 
-/**
- * Configure an SPI transfer data structure for a data exchange using the link
- * layer protocol describe at the top of this file.
- *
- * @param trx      The transfer data structure to configure
- * @param ss_pin   The number of the pin connected to the SPI slave to address
- * @param ss_port  The port of the pin connected to the SPI slave to address
- * @param id       The message type identifier
- * @param tx_buf   The payload to be transmitted (can be NULL if tx_size is 0)
- * @param tx_size  The size (in bytes) of the payload to transmit
- * @param rx_buf   The buffer into which to store the received data (must be
- *                 at least rx_size bytes, but can be NULL if rx_size is 0)
- * @param rx_max   The maximum size (in bytes) of the payload to receive
- * @param p        The process to notify when the transfer is complete
- */
-void
+spim_trx_llp_status
 spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 	     uint8_t id, uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-	     size_t rx_max, process* p)
+	     size_t rx_buf_size, process* p)
 {
-  if (tx_buf == NULL) {
-    tx_size = 0;
+  if (tx_buf == NULL && tx_size > 0) {
+    return SPIM_TRX_LLP_TX_BUF_IS_NULL;
   }
   if (rx_buf == NULL) {
-    rx_max = 0;
+    return SPIM_TRX_LLP_RX_BUF_IS_NULL;
+  }
+  if (rx_buf_size <= LLP_HEADER_LENGTH) {
+    return SPIM_TRX_LLP_RX_BUF_TOO_SMALL;
   }
   trx->flags_rx_delay_remaining = MAX_RX_DELAY;
   trx->ss_mask = bv8(ss_pin & 0x07);
@@ -121,7 +111,9 @@ spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
   trx->tx_buf = tx_buf;
   trx->tx_remaining = tx_size;
   trx->rx_buf = rx_buf;
-  trx->rx_max = rx_max;
+  trx->rx_remaining = rx_buf_size - LLP_HEADER_LENGTH;
+  trx->p = p;
+  return SPIM_TRX_LLP_OK;
 }
 
 
@@ -129,17 +121,29 @@ spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 inline
 bool spim_trx_is_in_transmission(spim_trx* trx)
 {
-  return trx->in_transmission;
+  return trx->flags_rx_delay_remaining & _BV(TRX_IN_TRANSMISSION_BIT);
 }
 
+inline
 bool spim_trx_is_queued(spim_trx* trx)
 {
-  spim_trx* t = trx_queue_head;
-  while (t != NULL) {
-    if (t == trx) return true;
-    t = t->next;
-  }
-  return false;
+  return trx->flags_rx_delay_remaining & _BV(TRX_QUEUED_BIT);
+}
+
+static inline
+uint8_t get_rx_delay_remaining(spim_trx* trx)
+{
+  return trx->flags_rx_delay_remaining & RX_DELAY_REMAINING_MASK;
+}
+
+/**
+ * It is only allowed to call this function if get_rx_delay_remaining(trx)
+ * is greater than 0!
+ */
+static inline
+void decrement_rx_delay_remaining(spim_trx* trx)
+{
+  trx->flags_rx_delay_remaining -= 1;
 }
 
 spim_trx_queue_status
@@ -149,6 +153,7 @@ spim_trx_queue(spim_trx* trx)
     return SPIM_TRX_QUEUE_ALREADY_QUEUED;
   }
 
+  trx_set_queued(trx_queue_head, true);
   if (trx_queue_tail == NULL) {
     // Queue is empty
     trx_queue_head = trx;
@@ -160,29 +165,7 @@ spim_trx_queue(spim_trx* trx)
   trx->next = NULL;
   return SPIM_TRX_QUEUE_OK;
 }
-
-static inline 
-void rx_data_byte(spim_trx* trx)
-{
-  if (trx->rx_remaining > 0) {
-    *(trx->rx_buf) = SPI_GET_DATA_REG();
-    trx->rx_buf += 1;
-    trx->rx_remaining -= 1;
-  }
-}
-
-static inline
-void tx_data_byte(spim_trx* trx)
-{
-  if (trx->tx_remaining > 0) {
-    SPI_SET_DATA_REG(*(trx->tx_buf));
-    trx->tx_buf += 1;
-    trx->tx_remaining -= 1;
-  } else {
-    // Transmit null byte
-    SPI_SET_DATA_REG(0);
-  }
-}
+     
 
 static inline
 void tx_byte(uint8_t byte)
@@ -193,15 +176,17 @@ void tx_byte(uint8_t byte)
 }
 
 static inline
-void rx_byte(spim_trx* trx)
+void tx_dummy_byte()
 {
-  switch (trx->state) {
+  tx_byte(0);
+}
 
-  }
-  if (trx->state == WAITING_FOR_RX_HEADER) {
-    uint8_t byte = SPI_GET_DATA_REG();
-    //   if (byte != 
-  }
+static inline
+uint8_t read_response_byte()
+{
+  // Wait for transfer to complete
+  while (! IS_SPI_INTERRUPT_FLAG_SET());
+  return SPI_GET_DATA_REG();
 }
 
 static inline
@@ -213,25 +198,44 @@ void shift_trx_queue(void)
   }
 }
 
+static
+void end_transfer(process_event_t ev)
+{
+  if (trx_queue_head->p != NULL) {
+    process_post_event(trx_queue_head->p, ev, (process_data_t)trx_queue_head);
+  }
+
+  // Make the slave select pin high
+  *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
+
+  // Update transfer status
+  trx_set_in_transmission(trx_queue_head, false);
+  trx_set_queued(trx_queue_head, false);
+  
+  // Shift transfer queue for next transfer
+  shift_trx_queue();
+}
+
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
 
   while (true) {
+    PROCESS_YIELD();
     // Wait until there's something in the queue
     PROCESS_WAIT_WHILE(trx_queue_head == NULL);
 
     // Update transfer status
-    trx_queue_head->in_transmission = true;
+    trx_set_in_transmisstion(trx_queue_head, true);
 
     // Start transfer by pulling the slave select pin low
     *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
 
     // Send first header byte (message type id)
     tx_byte(trx_queue_head->id);
-    trx_queue_head->crc = crc16_update(crc16_update(CRC16_INIT_VAL,
-						    trx_queue_head->id),
-				       trx_queue_head->tx_remaining);
+    crc16_init(&(trx_queue_head->crc));
+    crc16_update(&(trx_queue_head->crc), trx_queue_head->id);
+    crc16_update(&(trx_queue_head->crc), trx_queue_head->tx_remaining);
     // Send second header byte (message size)
     tx_byte(trx_queue_head->tx_remaining);
     PROCESS_YIELD();
@@ -239,8 +243,7 @@ PROCESS_THREAD(spim_trx_process)
     // Send message bytes
     while (trx_queue_head->tx_remaining > 0) {
       tx_byte(*(trx_queue_head->tx_buf));
-      trx_queue_head->crc = crc16_update(trx_queue_head->crc,
-					 *(trx_queue_head->tx_buf));
+      crc16_update(&(trx_queue_head->crc), *(trx_queue_head->tx_buf));
       trx_queue_head->tx_buf += 1;
       trx_queue_head->tx_remaining -= 1;
       PROCESS_YIELD();
@@ -249,26 +252,68 @@ PROCESS_THREAD(spim_trx_process)
     // Send CRC footer bytes
     tx_byte(trx_queue_head->crc >> 8);
     tx_byte(trx_queue_head->crc & 0x00FF);
-
-
-    // TODO: start receiving data
-
-    // Make sure the last byte has been transmitted
-    while (! IS_SPI_INTERRUPT_FLAG_SET());
-    // End transfer by making the slave select pin high again
-    *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
-
-    // Update transfer status
-    trx_queue_head->in_transmission = false;
-
-    // Shift queue
-    shift_trx_queue();
-
-    // Yield CPU for other threads to ensure there is some time between making
-    // the slave select pin high and pulling it low again for the next
-    // transfer, which can be an issue if there are two subsequent transfers
-    // to the same slave device.
+    
+    // Wait for reply
+    tx_dummy_byte();
     PROCESS_YIELD();
+    while (get_rx_delay_remaining(trx_queue_head) > 0 &&
+	   read_response_byte() == TYPE_RX_PROCESSING) {
+      tx_dummy_byte();
+      decrement_rx_delay_remaining(trx_queue_head);
+      PROCESS_YIELD();
+    }
+
+    // Receive response header (first byte has already been received)
+    crc16_init(&(trx_queue_head->crc));
+    trx_queue_head->rx_buf[0] = read_response_byte();
+    tx_dummy_byte(); // for the size byte
+    if (trx_queue_head->rx_buf[0] == TYPE_CRC_FAILURE) {
+      // CRC failure on response side, abort the transfer
+      end_transfer(TRX_CRC_FAILURE);
+      continue;
+    }
+    if (trx_queue_head->rx_buf[0] == TYPE_MESSAGE_TOO_LARGE) {
+      // Message is too large for slave's receive buffer, abort the transfer
+      end_transfer(TRX_MESSAGE_TOO_LARGE);
+      continue;
+    }
+
+
+    crc16_update(&(trx_queue_head->crc), trx_queue_head->rx_buf[0]);
+    trx_queue_head->rx_buf[1] = read_response_byte();
+    tx_dummy_byte(); // for the first payload or footer byte
+    if (trx_queue_head->rx_buf[1] > trx_queue_head->rx_remaining) {
+      // rx_buf is too small for the response, abort the transfer
+      end_transfer(TRX_RESPONSE_TOO_LARGE);
+      continue;
+    }
+    trx_queue_head->rx_remaining = trx_queue_head->rx_buf[1];
+    crc16_update(&(trx_queue_head->crc), trx_queue_head->rx_buf[1]);
+    trx_queue_head->rx_buf += 2;
+
+    PROCESS_YIELD();
+    // Receive response payload
+    while (trx_queue_head->rx_remaining > 0) {
+      *(trx_queue_head->rx_buf) = read_response_byte();
+      tx_dummy_byte();
+      crc16_update(&(trx_queue_head->crc), *(trx_queue_head->rx_buf));
+      trx_queue_head->rx_buf += 1;
+      trx_queue_head->rx_remaining -= 1;
+      PROCESS_YIELD();
+    }
+
+    // Receive response footer (first byte has already been received)
+    uint16_t crc = read_response_byte() << 8;
+    tx_dummy_byte();
+    crc |= read_response_byte();
+    if (! crc16_equal(crc, trx_queue_head->crc)) {
+      // CRC failure, abort transfer
+      end_transfer(TRX_RESPONSE_CRC_FAILURE);
+      continue;
+    }
+
+    // End current transfer
+    end_transfer(TRX_COMPLETED_SUCCESSFULLY);
   }
 
   PROCESS_END();

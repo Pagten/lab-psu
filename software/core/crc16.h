@@ -1,5 +1,5 @@
 /*
- * spi_common.h
+ * crc16.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -19,22 +19,38 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SPI_COMMON_H
-#define SPI_COMMON_H
+#ifndef CRC16_H
+#define CRC16_H
 
 /**
- * @file spi_common.h
- * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 3 Jul 2014
- *
- * This file contains some constants shared by the SPI master and slave.
+ * @file crc16.h
+ * @author Pieter Agten (pieter.agten@gmail.com)
+ * @date 6 Jul 2014
  */
 
-#define LLP_HEADER_LENGTH 2
-#define MAX_RX_DELAY 15
+#include <stdint.h>
+#include <stdbool.h>
+#include <util/crc16.h>
 
-#define TYPE_RX_PROCESSING        0xFD
-#define TYPE_CRC_FAILURE          0xFE
-#define TYPE_MESSAGE_TOO_LARGE    0xFF
+
+typedef uint16_t crc16;
+
+static inline 
+void crc16_init(crc16* crc)
+{
+  *crc = 0xFFFF;
+}
+
+static inline
+void crc16_update(crc16* crc, uint8_t val)
+{
+  *crc = crc16_update(*crc, val);
+}
+
+static inline
+bool crc16_equal(crc16* crc0, crc16* crc1)
+{
+  return *crc0 == *crc1;
+}
 
 #endif
