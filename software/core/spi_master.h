@@ -49,17 +49,17 @@
  *  4) The master sends a two-byte CRC checksum footer calculated over the
  *     two-byte header and the payload.
  *
- *  During this entire process, the slave can send its response, which should
+ *  After this entire process, the slave should send its response, which should
  *  have the following format:
- *  1) The slave sends the value 0x87 as long it is not yet ready to send its
+ *  1) The slave sends the value 0xFD as long it is not yet ready to send its
  *     actual response (the value indicates the slave is still calculating the
  *     response). The master will ignore these values (i.e., not copy them 
  *     into the receive buffer). If the slave has the response available
  *     immediately, it can skip this step.
  *  2) The slave sends a two-byte response header. The first byte of which is
  *     an identifier indicating the type of the response being sent. This byte
- *     MUST NOT be 0x87. A response type of 0x88 indicates a CRC checksum 
- *     failure on the data sent by the master and a response type of 0x89 
+ *     MUST NOT be 0xFD. A response type of 0xFE indicates a CRC checksum 
+ *     failure on the data sent by the master and a response type of 0xFF 
  *     indicates the master payload is too large for the slave's receive
  *     buffer. The second header byte indicates the length of the response
  *     payload that follows.
@@ -69,13 +69,12 @@
  *  The transfer ends successfully when (1) the master has sent its data
  *  according to the scheme above, (2) the master has received the slave's
  *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
- *  response type is not 0x88 or 0x89.
+ *  response type is not 0xFE or 0xFF.
  *
  *  From the viewpoint of the master, the following exceptions can occur
  *  during this process:
  *   * The slave delays its response for more than 16 bytes after the master
- *     has sent its footer (by continually sending 0x87 times from the start
- *     of transfer).
+ *     has sent its footer (by continually sending 0xFD)
  *   * The slave indicates a CRC checksum failure.
  *   * The slave indicates its receive buffer it too small for the payload
  *     sent by the master.
@@ -132,13 +131,12 @@ typedef enum {
  */
 typedef struct _spim_trx {
   uint8_t flags_rx_delay_remaining;
-  bool in_transmission;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;
   uint8_t* tx_buf;
-  size_t tx_remaining;
+  uint8_t tx_remaining;
   uint8_t* rx_buf;
-  size_t rx_remaining;
+  uint8_t rx_remaining;
   struct _spim_trx* next;
 } spim_trx;
 
@@ -190,8 +188,8 @@ void spim_trx_init(spim_trx* trx);
  */
 spim_trx_set_status
 spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-		uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-		size_t rx_size, process* p);
+		uint8_t* tx_buf, uint8_t tx_size, uint8_t* rx_buf,
+		uint8_t rx_size, process* p);
 
 /**
  * Configure an SPI transfer data structure for a data exchange using the link
@@ -212,8 +210,8 @@ spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
  */
 spim_trx_set_status
 spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	     uint8_t id, uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-	     size_t rx_max, process* p);
+	     uint8_t id, uint8_t* tx_buf, uint8_t tx_size, uint8_t* rx_buf,
+	     uint8_t rx_max, process* p);
 
 
 /**

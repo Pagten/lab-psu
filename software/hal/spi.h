@@ -9,7 +9,10 @@
 #define DD_MOSI  3
 #define DD_SS    2
 
+#define SPI_SS_PIN B,2
+
 #define SPI_SET_ROLE_MASTER()      SPCR |= _BV(MSTR)
+#define SPI_SET_ROLE_SLAVE()       SPCR &= _BV(MSTR)
 #define SPI_SET_DATA_ORDER_LSB()   SPCR |= _BV(DORD)
 #define SPI_SET_DATA_ORDER_MSB()   SPCR &= ~_BV(DORD)
 #define SPI_ENABLE()               SPCR |= _BV(SPE)
@@ -17,6 +20,11 @@
   do {								\
     DDR_SPI |= (_BV(DD_MOSI) | _BV(DD_SCK) | _BV(DD_SS));	\
     DDR_SPI &= ~_BV(DD_MISO);					\
+  } while(0)
+#define SPI_SET_PIN_DIRS_SLAVE()				\
+  do {								\
+    DDR_SPI &= ~(_BV(DD_MOSI) | _BV(DD_SCK) | _BV(DD_SS));	\
+    DDR_SPI |= _BV(DD_MISO);					\
   } while(0)
 #define SPI_SET_MODE(cpol,cpha)                         \
   do {                                                  \
@@ -34,5 +42,9 @@
 //#define SPI_GET_STATUS_REG()   SPSR
 
 #define IS_SPI_INTERRUPT_FLAG_SET() (SPSR & _BV(SPIF))
+#defien IS_SPI_WCOL_FLAG_SET()      (SPSR & _BV(WCOL))
+
+// Transfer complete interrupt
+#define SPI_TC_VECT  SPI_STC_vect
 
 #endif

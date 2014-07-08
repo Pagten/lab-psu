@@ -42,7 +42,7 @@ static spim_trx* trx_queue_tail;
 
 #include "hal/gpio.h"
 
-#define RX_DELAY_REMAINING_MASK   ((1 << 4) - 1)
+#define RX_DELAY_REMAINING_MASK  0x0F
 #define TRX_QUEUED_BIT           7
 #define TRX_IN_TRANSMISSION_BIT  6
 #define TRX_USE_LLP_BIT          5

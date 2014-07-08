@@ -31,6 +31,8 @@
  */
 
 #define LLP_HEADER_LENGTH 2
+#define LLP_FOOTER_LENGTH 2
+
 #define MAX_RX_DELAY 15
 
 #define TYPE_RX_PROCESSING        0xFD

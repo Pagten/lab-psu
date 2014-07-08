@@ -38,6 +38,7 @@
 
 #include "core/process.h"
 
+
 /**
  * Initialize the SPI slave module.
  */
@@ -49,12 +50,12 @@ void spis_init();
  * @param p  The process to notify when a message from the SPI master was
  *           received
  */
-void spis_set_rx_callback(process* p);
+void spis_register_callback(process* p);
 
 /**
  * Send a response in reply to a message from the SPI master. This function
  * should be called within 16 SPI clock periods after the process set using
- * the spis_set_rx_callback() function was notified of an incoming message.
+ * the spis_register_callback() function was notified of an incoming message.
  *
  * @param r  The response to send
  * @return TODO
