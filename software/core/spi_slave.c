@@ -141,8 +141,6 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 }
 
 
-// TODO: should we check the write collision flag when we call
-// SET_SPI_DATA_REG ?
 INTERRUPT(SPI_TC_VECT)
 {
   uint8_t data = SPI_GET_DATA_REG();
@@ -189,7 +187,8 @@ INTERRUPT(SPI_TC_VECT)
     if ((trx.crc & 0x00FF) == data) {
       trx.status = SPIS_TRX_WAITING_FOR_CALLBACK;
       if (callback != NULL) {
-	process_post_data(callback, SPIS_MESSAGE_RECEIVED, (process_data_t)trx);
+	process_post_data(callback, SPIS_MESSAGE_RECEIVED,
+			  (process_data_t)trx);
 	break;
       } else {
 	trx.error_code = TYPE_ERR_NO_PROCESS_LISTENING;
