@@ -51,30 +51,31 @@
  *
  *  After this entire process, the slave should send its response, which should
  *  have the following format:
- *  1) The slave sends the value 0xFD as long it is not yet ready to send its
+ *  1) The slave sends the value 0xFC as long it is not yet ready to send its
  *     actual response (the value indicates the slave is still calculating the
  *     response). The master will ignore these values (i.e., not copy them 
  *     into the receive buffer). If the slave has the response available
  *     immediately, it can skip this step.
  *  2) The slave sends a two-byte response header. The first byte of which is
  *     an identifier indicating the type of the response being sent. This byte
- *     MUST NOT be 0xFD. A response type of 0xFE indicates a CRC checksum 
- *     failure on the data sent by the master and a response type of 0xFF 
- *     indicates the master payload is too large for the slave's receive
- *     buffer. The second header byte indicates the length of the response
- *     payload that follows.
+ *     MUST NOT be 0xFC. A response type of 0xFD indicates there is no process
+ *     listening for incoming SPI messages on the slave. A response type of
+ *     0xFE indicates a CRC checksum failure on the data sent by the master
+ *     and a response type of 0xFF indicates the master payload is too large
+ *     for the slave's receive buffer. The second header byte indicates the
+ *     length of the response payload that follows.
  *  3) The slave sends the response payload.
  *  4) The slave sends a two-byte CRC checksum footer calculated over the
  *     two-byte response header and the response payload.
  *  The transfer ends successfully when (1) the master has sent its data
  *  according to the scheme above, (2) the master has received the slave's
  *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
- *  response type is not 0xFE or 0xFF.
+ *  response type is not 0xFD, 0xFE or 0xFF.
  *
  *  From the viewpoint of the master, the following exceptions can occur
  *  during this process:
  *   * The slave delays its response for more than 16 bytes after the master
- *     has sent its footer (by continually sending 0xFD)
+ *     has sent its footer (by continually sending 0xFC)
  *   * The slave indicates a CRC checksum failure.
  *   * The slave indicates its receive buffer it too small for the payload
  *     sent by the master.

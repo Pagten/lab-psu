@@ -39,13 +39,31 @@
 #include "core/process.h"
 
 
+typedef enum {
+  SPIS_SEND_RESPONSE_OK,
+  SPIS_SEND_RESPONSE_INVALID_TYPE,
+  SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL,
+  SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS
+} spis_send_response_status;
+
+
 /**
  * Initialize the SPI slave module.
  */
 void spis_init();
 
 /**
- * Set the process to notify on incoming data
+ * Set the process to notify on incoming data.
+ *
+ * The SPI slave module will send the SPIS_MESSAGE_RECEIVED event to the 
+ * process when a message has been successfully received. The process then has
+ * some time (15 SPI transmission periods) to calculate a response and register
+ * it with the SPI slave module using the spis_send_response() function. When
+ * response has been sent successfully, the SPIS_RESPONSE_TRANSMITTED event
+ * will be sent to the process. If the master ends the transfer before the
+ * response can be delivered completely, the SPIS_RESPONSE_ERROR will be sent
+ * to the process. Note that there is no guarantee that the master has success-
+ * fully received the response, even when the SPIS_TRX_COMPLETED event is sent.
  *
  * @param p  The process to notify when a message from the SPI master was
  *           received
@@ -54,14 +72,30 @@ void spis_register_callback(process* p);
 
 /**
  * Send a response in reply to a message from the SPI master. This function
- * should be called within 16 SPI clock periods after the process set using
- * the spis_register_callback() function was notified of an incoming message.
+ * should be called within 15 SPI clock periods after the process set using
+ * the spis_register_callback() function has received the
+ * SPIS_MESSAGE_RECEIVED event. The process will be notified with the
+ * SPIS_RESPONSE_ERROR event if the master ends the transfer before the
+ * response can be delivered completely. The process will be notified with the
+ * SPIS_RESPONSE_TRANSMITTED event when the response has been transmitted
+ * completely, but this does not guarantee that the master has successfully
+ * received the payload. The master can always retransmit the original message
+ * if it did not successfully receive the response (master and slave should
+ * ensure the messages exchanged are idempotent). The caller process should
+ * ensure the integrity of the payload buffer until it receives the
+ * SPIS_RESPONSE_ERROR or SPIS_RESPONSE_TRANSMITTED events.
  *
- * @param r  The response to send
- * @return TODO
+ * @param type    The response type id, must be smaller than MAX_RESPONSE_TYPE
+ * @param payload The payload to send as response (can be NULL if size is 0)
+ * @param size    The size of the payload (in number of bytes)
+ * @return SPIS_SEND_RESPONSE_INVALID_TYPE if the given type is larger than
+ *         MAX_RESPONSE_TYPE, SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL if the given
+ *         payload is NULL but size is greater than 0,
+ *         SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS if there is no transfer in
+ *         progress to which to reply, or SPIS_SEND_RESPONSE_OK otherwise.
  */
 spis_send_response_status
-spis_send_response(spis_response* r);
+spis_send_response(uint8_t type, uint8_t* payload, uint8_t size);
 
 
 #endif
