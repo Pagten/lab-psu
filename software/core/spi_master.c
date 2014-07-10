@@ -33,6 +33,14 @@
 #include "util/bit.h"
 #include "util/log.h"
 
+struct spim_trx {
+  uint8_t flags;
+  uint8_t ss_mask;
+  volatile uint8_t *ss_port;
+  process_t p;
+  struct spim_trx* next;
+};
+
 
 PROCESS(spim_trx_process);
 
@@ -65,14 +73,14 @@ void spim_init(void)
 
 void spim_trx_init(spim_trx* trx)
 {
-  trx->flags_rx_delay_remaining = 0;
+  trx->flags = 0;
 }
 
 
 spim_trx_simple_status
-spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-		uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-		size_t rx_size, process* p)
+spim_trx_simple(spim_trx_simple* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+		uint8_t tx_size, uint8_t* tx_buf, uint8_t rx_size,
+		uint8_t* rx_buf, process* p)
 {
   if (tx_buf == NULL && tx_size > 0) {
     return SPIM_TRX_SIMPLE_TX_BUF_IS_NULL;
@@ -80,40 +88,40 @@ spim_trx_simple(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
   if (rx_buf == NULL && rx_size > 0) {
     return SPIM_TRX_SIMPLE_RX_BUF_IS_NULL;
   }
+
   trx->flags_rx_delay_remaining = 0;
   trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
+  trx->tx_size = tx_size;
   trx->tx_buf = tx_buf;
-  trx->tx_remaining = tx_size;
+  trx->rx_size = rx_size;
   trx->rx_buf = rx_buf;
-  trx->rx_remaining = rx_size;
   trx->p = p;
   return SPIM_TRX_SIMPLE_OK;
 }
 
 
 spim_trx_llp_status
-spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	     uint8_t id, uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf,
-	     size_t rx_buf_size, process* p)
+spim_trx_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+	     uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
+	     uint8_t rx_type, uint8_t rx_buf_size, uint8_t* rx_buf,
+	     process* p)
 {
   if (tx_buf == NULL && tx_size > 0) {
     return SPIM_TRX_LLP_TX_BUF_IS_NULL;
   }
-  if (rx_buf == NULL) {
+  if (rx_buf == NULL && rx_buf_size > 0) {
     return SPIM_TRX_LLP_RX_BUF_IS_NULL;
   }
-  if (rx_buf_size <= LLP_HEADER_LENGTH) {
-    return SPIM_TRX_LLP_RX_BUF_TOO_SMALL;
-  }
+
   trx->flags_rx_delay_remaining = _BV(TRX_USE_LLP_BIT) | MAX_RX_DELAY;
   trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
-  trx->id = id;
+  trx->tx_type = tx_type;
+  trx->tx_size = tx_size;
   trx->tx_buf = tx_buf;
-  trx->tx_remaining = tx_size;
+  trx->rx_size = rx_buf_size
   trx->rx_buf = rx_buf;
-  trx->rx_remaining = rx_buf_size - LLP_HEADER_LENGTH;
   trx->p = p;
   return SPIM_TRX_LLP_OK;
 }
@@ -123,37 +131,37 @@ spim_trx_llp(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 inline
 bool spim_trx_is_in_transmission(spim_trx* trx)
 {
-  return trx->flags_rx_delay_remaining & _BV(TRX_IN_TRANSMISSION_BIT);
+  return trx->flags & _BV(TRX_IN_TRANSMISSION_BIT);
 }
 
 static inline
 void trx_set_in_transmission(spim_trx* trx, bool v)
 {
   if (v) {
-    trx->flags_rx_delay_remaining |= _BV(TRX_IN_TRANSMISSION_BIT);
+    trx->flags |= _BV(TRX_IN_TRANSMISSION_BIT);
   } else {
-    trx->flags_rx_delay_remaining &= ~_BV(TRX_IN_TRANSMISSION_BIT);    
+    trx->flags &= ~_BV(TRX_IN_TRANSMISSION_BIT);    
   }
 }
 
 inline
 bool spim_trx_is_queued(spim_trx* trx)
 {
-  return trx->flags_rx_delay_remaining & _BV(TRX_QUEUED_BIT);
+  return trx->flags & _BV(TRX_QUEUED_BIT);
 }
 
 static inline
 void trx_set_queued(spim_trx* trx)
 {
   if (v) {
-    trx->flags_rx_delay_remaining |= _BV(TRX_QUEUED_BIT);
+    trx->flags |= _BV(TRX_QUEUED_BIT);
   } else {
-    trx->flags_rx_delay_remaining &= ~_BV(TRX_QUEUED_BIT);    
+    trx->flags &= ~_BV(TRX_QUEUED_BIT);    
   }
 }
 
 static inline
-uint8_t get_rx_delay_remaining(spim_trx* trx)
+uint8_t get_rx_delay_remaining(spim_trx_llp* trx)
 {
   return trx->flags_rx_delay_remaining & RX_DELAY_REMAINING_MASK;
 }
@@ -163,7 +171,7 @@ uint8_t get_rx_delay_remaining(spim_trx* trx)
  * is greater than 0!
  */
 static inline
-void decrement_rx_delay_remaining(spim_trx* trx)
+void decrement_rx_delay_remaining(spim_trx_llp* trx)
 {
   trx->flags_rx_delay_remaining -= 1;
 }
@@ -175,7 +183,6 @@ spim_trx_queue(spim_trx* trx)
     return SPIM_TRX_QUEUE_ALREADY_QUEUED;
   }
 
-  trx_set_queued(trx_queue_head, true);
   if (trx_queue_tail == NULL) {
     // Queue is empty
     trx_queue_head = trx;
@@ -185,6 +192,7 @@ spim_trx_queue(spim_trx* trx)
   }
   trx_queue_tail = trx;
   trx->next = NULL;
+  trx_set_queued(trx, true);
   return SPIM_TRX_QUEUE_OK;
 }
      
@@ -242,6 +250,10 @@ PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
 
+  static uint8_t tx_counter;
+  static uint8_t rx_counter;
+  static crc16_t crc;
+  
   while (true) {
     PROCESS_YIELD();
     // Wait until there's something in the queue
@@ -255,106 +267,107 @@ PROCESS_THREAD(spim_trx_process)
 
     if (trx->flags_rx_delay_remaining & _BV(TRX_USE_LLP)) {
       // Link-layer protocol
+      const spim_trx_llp* trx = (spim_trx_llp*)trx_queue_head;
 
       // Send first header byte (message type id)
-      tx_byte(trx_queue_head->id);
-      crc16_init(&(trx_queue_head->crc));
-      crc16_update(&(trx_queue_head->crc), trx_queue_head->id);
-      crc16_update(&(trx_queue_head->crc), trx_queue_head->tx_remaining);
+      tx_byte(trx->tx_type);
+      crc16_init(&crc);
+      crc16_update(&crc, trx->id);
+      crc16_update(&crc, trx->tx_size);
       // Send second header byte (message size)
-      tx_byte(trx_queue_head->tx_remaining);
+      tx_byte(trx->tx_size);
       PROCESS_YIELD();
       
       // Send message bytes
-      while (trx_queue_head->tx_remaining > 0) {
-	tx_byte(*(trx_queue_head->tx_buf));
-	crc16_update(&(trx_queue_head->crc), *(trx_queue_head->tx_buf));
-	trx_queue_head->tx_buf += 1;
-	trx_queue_head->tx_remaining -= 1;
+      tx_counter = 0;
+      while (tx_counter < trx->tx_size) {
+	tx_byte(trx->tx_buf[tx_counter]);
+	crc16_update(&crc, trx->tx_buf[tx_counter]);
+	tx_counter += 1;
 	PROCESS_YIELD();
       }
       
       // Send CRC footer bytes
-      tx_byte(trx_queue_head->crc >> 8);
-      tx_byte(trx_queue_head->crc & 0x00FF);
+      tx_byte((uint8_t)(crc >> 8));
+      tx_byte((uint8_t)(crc & 0x00FF));
       
       // Wait for reply
       tx_dummy_byte();
       PROCESS_YIELD();
-      while (get_rx_delay_remaining(trx_queue_head) > 0 &&
+      while (get_rx_delay_remaining(trx) > 0 &&
 	     read_response_byte() == TYPE_RX_PROCESSING) {
 	tx_dummy_byte();
-	decrement_rx_delay_remaining(trx_queue_head);
+	decrement_rx_delay_remaining(trx);
 	PROCESS_YIELD();
       }
       
       // Receive response header (first byte has already been received)
-      crc16_init(&(trx_queue_head->crc));
-      trx_queue_head->rx_buf[0] = read_response_byte();
+      crc16_init(&crc);
+      trx->rx_type = read_response_byte();
       tx_dummy_byte(); // for the size byte
-      if (trx_queue_head->rx_buf[0] == TYPE_CRC_FAILURE) {
+      if (trx->rx_type == TYPE_CRC_FAILURE) {
 	// CRC failure on response side, abort the transfer
 	end_transfer(TRX_CRC_FAILURE);
 	continue;
       }
-      if (trx_queue_head->rx_buf[0] == TYPE_MESSAGE_TOO_LARGE) {
+      if (trx->rx_type == TYPE_MESSAGE_TOO_LARGE) {
 	// Message is too large for slave's receive buffer, abort the transfer
 	end_transfer(TRX_MESSAGE_TOO_LARGE);
 	continue;
       }
-      
-      crc16_update(&(trx_queue_head->crc), trx_queue_head->rx_buf[0]);
-      trx_queue_head->rx_buf[1] = read_response_byte();
+      crc16_update(&crc, trx->rx_type);
+
+      trx->rx_size = read_response_byte();
       tx_dummy_byte(); // for the first payload or footer byte
-      if (trx_queue_head->rx_buf[1] > trx_queue_head->rx_remaining) {
+      if (trx->rx_size > trx->rx_remaining) {
 	// rx_buf is too small for the response, abort the transfer
 	end_transfer(TRX_RESPONSE_TOO_LARGE);
 	continue;
       }
-      trx_queue_head->rx_remaining = trx_queue_head->rx_buf[1];
-      crc16_update(&(trx_queue_head->crc), trx_queue_head->rx_buf[1]);
-      trx_queue_head->rx_buf += 2;
+      crc16_update(&crc, trx->rx_size);
+      
       
       PROCESS_YIELD();
       // Receive response payload
-      while (trx_queue_head->rx_remaining > 0) {
-	*(trx_queue_head->rx_buf) = read_response_byte();
+      rx_counter = 0;
+      while (rx_counter < trx->rx_size) {
+	trx->rx_buf[rx_counter] = read_response_byte();
 	tx_dummy_byte();
-	crc16_update(&(trx_queue_head->crc), *(trx_queue_head->rx_buf));
-	trx_queue_head->rx_buf += 1;
-	trx_queue_head->rx_remaining -= 1;
+	crc16_update(&crc, trx->rx_buf[rx_counter]);
+	rx_counter += 1;
 	PROCESS_YIELD();
       }
       
       // Receive response footer (first byte has already been received)
-      uint16_t crc = read_response_byte() << 8;
+      crc16_t rx_crc = ((crc16_t)read_response_byte()) << 8;
       tx_dummy_byte();
-      crc |= read_response_byte();
-      if (! crc16_equal(crc, trx_queue_head->crc)) {
+      rx_crc |= read_response_byte();
+      if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
 	end_transfer(TRX_RESPONSE_CRC_FAILURE);
 	continue;
       }
     } else {
       // Simple transfer
-      while (trx_queue_head->tx_remaining > 0) {
-	tx_byte(*(trx_queue_head->tx_buf));
-	trx_queue_head->tx_buf += 1;
-	trx_queue_head->tx_remaining -= 1;
+      const spim_trx_simple* trx = (spim_trx_simple*)trx_queue_head;
+
+      tx_counter = 0;
+      rx_counter = 0;
+      while (tx_counter < trx->tx_size) {
+	tx_byte(trx->tx_buf[tx_counter]);
+	tx_counter += 1;
 	PROCESS_YIELD();
-	if (trx_queue_head->rx_remaining > 0) {
-	  *(trx_queue_head->rx_buf) = read_response_byte();
-	  trx_queue_head->rx_buf += 1;
-	  trx_queue_head->rx_remaining -= 1;
+	if (rx_counter < trx->rx_size) {
+	  trx->rx_buf[rx_counter] = read_response_byte();
+	  rx_counter += 1;
 	}
       }
 
-      while (trx_queue_head->rx_remaining > 0) {
+      while (rx_counter < trx->rx_size) {
 	tx_dummy_byte();
 	PROCESS_YIELD();	
-	*(trx_queue_head->rx_buf) = read_response_byte();
-	trx_queue_head->rx_buf += 1;
-	trx_queue_head->rx_remaining -= 1;
+	trx->rx_buf[rx_counter] = read_response_byte();
+	rx_counter += 1;
       }
     }
     // End current transfer
