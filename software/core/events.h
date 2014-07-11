@@ -1,5 +1,5 @@
 /*
- * crc16.h
+ * events.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -19,38 +19,31 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CRC16_H
-#define CRC16_H
+#ifndef EVENTS_H
+#define EVENTS_H
 
 /**
- * @file crc16.h
- * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 6 Jul 2014
+ * @file events.h
+ * @author Pieter Agten <pieter.agten@gmail.com>
+ * @date 11 Jul 2014
+ *
+ * This file contains the list of global events. Global events have an id 
+ * greater than or equal to 128. User-defined events should have an id smaller
+ * than 128.
  */
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <util/crc16.h>
+enum {
+  // SPI Master
+  SPIM_TRX_COMPLETED_SUCCESSFULLY = 128,
+  SPIM_TRX_ERR_CRC_FAILURE,
+  SPIM_TRX_ERR_MESSAGE_TOO_LARGE,
+  SPIM_TRX_ERR_RESPONSE_TOO_LARGE,
+  SPIM_TRX_ERR_RESPONSE_CRC_FAILURE,
 
-
-typedef uint16_t crc16;
-
-static inline 
-void crc16_init(crc16* crc)
-{
-  *crc = 0xFFFF;
-}
-
-static inline
-void crc16_update(crc16* crc, uint8_t val)
-{
-  *crc = _crc16_update(*crc, val);
-}
-
-static inline
-bool crc16_equal(crc16* crc0, crc16* crc1)
-{
-  return *crc0 == *crc1;
-}
+  // SPI Slave
+  SPIS_MESSAGE_RECEIVED,
+  SPIS_RESPONSE_TRANSMITTED,
+  SPIS_RESPONSE_ERROR,
+};
 
 #endif

@@ -41,8 +41,8 @@
 #define SPI_GET_DATA_REG()     SPDR
 //#define SPI_GET_STATUS_REG()   SPSR
 
-#define IS_SPI_INTERRUPT_FLAG_SET() (SPSR & _BV(SPIF))
-#defien IS_SPI_WCOL_FLAG_SET()      (SPSR & _BV(WCOL))
+#define IS_SPI_INTERRUPT_FLAG_SET()       (SPSR & _BV(SPIF))
+#define IS_SPI_WRITE_COLLISION_FLAG_SET() (SPSR & _BV(WCOL))
 
 // Transfer complete interrupt
 #define SPI_TC_VECT  SPI_STC_vect

@@ -118,13 +118,13 @@ typedef enum {
   SPIM_TRX_LLP_TX_BUF_IS_NULL,
   SPIM_TRX_LLP_RX_BUF_IS_NULL,
   SPIM_TRX_LLP_RX_BUF_TOO_SMALL,
-} spim_trx_llp_status;
+} spim_trx_set_llp_status;
 
 typedef enum {
   SPIM_TRX_SIMPLE_OK,
-  SPIM_TRX_LLP_TX_BUF_IS_NULL,
-  SPIM_TRX_LLP_RX_BUF_IS_NULL,
-} spim_trx_simple_status;
+  SPIM_TRX_SIMPLE_TX_BUF_IS_NULL,
+  SPIM_TRX_SIMPLE_RX_BUF_IS_NULL,
+} spim_trx_set_simple_status;
 
 typedef enum {
   SPIM_TRX_QUEUE_OK,
@@ -132,7 +132,8 @@ typedef enum {
 } spim_trx_queue_status;
 
 
-struct spim_trx;
+//struct spim_trx;
+typedef struct spim_trx spim_trx;
 
 /**
  * An SPI simple transfer data structure.
@@ -141,7 +142,7 @@ typedef struct {
   uint8_t flags;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;
-  process_t p;
+  process* p;
   struct spim_trx* next;
 
   uint8_t tx_size;  
@@ -158,7 +159,7 @@ typedef struct {
   uint8_t flags_rx_delay_remaining;
   uint8_t ss_mask;
   volatile uint8_t *ss_port;  
-  process_t p;
+  process* p;
   struct spim_trx* next;
 
   uint8_t tx_type;
@@ -215,10 +216,11 @@ void spim_trx_init(spim_trx* trx);
  * @return SPIM_TRX_SET_OK if the transfer structure was initialized succes-
  *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0. 
  */
-spim_trx_simple_status
-spim_trx_simple(spim_trx_simple* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-		uint8_t tx_size, uint8_t* tx_buf, uint8_t rx_size,
-		uint8_t* rx_buf, process* p);
+spim_trx_set_simple_status
+spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
+		    volatile uint8_t* ss_port, uint8_t tx_size,
+		    uint8_t* tx_buf, uint8_t rx_size, uint8_t* rx_buf,
+		    process* p);
 
 /**
  * Configure an SPI transfer data structure for a data exchange using the link
@@ -237,10 +239,10 @@ spim_trx_simple(spim_trx_simple* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
  * @return SPIM_TRX_SET_OK if the transfer structure was initialized success-
  *         fully or SPIM_TRX_SET_INVALID if TODO
  */
-spim_trx_llp_status
-spim_trx_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	     uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
-	     uint8_t rx_max, uint8_t rx_max, process* p);
+spim_trx_set_llp_status
+spim_trx_set_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+		 uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
+		 uint8_t rx_max, uint8_t* rx_buf, process* p);
 
 
 /**

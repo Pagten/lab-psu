@@ -28,12 +28,21 @@
  * protocol designed for request-response type messages.
  */
 
-#include "spi_slave.h"
-#include "spi_common.h"
-#include "core/crc16.h"
-#include "core/process.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <util/atomic.h>
 
-// Note: SPIS_RX_BUF_SIZE must be between 0 and (255 - LLP_FOOTER_LENGTH)!
+#include "spi_slave.h"
+#include "core/crc16.h"
+#include "core/events.h"
+#include "core/process.h"
+#include "core/spi_common.h"
+#include "hal/gpio.h"
+#include "hal/interrupt.h"
+#include "hal/spi.h"
+
+// Note: SPIS_RX_BUF_SIZE must be between 0 and 255
+#define SPIS_RX_BUF_SIZE 32
 
 enum spis_trx_status {
   SPIS_TRX_IDLE,
@@ -59,7 +68,7 @@ struct spis_trx {
   uint8_t rx_type;
   uint8_t rx_size;
   uint8_t rx_buf[SPIS_RX_BUF_SIZE];
-  crc16_t crc;
+  crc16 crc;
   uint8_t rx_received;
   uint8_t* tx_buf;
   uint8_t tx_remaining;
@@ -73,13 +82,14 @@ static struct spis_trx trx;
 void spis_init()
 {
   callback = NULL;
-  rx_len = 0;
-  trx.type = 0;
+  trx.rx_type = 0;
   trx.rx_size = 0;
   trx.crc = 0;
   trx.rx_received = 0;
   trx.tx_buf = NULL;
+  trx.tx_remaining = 0;
   trx.status = SPIS_TRX_IDLE;
+  trx.error_code = 0;
 
   SPI_SET_PIN_DIRS_SLAVE();
   SPI_SET_ROLE_SLAVE();
@@ -93,7 +103,7 @@ void spis_init()
 
 void spis_register_callback(process* p)
 {
-  ATOMIC_BLOCK {
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     callback = p;
   }
 }
@@ -101,21 +111,21 @@ void spis_register_callback(process* p)
 spis_send_response_status
 spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 {
-  if (type > MAX_NORMAL_TYPE) {
+  if (type > MAX_RESPONSE_TYPE) {
     return SPIS_SEND_RESPONSE_INVALID_TYPE;
   }
   if (payload == NULL && size > 0) {
     return SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL;
   }
 
-  ATOMIC_BLOCK {
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     if (trx.status != SPIS_TRX_WAITING_FOR_CALLBACK) {
       return SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS;
     }
 
     do {
       SPI_SET_DATA_REG(type);
-    } while (IS_SPI_WCOL_FLAG_SET());
+    } while (IS_SPI_WRITE_COLLISION_FLAG_SET());
     trx.tx_buf = payload;
     trx.tx_remaining = size;
     trx.status = SPIS_TRX_SEND_RESPONSE_SIZE;
@@ -128,13 +138,13 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 {
   if (GET_PIN(SPI_SS_PIN)) {
     // The SS pin is high: the master is ending the transfer
-    SPI_SET_DATA(TYPE_RX_PROCESSING);
+    SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
     if (trx.status < SPIS_TRX_COMPLETED &&
 	trx.status >= SPIS_TRX_WAITING_FOR_CALLBACK &&
 	callback != NULL) {
       // Transfer was ended prematurely, after notifying the callback that a
       // message was received
-      process_post_data(callback, SPIS_RESPONSE_ERROR, (process_data_t)trx);
+      process_post_event(callback, SPIS_RESPONSE_ERROR, (process_data_t)&trx);
     }
     trx.status = SPIS_TRX_IDLE;
   }
@@ -187,8 +197,8 @@ INTERRUPT(SPI_TC_VECT)
     if ((trx.crc & 0x00FF) == data) {
       trx.status = SPIS_TRX_WAITING_FOR_CALLBACK;
       if (callback != NULL) {
-	process_post_data(callback, SPIS_MESSAGE_RECEIVED,
-			  (process_data_t)trx);
+	process_post_event(callback, SPIS_MESSAGE_RECEIVED,
+			   (process_data_t)&trx);
 	break;
       } else {
 	trx.error_code = TYPE_ERR_NO_PROCESS_LISTENING;
@@ -198,7 +208,7 @@ INTERRUPT(SPI_TC_VECT)
     }
     // Drop to SPIS_TRX_SEND_ERROR_TYPE
   case SPIS_TRX_SEND_ERROR_TYPE:
-    SPI_SET_DATA(trx.error_code);
+    SPI_SET_DATA_REG(trx.error_code);
     crc16_init(&(trx.crc)); // Re-use crc field for response crc calculation
     crc16_update(&(trx.crc), trx.error_code);
     trx.status = SPIS_TRX_SEND_ERROR_SIZE;
@@ -212,7 +222,7 @@ INTERRUPT(SPI_TC_VECT)
     }
     break;
   case SPIS_TRX_SEND_ERROR_SIZE:
-    SPI_SET_DATA(0); // No payload on error response
+    SPI_SET_DATA_REG(0); // No payload on error response
     crc16_update(&(trx.crc), 0);
     trx.status = SPIS_TRX_SEND_FOOTER0;
     break;
@@ -220,12 +230,12 @@ INTERRUPT(SPI_TC_VECT)
     // Do nothing
     break;
   case SPIS_TRX_SEND_RESPONSE_SIZE:
-    SPI_SET_DATA(trx.tx_remaining);
+    SPI_SET_DATA_REG(trx.tx_remaining);
     crc16_update(&(trx.crc), trx.tx_remaining);
     trx.status = SPIS_TRX_SEND_RESPONSE_PAYLOAD;
     break;
   case SPIS_TRX_SEND_RESPONSE_PAYLOAD:
-    SPI_SET_DATA(*(trx.tx_buf));
+    SPI_SET_DATA_REG(*(trx.tx_buf));
     trx.tx_buf += 1;
     trx.tx_remaining -= 1;
     if (trx.tx_remaining == 0) {
@@ -233,18 +243,18 @@ INTERRUPT(SPI_TC_VECT)
     }
     break;
   case SPIS_TRX_SEND_FOOTER0:
-    SPI_SET_DATA((uint8_t)(trx.crc >> 8));
+    SPI_SET_DATA_REG((uint8_t)(trx.crc >> 8));
     trx.status = SPIS_TRX_SEND_FOOTER1;
     break;
   case SPIS_TRX_SEND_FOOTER1:
-    SPI_SET_DATA((uint8_t)(trx.crc & 0x00FF));
+    SPI_SET_DATA_REG((uint8_t)(trx.crc & 0x00FF));
     trx.status = SPIS_TRX_COMPLETED;
     break;
   case SPIS_TRX_COMPLETED:
-    SPI_SET_DATA(TYPE_RX_PROCESSING);
+    SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
     if (callback != NULL) {
-      process_post_data(callback, SPIS_RESPONSE_TRANSMITTED,
-			(process_data_t)trx);
+      process_post_event(callback, SPIS_RESPONSE_TRANSMITTED,
+			 (process_data_t)&trx);
     }
     break;
   }
