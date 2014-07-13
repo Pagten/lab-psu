@@ -12,8 +12,8 @@ Circuit: * Z:\home\pieter\projects\pietr\lab-psu\ltspice\v-measure-opamp3.asc
 .step r=91
 .step r=100
 
-Date: Tue Apr 15 23:28:02 2014
-Total elapsed time: 0.261 seconds.
+Date: Sat May 24 12:20:31 2014
+Total elapsed time: 0.206 seconds.
 
 tnom = 27
 temp = 27
@@ -26,7 +26,7 @@ rejected = 0
 matrix size = 13
 fillins = 3
 solver = Normal
-Matrix Compiler1:      36 opcodes  0.5/0.2/[0.2]
-Matrix Compiler2: off  [0.3]/0.4/0.3
+Matrix Compiler1:      36 opcodes  0.5/[0.2]/0.4
+Matrix Compiler2:      86 opcodes  0.5/[0.3]/0.5
 
 
