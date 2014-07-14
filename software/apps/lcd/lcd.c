@@ -23,12 +23,13 @@
 /**
  * @file lcd.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 15 mar 2014
+ * @date 15 Mar 2014
  *
  * This is the main file for a small LCD test program.
  */
 
 #include "hal/gpio.h"
+#include "core/timer.h"
 #include "drivers/hd44780.h"
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
@@ -42,34 +43,33 @@ FUSES =
 
 
 #define LCD_DATA_PORT       PORTD
-#define LCD_CTRL_PORT       PORTC
-#define LCD_FIRST_DATA_PIN  1
-#define LCD_E_PIN           1
-#define LCD_RS_PIN          5
-#define LCD_RW_PIN          4
+#define LCD_CTRL_PORT       PORTD
+#define LCD_FIRST_DATA_PIN  0
+#define LCD_E_PIN           4
+#define LCD_RS_PIN          7
+#define LCD_RW_PIN          6
 
 
-
-static hd44780_lcd lcd;
-
-
-static inline
-void init_pins(void)
+// Wait 1 second using a timer
+static void wait(void)
 {
+  static timer tmr;
 
+  tmr_set(&tmr, CLK_AT_LEAST(1.0 * CLOCK_SEC));
+  while (! tmr_expired(&tmr));
 }
 
 int main(void)
 {
-  init_pins();
+  static hd44780_lcd lcd;
+  
   hd44780_init();
-
   hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
 		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
   hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
-    hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, false);
-  hd44780_lcd_set_display(&lcd, true, false, false);
-  hd44780_lcd_home(&lcd);
+  hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, NO_SHIFT_DISPLAY);
+  hd44780_lcd_set_display(&lcd, ENABLE_DISPLAY, DISABLE_CURSOR,
+			  DISABLE_CURSOR_BLINK);
 
   hd44780_lcd_set_ddram_address(&lcd, 0x04);
   hd44780_lcd_write(&lcd, 'H');
@@ -85,6 +85,7 @@ int main(void)
   hd44780_lcd_write(&lcd, 'd');
   hd44780_lcd_write(&lcd, '!');
 
+  wait();
   hd44780_lcd_set_ddram_address(&lcd, 0x40);
   hd44780_lcd_write(&lcd, 'L');
   hd44780_lcd_write(&lcd, 'i');
@@ -93,6 +94,7 @@ int main(void)
   hd44780_lcd_write(&lcd, ' ');
   hd44780_lcd_write(&lcd, '2');
 
+  wait();
   hd44780_lcd_set_ddram_address(&lcd, 0x14);
   hd44780_lcd_write(&lcd, 'L');
   hd44780_lcd_write(&lcd, 'i');
@@ -101,6 +103,7 @@ int main(void)
   hd44780_lcd_write(&lcd, ' ');
   hd44780_lcd_write(&lcd, '3');
 
+  wait();
   hd44780_lcd_set_ddram_address(&lcd, 0x54);
   hd44780_lcd_write(&lcd, 'L');
   hd44780_lcd_write(&lcd, 'i');

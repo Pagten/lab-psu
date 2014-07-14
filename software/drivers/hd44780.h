@@ -29,7 +29,7 @@
 /**
  * @file hd44780.h
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 13 mar 2014
+ * @date 13 Mar 2014
  *
  * Driver for Hitachi HD44780 compatible dot matrix LCD controllers. The driver
  * operates the LCD in read/write 4-bit mode and assumes 5x8 dot characters.
@@ -108,8 +108,9 @@ hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
 /**
  * Initialize a HD44780 LCD.
  *
- * Any HD44780 LCD must be initialized before any of the other lcd functions
- * can be used on it.
+ * The initialization includes setting the correct pin directions. Any HD44780
+ * LCD must be initialized before any of the other lcd functions can be used
+ * on it.
  * 
  * @param lcd      The LCD device to initialize.
  * @param nb_rows  The number of rows on the LCD device. Note that a four row
@@ -152,6 +153,9 @@ void hd44780_lcd_home(hd44780_lcd* lcd);
  */
 void hd44780_lcd_set_entry_mode(hd44780_lcd* lcd, hd44780_direction cursor_dir,
 				bool shift_display);
+#define SHIFT_DISPLAY true
+#define NO_SHIFT_DISPLAY false
+
 
 
 /**
@@ -164,6 +168,12 @@ void hd44780_lcd_set_entry_mode(hd44780_lcd* lcd, hd44780_direction cursor_dir,
  */
 void hd44780_lcd_set_display(hd44780_lcd* lcd, bool display, bool cursor,
 			     bool cursor_blink);
+#define ENABLE_DISPLAY true
+#define DISABLE_DISPLAY false
+#define ENABLE_CURSOR true
+#define DISABLE_CURSOR false
+#define ENABLE_CURSOR_BLINK true
+#define DISABLE_CURSOR_BLINK false
 
 
 /**
