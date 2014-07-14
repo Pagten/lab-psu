@@ -27,7 +27,7 @@
 /**
  * @file timer.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 jan 2014
+ * @date 14 Jan 2014
  *
  * This file implements a timer. The implementation is based on the timer of
  * Contiki (http://www.contiki-os.org).

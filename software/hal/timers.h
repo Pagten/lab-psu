@@ -84,7 +84,8 @@
 #define TMR_SET_CNTR(tmr,val)           CAT(tmr,_SET_CNTR(val))
 #define TMR_GET_CNTR(tmr)               CAT(tmr,_GET_CNTR)
 
-#define TIMER0_SIZE 8
+#define TMR_IS_INTERRUPT_FLAG_SET(tmr,intr)	\
+  CAT(tmr,_IS_,intr,_INTERRUPT_FLAG_SET)
 
 // Constants
 #define TMR_SIZE(tmr)                   CAT(tmr,_SIZE)

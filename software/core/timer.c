@@ -25,7 +25,7 @@
 /**
  * @file timer.c
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 jan 2014
+ * @date 14 Jan 2014
  */
 
 #include "timer.h"

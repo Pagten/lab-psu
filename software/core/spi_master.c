@@ -30,6 +30,8 @@
 #include "core/events.h"
 #include "core/process.h"
 #include "core/spi_common.h"
+#include "core/timer.h"
+#include "hal/gpio.h"
 #include "hal/spi.h"
 #include "util/bit.h"
 #include "util/log.h"
@@ -51,12 +53,13 @@ static spim_trx* trx_queue_tail;
 #define trx_q_hd_simple ((spim_trx_simple*)trx_queue_head)
 #define trx_q_hd_llp    ((spim_trx_llp*)trx_queue_head)
 
-#include "hal/gpio.h"
-
 #define RX_DELAY_REMAINING_MASK  0x0F
 #define TRX_QUEUED_BIT           7
 #define TRX_IN_TRANSMISSION_BIT  6
 #define TRX_USE_LLP_BIT          5
+
+#define LLP_TX_DELAY  (25.0 * CLOCK_USEC)
+#define LLP_RX_DELAY  (50.0 * CLOCK_USEC)
 
 void spim_init(void)
 {
@@ -252,7 +255,7 @@ void end_transfer(process_event_t ev)
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
-
+  static timer trx_timer;
   static uint8_t tx_counter;
   static uint8_t rx_counter;
   static crc16 crc;
@@ -273,40 +276,52 @@ PROCESS_THREAD(spim_trx_process)
 
       // Send first header byte (message type id)
       tx_byte(trx_q_hd_llp->tx_type);
+      timer_set(&trx_timer, CLK_AT_LEAST(LLP_TX_DELAY));
       crc16_init(&crc);
       crc16_update(&crc, trx_q_hd_llp->tx_type);
       crc16_update(&crc, trx_q_hd_llp->tx_size);
       // Send second header byte (message size)
+
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_byte(trx_q_hd_llp->tx_size);
-      PROCESS_YIELD();
-      
+      timer_restart(&trx_timer);
+
       // Send message bytes
       tx_counter = 0;
       while (tx_counter < trx_q_hd_llp->tx_size) {
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
+	timer_restart(&trx_timer);
 	crc16_update(&crc, trx_q_hd_llp->tx_buf[tx_counter]);
 	tx_counter += 1;
-	PROCESS_YIELD();
       }
       
       // Send CRC footer bytes
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_byte((uint8_t)(crc >> 8));
+      timer_restart(&trx_timer);
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_byte((uint8_t)(crc & 0x00FF));
-      
+      timer_set(&trx_timer, CLK_AT_LEAST(LLP_RX_DELAY));
+
       // Wait for reply
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte();
-      PROCESS_YIELD();
+      timer_restart(&trx_timer); 
       while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
 	     read_response_byte() == TYPE_RX_PROCESSING) {
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	tx_dummy_byte();
+	timer_restart(&trx_timer);	
 	decrement_rx_delay_remaining(trx_q_hd_llp);
-	PROCESS_YIELD();
       }
       
       // Receive response header (first byte has already been received)
       crc16_init(&crc);
       trx_q_hd_llp->rx_type = read_response_byte();
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte(); // for the size byte
+      timer_restart(&trx_timer); 
       if (trx_q_hd_llp->rx_type == TYPE_ERR_CRC_FAILURE) {
 	// CRC failure on response side, abort the transfer
 	end_transfer(SPIM_TRX_ERR_CRC_FAILURE);
@@ -319,8 +334,10 @@ PROCESS_THREAD(spim_trx_process)
       }
       crc16_update(&crc, trx_q_hd_llp->rx_type);
 
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       uint8_t size = read_response_byte();
       tx_dummy_byte(); // for the first payload or footer byte
+      timer_restart(&trx_timer); 
       if (size > trx_q_hd_llp->rx_size) {
 	// rx_buf is too small for the response, abort the transfer
 	end_transfer(SPIM_TRX_ERR_RESPONSE_TOO_LARGE);
@@ -329,19 +346,19 @@ PROCESS_THREAD(spim_trx_process)
       trx_q_hd_llp->rx_size = size;
       crc16_update(&crc, trx_q_hd_llp->rx_size);
       
-      
-      PROCESS_YIELD();
       // Receive response payload
       rx_counter = 0;
       while (rx_counter < trx_q_hd_llp->rx_size) {
 	trx_q_hd_llp->rx_buf[rx_counter] = read_response_byte();
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	tx_dummy_byte();
+	timer_restart(&trx_timer); 
 	crc16_update(&crc, trx_q_hd_llp->rx_buf[rx_counter]);
 	rx_counter += 1;
-	PROCESS_YIELD();
       }
       
       // Receive response footer (first byte has already been received)
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       crc16 rx_crc = ((crc16)read_response_byte()) << 8;
       tx_dummy_byte();
       rx_crc |= read_response_byte();
@@ -352,13 +369,11 @@ PROCESS_THREAD(spim_trx_process)
       }
     } else {
       // Simple transfer
-
       tx_counter = 0;
       rx_counter = 0;
       while (tx_counter < trx_q_hd_simple->tx_size) {
 	tx_byte(trx_q_hd_simple->tx_buf[tx_counter]);
 	tx_counter += 1;
-	PROCESS_YIELD();
 	if (rx_counter < trx_q_hd_simple->rx_size) {
 	  trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
 	  rx_counter += 1;
@@ -366,8 +381,7 @@ PROCESS_THREAD(spim_trx_process)
       }
 
       while (rx_counter < trx_q_hd_simple->rx_size) {
-	tx_dummy_byte();
-	PROCESS_YIELD();	
+	tx_dummy_byte();	
 	trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
 	rx_counter += 1;
       }

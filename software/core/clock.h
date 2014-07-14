@@ -41,7 +41,7 @@
 #warning "F_CPU not defined in clock.h!"
 #endif
 
-typedef uint16_t clock_time_t;
+typedef uint32_t clock_time_t;
 
 #define CLOCK_TMR            TIMER0
 #define CLOCK_TMR_PRESCALER  1024
@@ -50,7 +50,10 @@ typedef uint16_t clock_time_t;
 #define CLOCK_MSEC   (CLOCK_SEC/1000.0)                   /** 1 millisecond */
 #define CLOCK_USEC   (CLOCK_SEC/1000000.0)                /** 1 microsecond */
 
-#define CLOCK_TIME_MAX UINT16_MAX
+#define CLOCK_TIME_MAX UINT32_MAX
+
+#define CLK_NEAREST(t)  (t + 0.5)
+#define CLK_AT_LEAST(t) (t + 1.0)
 
 /**
  * Initialize the clock module.
@@ -61,9 +64,9 @@ void clock_init(void);
 /**
  * Return the current clock time.
  *
- * The clock ticks every 1024 CPU clock cycles and hence overflows every 
- * (1024 * 2^16)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 64 us
- * and overflows every 4 seconds.
+ * The clock ticks every 256 CPU clock cycles and hence overflows every 
+ * (1024 * 2^32)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 64 us
+ * and overflows every 3 days.
  */
 clock_time_t clock_get_time(void);
 

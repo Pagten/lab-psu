@@ -40,7 +40,9 @@
  * specify the length of its response (up to a pre-specified maximum). It also
  * allows the slave device to delay its response for up to 16 bytes after the
  * master has sent its message, which can be useful if the slave needs some
- * time to generate its response. The protocol works as follows.
+ * time to generate its response. The protocol consists of a master transmit
+ * phase and master receive phase. The master transmit phase proceeds as
+ * follows.
  *  1) The master initiates the transfer by pulling the slave's SS pin low.
  *  2) The master sends a two-byte header. The first byte of which is a user-
  *     specified identifier indicating the type of message being sent, and the
@@ -49,8 +51,8 @@
  *  4) The master sends a two-byte CRC checksum footer calculated over the
  *     two-byte header and the payload.
  *
- *  After this entire process, the slave should send its response, which should
- *  have the following format:
+ *  After these steps, the master receive phase begins, in which the slave
+ *  should send its response. This phase proceeds as follows.
  *  1) The slave sends the value 0xFC as long it is not yet ready to send its
  *     actual response (the value indicates the slave is still calculating the
  *     response). The master will ignore these values (i.e., not copy them 
@@ -72,12 +74,17 @@
  *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
  *  response type is not 0xFD, 0xFE or 0xFF.
  *
+ *  In order for the slave to have enough time to read its SPI receive
+ *  register and set up its SPI transmit register, the master will wait at
+ *  least 25us between each byte during the master transmit phase and at least
+ *  50us between each byte during the master receive phase.
+ *
  *  From the viewpoint of the master, the following exceptions can occur
  *  during this process:
  *   * The slave delays its response for more than 16 bytes after the master
  *     has sent its footer (by continually sending 0xFC)
  *   * The slave indicates a CRC checksum failure.
- *   * The slave indicates its receive buffer it too small for the payload
+ *   * The slave indicates its receive buffer is too small for the payload
  *     sent by the master.
  *   * The response size indicated by the slave is larger than the maximum
  *     response size specified by the user.

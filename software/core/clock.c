@@ -26,13 +26,14 @@
  */
 
 #include "clock.h"
+#include <util/atomic.h>
 #include "hal/interrupt.h"
 
 #if TMR_SIZE(CLOCK_TMR) != 8
 #error "The clock currently only supports 8-bit timers."
 #endif
 
-static uint8_t clock_upper;
+static volatile __uint24 clock_upper;
 
 void clock_init()
 {
@@ -41,13 +42,28 @@ void clock_init()
   TMR_SET_MODE(CLOCK_TMR, NORMAL);                  // Set normal mode
   TMR_SET_CNTR(CLOCK_TMR, 0);                       // Set counter to 0
   TMR_SET_PRESCALER(CLOCK_TMR,CLOCK_TMR_PRESCALER); // Start timer
+
+  clock_upper = 0;
 }
 
 clock_time_t clock_get_time()
 {
-  return (clock_upper << 8) | TMR_GET_CNTR(CLOCK_TMR);
+  clock_time_t result;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    uint8_t cntr = TMR_GET_CNTR(CLOCK_TMR);
+    if (cntr == 0 && TMR_IS_INTERRUPT_FLAG_SET(CLOCK_TMR, OVF)) {
+      // Timer has just overflowed and interrupt has not been handled yet
+      result = (((clock_time_t)clock_upper << 24) + 1) | 
+	TMR_GET_CNTR(CLOCK_TMR);
+    } else {
+      result = ((clock_time_t)clock_upper << 24) | TMR_GET_CNTR(CLOCK_TMR);
+    }
+  }
+  return result;
 }
 
+
+// This interrupt takes 46 cycles when clock_upper is 24-bits wide
 INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OVF))
 {
   clock_upper += 1;
