@@ -76,8 +76,8 @@
  *
  *  In order for the slave to have enough time to read its SPI receive
  *  register and set up its SPI transmit register, the master will wait at
- *  least 25us between each byte during the master transmit phase and at least
- *  50us between each byte during the master receive phase.
+ *  least 30us between each byte during the master transmit phase and at least
+ *  40us between each byte during the master receive phase.
  *
  *  From the viewpoint of the master, the following exceptions can occur
  *  during this process:

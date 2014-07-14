@@ -58,8 +58,8 @@ static spim_trx* trx_queue_tail;
 #define TRX_IN_TRANSMISSION_BIT  6
 #define TRX_USE_LLP_BIT          5
 
-#define LLP_TX_DELAY  (25.0 * CLOCK_USEC)
-#define LLP_RX_DELAY  (50.0 * CLOCK_USEC)
+#define LLP_TX_DELAY  (30.0 * CLOCK_USEC)
+#define LLP_RX_DELAY  (40.0 * CLOCK_USEC)
 
 void spim_init(void)
 {

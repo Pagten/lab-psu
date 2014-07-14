@@ -44,7 +44,7 @@
 typedef uint32_t clock_time_t;
 
 #define CLOCK_TMR            TIMER0
-#define CLOCK_TMR_PRESCALER  1024
+#define CLOCK_TMR_PRESCALER  256
 
 #define CLOCK_SEC    ((double)F_CPU/CLOCK_TMR_PRESCALER)  /** 1 second */
 #define CLOCK_MSEC   (CLOCK_SEC/1000.0)                   /** 1 millisecond */
@@ -65,8 +65,8 @@ void clock_init(void);
  * Return the current clock time.
  *
  * The clock ticks every 256 CPU clock cycles and hence overflows every 
- * (1024 * 2^32)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 64 us
- * and overflows every 3 days.
+ * (256 * 2^32)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 16 us
+ * and overflows every 19 hours.
  */
 clock_time_t clock_get_time(void);
 
