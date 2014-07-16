@@ -125,11 +125,11 @@ flashprof: $(PROJECT_NAME)
 upload: $(PROJECT_NAME)
 	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U flash:w:$<:e
 
-eeupload:
+eeupload: $(PROJECT_NAME)
 	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U eeprom:w:$<:e
 
-fuseupload:
-	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U lfuse:w:$<:e -U hfuse:w:$<:e -U efuse:w:$<:e
+fuseupload: $(PROJECT_NAME)
+	$(AVRDUDE) $(AVRDUDE_OPTIONS) -u -U lfuse:w:$<:e -U hfuse:w:$<:e -U efuse:w:$<:e
 
 # Don't treat $(PROJECT_NAME) as an intermediate file because it is
 # in fact the primary target.
