@@ -28,9 +28,16 @@
  * This is the main file for a small LCD test program.
  */
 
+#include "hal/interrupt.h"
 #include "hal/gpio.h"
+#include "core/clock.h"
 #include "core/timer.h"
 #include "drivers/hd44780.h"
+
+#include <stdio.h>
+
+#include <avr/io.h> // For fuses
+#include <util/delay.h>
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -50,26 +57,40 @@ FUSES =
 #define LCD_RW_PIN          6
 
 
-// Wait 1 second using a timer
+static hd44780_lcd lcd;
+
+
+
+static void print_string(char* s)
+{
+  while (*s) {
+    hd44780_lcd_write(&lcd, *s);
+    s += 1;
+  }
+}
+
+static void print_time(void)
+{
+  clock_time_t now = clock_get_time();
+  char str[12];
+  sprintf(str, "%lu", now);
+  print_string(str);
+}
+
+
+// Wait 2 seconds using a timer
 static void wait(void)
 {
   static timer tmr;
 
-  tmr_set(&tmr, CLK_AT_LEAST(1.0 * CLOCK_SEC));
-  while (! tmr_expired(&tmr));
+  timer_set(&tmr, CLK_AT_LEAST(2.0 * CLOCK_SEC));
+  while (! timer_expired(&tmr));
+
+  //  _delay_ms(2000.0);
 }
 
-int main(void)
+static void print_lcd_welcome(void)
 {
-  static hd44780_lcd lcd;
-  
-  hd44780_init();
-  hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
-		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
-  hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
-  hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, NO_SHIFT_DISPLAY);
-  hd44780_lcd_set_display(&lcd, ENABLE_DISPLAY, DISABLE_CURSOR,
-			  DISABLE_CURSOR_BLINK);
 
   hd44780_lcd_set_ddram_address(&lcd, 0x04);
   hd44780_lcd_write(&lcd, 'H');
@@ -87,31 +108,60 @@ int main(void)
 
   wait();
   hd44780_lcd_set_ddram_address(&lcd, 0x40);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '2');
+  print_time();
+  //  hd44780_lcd_write(&lcd, 'L');
+  //  hd44780_lcd_write(&lcd, 'i');
+  //  hd44780_lcd_write(&lcd, 'n');
+  //  hd44780_lcd_write(&lcd, 'e');
+  //  hd44780_lcd_write(&lcd, ' ');
+  //  hd44780_lcd_write(&lcd, '2');
 
   wait();
   hd44780_lcd_set_ddram_address(&lcd, 0x14);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '3');
+  print_time();
+  //  hd44780_lcd_write(&lcd, 'L');
+  //  hd44780_lcd_write(&lcd, 'i');
+  //  hd44780_lcd_write(&lcd, 'n');
+  //  hd44780_lcd_write(&lcd, 'e');
+  //  hd44780_lcd_write(&lcd, ' ');
+  //  hd44780_lcd_write(&lcd, '3');
 
-  wait();
-  hd44780_lcd_set_ddram_address(&lcd, 0x54);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '4');
+  //  wait();
+  //  hd44780_lcd_set_ddram_address(&lcd, 0x54);
+  //  print_time();
+  //hd44780_lcd_write(&lcd, 'L');
+  //hd44780_lcd_write(&lcd, 'i');
+  //hd44780_lcd_write(&lcd, 'n');
+  //hd44780_lcd_write(&lcd, 'e');
+  //hd44780_lcd_write(&lcd, ' ');
+  //hd44780_lcd_write(&lcd, '4');
+}
 
+int main(void)
+{
+  ENABLE_INTERRUPTS();
+  clock_init();
+
+
+  // Init LCD
+  hd44780_init();
+  hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
+		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
+  hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
+  hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, NO_SHIFT_DISPLAY);
+  hd44780_lcd_set_display(&lcd, ENABLE_DISPLAY, DISABLE_CURSOR,
+			  DISABLE_CURSOR_BLINK);
+ 
+
+  print_lcd_welcome();
+
+  while (true) {
+    _delay_ms(2000.0);
+    hd44780_lcd_set_ddram_address(&lcd, 0x54);
+    print_string("        ");
+    hd44780_lcd_set_ddram_address(&lcd, 0x54);
+    print_time();
+  } 
 
   while (true);
 }
