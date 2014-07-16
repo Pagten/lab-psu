@@ -53,10 +53,9 @@ clock_time_t clock_get_time()
     uint8_t cntr = TMR_GET_CNTR(CLOCK_TMR);
     if (cntr == 0 && TMR_IS_INTERRUPT_FLAG_SET(CLOCK_TMR, OVF)) {
       // Timer has just overflowed and interrupt has not been handled yet
-      result = (((clock_time_t)clock_upper << 24) + 1) | 
-	TMR_GET_CNTR(CLOCK_TMR);
+      result = (((clock_time_t)clock_upper << 24) + 1) | cntr;
     } else {
-      result = ((clock_time_t)clock_upper << 24) | TMR_GET_CNTR(CLOCK_TMR);
+      result = ((clock_time_t)clock_upper << 24) | cntr;
     }
   }
   return result;
