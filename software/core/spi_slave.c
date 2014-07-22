@@ -45,7 +45,7 @@
 #define SPIS_RX_BUF_SIZE 32
 
 enum spis_trx_status {
-  SPIS_TRX_IDLE,
+  SPIS_TRX_READY,
   SPIS_TRX_RECEIVING_SIZE,
   SPIS_TRX_RECEIVING_PAYLOAD,
   SPIS_TRX_RECEIVING_FOOTER0,
@@ -58,7 +58,9 @@ enum spis_trx_status {
   SPIS_TRX_SEND_RESPONSE_PAYLOAD,
   SPIS_TRX_SEND_FOOTER0,
   SPIS_TRX_SEND_FOOTER1,
-  SPIS_TRX_COMPLETED
+  SPIS_TRX_COMPLETED,
+  SPIS_TRX_WAITING_FOR_TRANSFER_TO_END,
+  SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK
 };
 
 /**
@@ -76,11 +78,13 @@ struct spis_trx {
   uint8_t error_code;
 };
 
+static bool transfer_in_progress;
 static process* callback;
 static struct spis_trx trx;
 
 void spis_init()
 {
+  transfer_in_progress = false;
   callback = NULL;
   trx.rx_type = 0;
   trx.rx_size = 0;
@@ -88,7 +92,7 @@ void spis_init()
   trx.rx_received = 0;
   trx.tx_buf = NULL;
   trx.tx_remaining = 0;
-  trx.status = SPIS_TRX_IDLE;
+  trx.status = SPIS_TRX_READY;
   trx.error_code = 0;
 
   SPI_SET_PIN_DIRS_SLAVE();
@@ -111,16 +115,25 @@ void spis_register_callback(process* p)
 spis_send_response_status
 spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 {
-  if (type > MAX_RESPONSE_TYPE) {
-    return SPIS_SEND_RESPONSE_INVALID_TYPE;
-  }
-  if (payload == NULL && size > 0) {
-    return SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL;
-  }
-
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     if (trx.status != SPIS_TRX_WAITING_FOR_CALLBACK) {
+      if (trx.status == SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
+	if (transfer_in_progress) {
+	  SPI_SET_DATA_REG(TYPE_ERR_SLAVE_NOT_READY);
+	  trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
+	} else {
+	  SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
+	  trx.status = SPIS_TRX_READY;
+	}
+      }
       return SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS;
+    }
+
+    if (type > MAX_RESPONSE_TYPE) {
+      return SPIS_SEND_RESPONSE_INVALID_TYPE;
+    }
+    if (size > 0 && payload == NULL) {
+      return SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL;
     }
 
     do {
@@ -136,17 +149,26 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 
 INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 {
-  if (GET_PIN(SPI_SS_PIN)) {
+  transfer_in_progress = (GET_PIN(SPI_SS_PIN) == 0);
+  if (! transfer_in_progress) {
     // The SS pin is high: the master is ending the transfer
     SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
-    if (trx.status < SPIS_TRX_COMPLETED &&
-	trx.status >= SPIS_TRX_WAITING_FOR_CALLBACK &&
-	callback != NULL) {
+    if (trx.status >= SPIS_TRX_WAITING_FOR_CALLBACK &&
+	trx.status < SPIS_TRX_COMPLETED) {
       // Transfer was ended prematurely, after notifying the callback that a
       // message was received
-      process_post_event(callback, SPIS_RESPONSE_ERROR, (process_data_t)&trx);
+      if (callback != NULL) {
+	process_post_event(callback, SPIS_RESPONSE_ERROR, PROCESS_DATA_NULL);
+      }
+      if (trx.status == SPIS_TRX_WAITING_FOR_CALLBACK) {
+	SPI_SET_DATA_REG(TYPE_ERR_SLAVE_NOT_READY);
+	trx.status = SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK;
+      } else {
+	trx.status = SPIS_TRX_READY;
+      }
+    } else if (trx.status != SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
+      trx.status = SPIS_TRX_READY;
     }
-    trx.status = SPIS_TRX_IDLE;
   }
 }
 
@@ -155,7 +177,7 @@ INTERRUPT(SPI_TC_VECT)
 {
   uint8_t data = SPI_GET_DATA_REG();
   switch (trx.status) {
-  case SPIS_TRX_IDLE:
+  case SPIS_TRX_READY:
     // Master has started a new transfer, first byte is the message type
     trx.rx_type = data;
     trx.rx_received = 0;
@@ -197,8 +219,7 @@ INTERRUPT(SPI_TC_VECT)
     if ((trx.crc & 0x00FF) == data) {
       trx.status = SPIS_TRX_WAITING_FOR_CALLBACK;
       if (callback != NULL) {
-	process_post_event(callback, SPIS_MESSAGE_RECEIVED,
-			   (process_data_t)&trx);
+	process_post_event(callback, SPIS_MESSAGE_RECEIVED, PROCESS_DATA_NULL);
 	break;
       } else {
 	trx.error_code = TYPE_ERR_NO_PROCESS_LISTENING;
@@ -252,10 +273,17 @@ INTERRUPT(SPI_TC_VECT)
     break;
   case SPIS_TRX_COMPLETED:
     SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
+    trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
     if (callback != NULL) {
       process_post_event(callback, SPIS_RESPONSE_TRANSMITTED,
-			 (process_data_t)&trx);
+			 PROCESS_DATA_NULL);
     }
+    break;
+  case SPIS_TRX_WAITING_FOR_TRANSFER_TO_END:
+    // Do nothing
+    break;
+  case SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK:
+    // Do nothing
     break;
   }
 }

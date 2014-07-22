@@ -261,6 +261,7 @@ PROCESS_THREAD(spim_trx_process)
   static crc16 crc;
   
   while (true) {
+  start:
     PROCESS_YIELD();
     // Wait until there's something in the queue
     PROCESS_WAIT_WHILE(trx_queue_head == NULL);
@@ -280,9 +281,13 @@ PROCESS_THREAD(spim_trx_process)
       crc16_init(&crc);
       crc16_update(&crc, trx_q_hd_llp->tx_type);
       crc16_update(&crc, trx_q_hd_llp->tx_size);
-      // Send second header byte (message size)
 
+      // Send second header byte (message size)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      if (read_response_byte() != TYPE_RX_PROCESSING) {
+	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
+	goto start;
+      }
       tx_byte(trx_q_hd_llp->tx_size);
       timer_restart(&trx_timer);
 
@@ -290,6 +295,10 @@ PROCESS_THREAD(spim_trx_process)
       tx_counter = 0;
       while (tx_counter < trx_q_hd_llp->tx_size) {
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	if (read_response_byte() != TYPE_RX_PROCESSING) {
+	  end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
+	  goto start;
+	}
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
 	timer_restart(&trx_timer);
 	crc16_update(&crc, trx_q_hd_llp->tx_buf[tx_counter]);
@@ -298,13 +307,20 @@ PROCESS_THREAD(spim_trx_process)
       
       // Send CRC footer bytes
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      if (read_response_byte() != TYPE_RX_PROCESSING) {
+	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);	
+      }
       tx_byte((uint8_t)(crc >> 8));
       timer_restart(&trx_timer);
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      if (read_response_byte() != TYPE_RX_PROCESSING) {
+	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
+	goto start;
+      }
       tx_byte((uint8_t)(crc & 0x00FF));
       timer_set(&trx_timer, CLK_AT_LEAST(LLP_RX_DELAY));
 
-      // Wait for reply
+      // Wait for response
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte();
       timer_restart(&trx_timer); 
@@ -316,6 +332,12 @@ PROCESS_THREAD(spim_trx_process)
 	decrement_rx_delay_remaining(trx_q_hd_llp);
       }
       
+      if (read_response_byte() == TYPE_RX_PROCESSING) {
+	// Response is taking too long, abort the transfer
+	end_transfer(SPIM_TRX_ERR_NO_RESPONSE);
+	goto start;
+      }
+
       // Receive response header (first byte has already been received)
       crc16_init(&crc);
       trx_q_hd_llp->rx_type = read_response_byte();
@@ -325,12 +347,12 @@ PROCESS_THREAD(spim_trx_process)
       if (trx_q_hd_llp->rx_type == TYPE_ERR_CRC_FAILURE) {
 	// CRC failure on response side, abort the transfer
 	end_transfer(SPIM_TRX_ERR_CRC_FAILURE);
-	continue;
+	goto start;
       }
       if (trx_q_hd_llp->rx_type == TYPE_ERR_MESSAGE_TOO_LARGE) {
 	// Message is too large for slave's receive buffer, abort the transfer
 	end_transfer(SPIM_TRX_ERR_MESSAGE_TOO_LARGE);
-	continue;
+  	goto start;
       }
       crc16_update(&crc, trx_q_hd_llp->rx_type);
 
@@ -341,7 +363,7 @@ PROCESS_THREAD(spim_trx_process)
       if (size > trx_q_hd_llp->rx_size) {
 	// rx_buf is too small for the response, abort the transfer
 	end_transfer(SPIM_TRX_ERR_RESPONSE_TOO_LARGE);
-	continue;
+	goto start;
       }
       trx_q_hd_llp->rx_size = size;
       crc16_update(&crc, trx_q_hd_llp->rx_size);
@@ -365,7 +387,7 @@ PROCESS_THREAD(spim_trx_process)
       if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
 	end_transfer(SPIM_TRX_ERR_RESPONSE_CRC_FAILURE);
-	continue;
+	goto start;
       }
     } else {
       // Simple transfer

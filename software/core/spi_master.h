@@ -50,29 +50,35 @@
  *  3) The master sends the user-specified payload.
  *  4) The master sends a two-byte CRC checksum footer calculated over the
  *     two-byte header and the payload.
+ *  During these steps, the slave should continually send the value 0xFB to
+ *  indicate it is successfully receiving the message. Any other value
+ *  indicates an error. If the master receives a value different from 0xFB
+ *  during this phase, it should abort the transfer.
  *
  *  After these steps, the master receive phase begins, in which the slave
  *  should send its response. This phase proceeds as follows.
- *  1) The slave sends the value 0xFC as long it is not yet ready to send its
+ *  1) The slave sends the value 0xFB as long it is not yet ready to send its
  *     actual response (the value indicates the slave is still calculating the
  *     response). The master will ignore these values (i.e., not copy them 
- *     into the receive buffer). If the slave has the response available
- *     immediately, it can skip this step.
+ *     into the receive buffer). The master will stay in this phase for 16 
+ *     SPI byte transfers, or until the slave sends a value different from
+ *     0xFB, whichever comes first.
  *  2) The slave sends a two-byte response header. The first byte of which is
  *     an identifier indicating the type of the response being sent. This byte
- *     MUST NOT be 0xFC. A response type of 0xFD indicates there is no process
+ *     MUST NOT be 0xFB. A response type of 0xFC indicates there is no process
  *     listening for incoming SPI messages on the slave. A response type of
- *     0xFE indicates a CRC checksum failure on the data sent by the master
- *     and a response type of 0xFF indicates the master payload is too large
- *     for the slave's receive buffer. The second header byte indicates the
- *     length of the response payload that follows.
+ *     0xFD indicates a CRC checksum failure on the data sent by the master, a
+ *     response type of 0xFE indicates the master payload is too large for the
+ *     slave's receive buffer and a response type of 0xFF indicates the slave
+ *     cannot free its receive buffer yet. The second header byte indicates
+ *     the length of the response payload that follows.
  *  3) The slave sends the response payload.
  *  4) The slave sends a two-byte CRC checksum footer calculated over the
  *     two-byte response header and the response payload.
  *  The transfer ends successfully when (1) the master has sent its data
  *  according to the scheme above, (2) the master has received the slave's
  *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
- *  response type is not 0xFD, 0xFE or 0xFF.
+ *  response type is not 0xFC, 0xFD, 0xFE or 0xFF.
  *
  *  In order for the slave to have enough time to read its SPI receive
  *  register and set up its SPI transmit register, the master will wait at
@@ -86,6 +92,7 @@
  *   * The slave indicates a CRC checksum failure.
  *   * The slave indicates its receive buffer is too small for the payload
  *     sent by the master.
+ *   * The slave indicates its receive buffer cannot yet be freed.
  *   * The response size indicated by the slave is larger than the maximum
  *     response size specified by the user.
  *   * The CRC checksum fails, indicating the response is corrupt.
@@ -114,17 +121,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-
+#include "core/spi_common.h"
 #include "core/clock.h"
 #include "core/process.h"
-
-#define SPIM_NO_DELAY 0
 
 typedef enum {
   SPIM_TRX_LLP_OK,
   SPIM_TRX_LLP_TX_BUF_IS_NULL,
   SPIM_TRX_LLP_RX_BUF_IS_NULL,
-  SPIM_TRX_LLP_RX_BUF_TOO_SMALL,
 } spim_trx_set_llp_status;
 
 typedef enum {
@@ -139,7 +143,6 @@ typedef enum {
 } spim_trx_queue_status;
 
 
-//struct spim_trx;
 typedef struct spim_trx spim_trx;
 
 /**
@@ -220,8 +223,10 @@ void spim_trx_init(spim_trx* trx);
  * @param rx_buf   The buffer into which to store the received data (must be
  *                 at least rx_size bytes, but can be NULL if rx_size is 0)
  * @param p        The process to notify when the transfer is complete
- * @return SPIM_TRX_SET_OK if the transfer structure was initialized succes-
- *         fully or SPIM_TRX_SET_INVALID if both tx_size and rx_size are 0. 
+ * @return SPIM_TRX_SIMPLE_OK if the transfer structure was initialized
+ *         successfully, SPIM_TRX_SIMPLE_TX_BUF_IS_NULL if tx_size is greater
+ *         than 0 but tx_buf is NULL, SPIM_TRX_SIMPLE_RX_BUF_IS_NULL if
+ *         rx_size is greater than 0 but rx_buf is NULL.
  */
 spim_trx_set_simple_status
 spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
@@ -237,20 +242,22 @@ spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
  * @param ss_pin   The number of the pin connected to the SPI slave to address
  * @param ss_port  The port of the pin connected to the SPI slave to address
  * @param tx_type  The message type identifier
- * @param tx_size  The size (in bytes) of the payload to transmit
+ * @param tx_size  The size (in bytes) of the payload to transmit (must be <=
+ *                 SPIM_MAX_TX_SIZE)
  * @param tx_buf   The payload to be transmitted (can be NULL if tx_size is 0)
  * @param rx_max   The maximum size (in bytes) of the payload to receive
  * @param rx_buf   The buffer into which to store the received data (must be
  *                 at least rx_size bytes, but can be NULL if rx_size is 0)
  * @param p        The process to notify when the transfer is complete
- * @return SPIM_TRX_SET_OK if the transfer structure was initialized success-
- *         fully or SPIM_TRX_SET_INVALID if TODO
+ * @return SPIM_TRX_LLP_OK if the transfer structure was initialized success-
+ *         fully, SPIM_TRX_LLP_TX_BUF_IS_NULL if tx_size is greater than 0 but
+ *         tx_buf is NULL, or SPIM_TRX_LLP_RX_BUF_IS_NULL if rx_size is
+ *         greater than 0 but rx_buf is NULL.
  */
 spim_trx_set_llp_status
 spim_trx_set_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 		 uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
 		 uint8_t rx_max, uint8_t* rx_buf, process* p);
-
 
 /**
  * Return whether an SPI transfer is in transmission.
