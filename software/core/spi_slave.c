@@ -112,6 +112,14 @@ void spis_register_callback(process* p)
   }
 }
 
+static inline
+void set_spi_data_reg(uint8_t value)
+{
+  do {
+    SPI_SET_DATA_REG(value);
+  } while (IS_SPI_WRITE_COLLISION_FLAG_SET());
+}
+
 spis_send_response_status
 spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 {
@@ -119,26 +127,30 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
     if (trx.status != SPIS_TRX_WAITING_FOR_CALLBACK) {
       if (trx.status == SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
 	if (transfer_in_progress) {
-	  SPI_SET_DATA_REG(TYPE_ERR_SLAVE_NOT_READY);
+	  set_spi_data_reg(TYPE_ERR_SLAVE_NOT_READY);
 	  trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
 	} else {
-	  SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
+	  set_spi_data_reg(TYPE_RX_PROCESSING);
 	  trx.status = SPIS_TRX_READY;
 	}
       }
       return SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS;
     }
 
+    // Here we know the status is SPIS_TRX_WAITING_FOR_CALLBACK and
+    // consequently we know transfer_in_progress == true.
     if (type > MAX_RESPONSE_TYPE) {
+      set_spi_data_reg(TYPE_ERR_RESPONSE_INVALID);
+      trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
       return SPIS_SEND_RESPONSE_INVALID_TYPE;
     }
     if (size > 0 && payload == NULL) {
+      set_spi_data_reg(TYPE_ERR_RESPONSE_INVALID);
+      trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
       return SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL;
     }
 
-    do {
-      SPI_SET_DATA_REG(type);
-    } while (IS_SPI_WRITE_COLLISION_FLAG_SET());
+    set_spi_data_reg(type);
     trx.tx_buf = payload;
     trx.tx_remaining = size;
     trx.status = SPIS_TRX_SEND_RESPONSE_SIZE;
@@ -152,7 +164,7 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
   transfer_in_progress = (GET_PIN(SPI_SS_PIN) == 0);
   if (! transfer_in_progress) {
     // The SS pin is high: the master is ending the transfer
-    SPI_SET_DATA_REG(TYPE_RX_PROCESSING);
+    set_spi_data_reg(TYPE_RX_PROCESSING);
     if (trx.status >= SPIS_TRX_WAITING_FOR_CALLBACK &&
 	trx.status < SPIS_TRX_COMPLETED) {
       // Transfer was ended prematurely, after notifying the callback that a
@@ -161,7 +173,7 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 	process_post_event(callback, SPIS_RESPONSE_ERROR, PROCESS_DATA_NULL);
       }
       if (trx.status == SPIS_TRX_WAITING_FOR_CALLBACK) {
-	SPI_SET_DATA_REG(TYPE_ERR_SLAVE_NOT_READY);
+	set_spi_data_reg(TYPE_ERR_SLAVE_NOT_READY);
 	trx.status = SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK;
       } else {
 	trx.status = SPIS_TRX_READY;

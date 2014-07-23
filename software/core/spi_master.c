@@ -284,10 +284,6 @@ PROCESS_THREAD(spim_trx_process)
 
       // Send second header byte (message size)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-      if (read_response_byte() != TYPE_RX_PROCESSING) {
-	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
-	goto start;
-      }
       tx_byte(trx_q_hd_llp->tx_size);
       timer_restart(&trx_timer);
 

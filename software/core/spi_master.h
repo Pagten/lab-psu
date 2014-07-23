@@ -50,10 +50,11 @@
  *  3) The master sends the user-specified payload.
  *  4) The master sends a two-byte CRC checksum footer calculated over the
  *     two-byte header and the payload.
- *  During these steps, the slave should continually send the value 0xFB to
- *  indicate it is successfully receiving the message. Any other value
- *  indicates an error. If the master receives a value different from 0xFB
- *  during this phase, it should abort the transfer.
+ *  From the second byte transmitted during these steps, the slave should
+ *  continually send the value 0xFB to indicate it is successfully receiving
+ *  the message. Any other value indicates an error. If the master receives a
+ *  value different from 0xFB during this phase (except for the first byte 
+ *  received from the slave), it should abort the transfer.
  *
  *  After these steps, the master receive phase begins, in which the slave
  *  should send its response. This phase proceeds as follows.
