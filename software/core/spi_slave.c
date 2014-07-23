@@ -158,6 +158,17 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
   return SPIS_SEND_RESPONSE_OK;
 }
 
+inline
+uint8_t spis_get_rx_size(void)
+{
+  return trx.rx_size;
+}
+
+inline
+uint8_t* spis_get_rx_data(void)
+{
+  return trx.rx_buf;
+}
 
 INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 {

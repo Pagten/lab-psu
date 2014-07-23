@@ -119,7 +119,7 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size);
  *
  * @return The size (in bytes) of the last received SPI payload.
  */
-uint8_t spis_get_rx_size();
+uint8_t spis_get_rx_size(void);
 
 
 /**
@@ -131,7 +131,7 @@ uint8_t spis_get_rx_size();
  *
  * @return A pointer to the last payload received from the SPI master.
  */
-uint8_t* spis_get_rx_data();
+uint8_t* spis_get_rx_data(void);
 
 
 #endif

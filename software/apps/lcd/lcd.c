@@ -87,9 +87,18 @@ PROCESS_THREAD(spi_handler)
     PROCESS_WAIT_EVENT();
 
     if (ev == SPIS_MESSAGE_RECEIVED) {
-      hd44780_lcd_set_ddram_address(&lcd, 0x00);
-      print_string("Message received    ");
       spis_send_response(0x00, NULL, 0);
+      hd44780_lcd_set_ddram_address(&lcd, 0x00);
+      print_string("Message received: ");
+      if (spis_get_rx_size() == 1) {
+        hd44780_lcd_write(&lcd, *spis_get_rx_data());
+	hd44780_lcd_write(&lcd, ' ');
+	hd44780_lcd_write(&lcd, ' ');
+      } else {
+	hd44780_lcd_write(&lcd, 'E');
+	hd44780_lcd_write(&lcd, 'R');
+	hd44780_lcd_write(&lcd, 'R');
+      }
     } else if (ev == SPIS_RESPONSE_TRANSMITTED) {
       hd44780_lcd_set_ddram_address(&lcd, 0x40);
       print_string("Response transmitted");

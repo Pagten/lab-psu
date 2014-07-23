@@ -252,6 +252,13 @@ void end_transfer(process_event_t ev)
   shift_trx_queue();
 }
 
+static inline
+bool is_error_response_type(uint8_t type)
+{
+  return type > TYPE_RX_PROCESSING;
+}
+
+
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
@@ -340,15 +347,10 @@ PROCESS_THREAD(spim_trx_process)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte(); // for the size byte
       timer_restart(&trx_timer); 
-      if (trx_q_hd_llp->rx_type == TYPE_ERR_CRC_FAILURE) {
-	// CRC failure on response side, abort the transfer
-	end_transfer(SPIM_TRX_ERR_CRC_FAILURE);
+      if (is_error_response_type(trx_q_hd_llp->rx_type)) {
+	// Error on slave side, abort the transfer
+	end_transfer(SPIM_TRX_ERR_SLAVE);
 	goto start;
-      }
-      if (trx_q_hd_llp->rx_type == TYPE_ERR_MESSAGE_TOO_LARGE) {
-	// Message is too large for slave's receive buffer, abort the transfer
-	end_transfer(SPIM_TRX_ERR_MESSAGE_TOO_LARGE);
-  	goto start;
       }
       crc16_update(&crc, trx_q_hd_llp->rx_type);
 

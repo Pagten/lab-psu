@@ -35,11 +35,12 @@
 
 #define MAX_RX_DELAY 15
 
-#define MAX_RESPONSE_TYPE              0xFA
-#define TYPE_RX_PROCESSING             0xFB
-#define TYPE_ERR_NO_PROCESS_LISTENING  0xFC
-#define TYPE_ERR_CRC_FAILURE           0xFD
-#define TYPE_ERR_MESSAGE_TOO_LARGE     0xFE
-#define TYPE_ERR_SLAVE_NOT_READY       0xFF
+#define MAX_RESPONSE_TYPE              0xF9
+#define TYPE_RX_PROCESSING             0xFA
+#define TYPE_ERR_NO_PROCESS_LISTENING  0xFB
+#define TYPE_ERR_CRC_FAILURE           0xFC
+#define TYPE_ERR_MESSAGE_TOO_LARGE     0xFD
+#define TYPE_ERR_SLAVE_NOT_READY       0xFE
+#define TYPE_ERR_RESPONSE_INVALID      0xFF
 
 #endif
