@@ -71,6 +71,7 @@ void spim_init(void)
   SPI_SET_DATA_ORDER_MSB();
   SPI_SET_MODE(0,0);
   SPI_SET_CLOCK_RATE_DIV_4();
+  SPI_TC_INTERRUPT_DISABLE();
   SPI_ENABLE();
 
   process_start(&spim_trx_process);
@@ -206,9 +207,9 @@ spim_trx_queue(spim_trx* trx)
 static inline
 void tx_byte(uint8_t byte)
 {
-  do {
+  //  do {
     SPI_SET_DATA_REG(byte);
-  } while (IS_SPI_WRITE_COLLISION_FLAG_SET()); 
+    //  } while (IS_SPI_WRITE_COLLISION_FLAG_SET()); //Problem: this might clear the SPIF flag!
 }
 
 static inline
@@ -217,11 +218,19 @@ void tx_dummy_byte()
   tx_byte(0);
 }
 
+#define DEBUG0 B,0
+
+static inline
+void wait_for_tx_complete()
+{
+  while (! IS_SPI_INTERRUPT_FLAG_SET()) {
+    TGL_PIN(DEBUG0);
+  }
+}
+
 static inline
 uint8_t read_response_byte()
 {
-  // Wait for transfer to complete
-  while (! IS_SPI_INTERRUPT_FLAG_SET());
   return SPI_GET_DATA_REG();
 }
 
@@ -259,6 +268,7 @@ bool is_error_response_type(uint8_t type)
 }
 
 
+
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
@@ -266,7 +276,8 @@ PROCESS_THREAD(spim_trx_process)
   static uint8_t tx_counter;
   static uint8_t rx_counter;
   static crc16 crc;
-  
+  static crc16 rx_crc; 
+
   while (true) {
   start:
     PROCESS_YIELD();
@@ -278,7 +289,7 @@ PROCESS_THREAD(spim_trx_process)
 
     // Start transfer by pulling the slave select pin low
     *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
-
+    //    TGL_PIN(DEBUG0);
     if (trx_queue_head->flags & _BV(TRX_USE_LLP_BIT)) {
       // Link-layer protocol
 
@@ -326,13 +337,15 @@ PROCESS_THREAD(spim_trx_process)
       // Wait for response
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte();
-      timer_restart(&trx_timer); 
+      timer_restart(&trx_timer);
+      wait_for_tx_complete();
       while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
 	     read_response_byte() == TYPE_RX_PROCESSING) {
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	tx_dummy_byte();
 	timer_restart(&trx_timer);	
 	decrement_rx_delay_remaining(trx_q_hd_llp);
+	wait_for_tx_complete();
       }
       
       if (read_response_byte() == TYPE_RX_PROCESSING) {
@@ -369,8 +382,8 @@ PROCESS_THREAD(spim_trx_process)
       // Receive response payload
       rx_counter = 0;
       while (rx_counter < trx_q_hd_llp->rx_size) {
-	trx_q_hd_llp->rx_buf[rx_counter] = read_response_byte();
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	trx_q_hd_llp->rx_buf[rx_counter] = read_response_byte();
 	tx_dummy_byte();
 	timer_restart(&trx_timer); 
 	crc16_update(&crc, trx_q_hd_llp->rx_buf[rx_counter]);
@@ -379,8 +392,10 @@ PROCESS_THREAD(spim_trx_process)
       
       // Receive response footer (first byte has already been received)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-      crc16 rx_crc = ((crc16)read_response_byte()) << 8;
+      rx_crc = ((crc16)read_response_byte()) << 8;
       tx_dummy_byte();
+      timer_restart(&trx_timer); 
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       rx_crc |= read_response_byte();
       if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
@@ -394,6 +409,7 @@ PROCESS_THREAD(spim_trx_process)
       while (tx_counter < trx_q_hd_simple->tx_size) {
 	tx_byte(trx_q_hd_simple->tx_buf[tx_counter]);
 	tx_counter += 1;
+	wait_for_tx_complete();
 	if (rx_counter < trx_q_hd_simple->rx_size) {
 	  trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
 	  rx_counter += 1;
@@ -401,7 +417,8 @@ PROCESS_THREAD(spim_trx_process)
       }
 
       while (rx_counter < trx_q_hd_simple->rx_size) {
-	tx_dummy_byte();	
+	tx_dummy_byte();
+	wait_for_tx_complete();	
 	trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
 	rx_counter += 1;
       }

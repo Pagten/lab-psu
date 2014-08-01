@@ -15,6 +15,8 @@
 #define SPI_SET_ROLE_SLAVE()       SPCR &= _BV(MSTR)
 #define SPI_SET_DATA_ORDER_LSB()   SPCR |= _BV(DORD)
 #define SPI_SET_DATA_ORDER_MSB()   SPCR &= ~_BV(DORD)
+#define SPI_TC_INTERRUPT_ENABLE()  SPCR |= _BV(SPIE)
+#define SPI_TC_INTERRUPT_DISABLE() SPCR &= ~_BV(SPIE)
 #define SPI_ENABLE()               SPCR |= _BV(SPE)
 #define SPI_SET_PIN_DIRS_MASTER()				\
   do {								\
@@ -40,7 +42,11 @@
 #define SPI_SET_DATA_REG(val)  SPDR = val
 #define SPI_GET_DATA_REG()     SPDR
 //#define SPI_GET_STATUS_REG()   SPSR
-
+#define SPI_CLEAR_FLAGS()	   \
+  do {				   \
+    uint8_t __attribute__((unused)) dummy0 = SPSR;	   \
+    uint8_t __attribute__((unused)) dummy1 = SPDR;	   \
+  } while(0)
 #define IS_SPI_INTERRUPT_FLAG_SET()       (SPSR & _BV(SPIF))
 #define IS_SPI_WRITE_COLLISION_FLAG_SET() (SPSR & _BV(WCOL))
 

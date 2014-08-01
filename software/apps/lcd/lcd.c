@@ -58,6 +58,8 @@ FUSES =
 #define LCD_RS_PIN          7
 #define LCD_RW_PIN          6
 
+#define DEBUG0 C,5
+
 PROCESS(spi_handler);
 
 static hd44780_lcd lcd;
@@ -83,13 +85,16 @@ PROCESS_THREAD(spi_handler)
 {
   PROCESS_BEGIN();
 
+  static uint8_t response_error_counter = 0;
+  static char buf[4];
+
   while (true) {
     PROCESS_WAIT_EVENT();
 
     if (ev == SPIS_MESSAGE_RECEIVED) {
       spis_send_response(0x00, NULL, 0);
       hd44780_lcd_set_ddram_address(&lcd, 0x00);
-      print_string("Message received: ");
+      print_string("Msg received: ");
       if (spis_get_rx_size() == 1) {
         hd44780_lcd_write(&lcd, *spis_get_rx_data());
 	hd44780_lcd_write(&lcd, ' ');
@@ -103,8 +108,13 @@ PROCESS_THREAD(spi_handler)
       hd44780_lcd_set_ddram_address(&lcd, 0x40);
       print_string("Response transmitted");
     } else if (ev == SPIS_RESPONSE_ERROR) {
+      if (response_error_counter < UINT8_MAX) {
+	response_error_counter += 1;
+      }
       hd44780_lcd_set_ddram_address(&lcd, 0x14);
-      print_string("Response error      ");
+      sprintf(buf,"%d",response_error_counter);
+      print_string("Response errors: ");
+      print_string(buf);
     } else {
       hd44780_lcd_set_ddram_address(&lcd, 0x40);
       print_string("Unknown event       ");
@@ -126,13 +136,25 @@ static void init_lcd(void)
 			  DISABLE_CURSOR_BLINK);
 }
 
+
+// For debugging:
+extern volatile uint8_t* spis_trx_status;
+
+static void init_pins(void)
+{
+  SET_PIN_DIR_OUTPUT(DEBUG0);
+  CLR_PIN(DEBUG0);
+}
+
 int main(void)
 {
   ENABLE_INTERRUPTS();
+  init_pins();
   clock_init();
   process_init();
   spis_init();
 
+  process_start(&spi_handler);
   spis_register_callback(&spi_handler);
 
   // Init LCD
