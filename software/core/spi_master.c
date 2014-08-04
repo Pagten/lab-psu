@@ -58,8 +58,8 @@ static spim_trx* trx_queue_tail;
 #define TRX_IN_TRANSMISSION_BIT  6
 #define TRX_USE_LLP_BIT          5
 
-#define LLP_TX_DELAY  (30.0 * CLOCK_USEC)
-#define LLP_RX_DELAY  (40.0 * CLOCK_USEC)
+#define LLP_TX_DELAY  (40.0 * CLOCK_USEC)
+#define LLP_RX_DELAY  (50.0 * CLOCK_USEC)
 
 void spim_init(void)
 {
@@ -84,8 +84,8 @@ void spim_trx_init(spim_trx* trx)
 }
 
 
-spim_trx_set_simple_status
-spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
+spim_trx_simple_set_status
+spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
 		    volatile uint8_t* ss_port, uint8_t tx_size,
 		    uint8_t* tx_buf, uint8_t rx_size, uint8_t* rx_buf,
 		    process* p)
@@ -109,8 +109,8 @@ spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
 }
 
 
-spim_trx_set_llp_status
-spim_trx_set_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+spim_trx_llp_set_status
+spim_trx_llp_set(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 		 uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
 		 uint8_t rx_max, uint8_t* rx_buf, process* p)
 {
@@ -130,6 +130,7 @@ spim_trx_set_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
   trx->rx_size = rx_max;
   trx->rx_buf = rx_buf;
   trx->p = p;
+  trx->error = SPIM_TRX_ERR_NONE;
   return SPIM_TRX_LLP_OK;
 }
 
@@ -207,9 +208,7 @@ spim_trx_queue(spim_trx* trx)
 static inline
 void tx_byte(uint8_t byte)
 {
-  //  do {
-    SPI_SET_DATA_REG(byte);
-    //  } while (IS_SPI_WRITE_COLLISION_FLAG_SET()); //Problem: this might clear the SPIF flag!
+  SPI_SET_DATA_REG(byte);
 }
 
 static inline
@@ -261,12 +260,20 @@ void end_transfer(process_event_t ev)
   shift_trx_queue();
 }
 
-static inline
-bool is_error_response_type(uint8_t type)
-{
-  return type > TYPE_RX_PROCESSING;
-}
 
+static
+void handle_response_error(uint8_t response_type)
+{
+  spim_trx_error_type err;
+  if (SPI_ERR_TYPE_MIN <= response_type &&
+      response_type <= SPI_ERR_TYPE_MAX) {
+    err = (spim_trx_error_type)response_type;
+  } else {
+    err = SPIM_TRX_ERR_SLAVE_UNKNOWN;
+  }
+  trx_q_hd_llp->error = err;
+  end_transfer(SPIM_TRX_ERROR);
+}
 
 
 PROCESS_THREAD(spim_trx_process)
@@ -289,9 +296,9 @@ PROCESS_THREAD(spim_trx_process)
 
     // Start transfer by pulling the slave select pin low
     *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
-    //    TGL_PIN(DEBUG0);
     if (trx_queue_head->flags & _BV(TRX_USE_LLP_BIT)) {
       // Link-layer protocol
+      uint8_t response;
 
       // Send first header byte (message type id)
       tx_byte(trx_q_hd_llp->tx_type);
@@ -309,8 +316,9 @@ PROCESS_THREAD(spim_trx_process)
       tx_counter = 0;
       while (tx_counter < trx_q_hd_llp->tx_size) {
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-	if (read_response_byte() != TYPE_RX_PROCESSING) {
-	  end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
+	response = read_response_byte();
+	if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	  handle_response_error(response);
 	  goto start;
 	}
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
@@ -321,14 +329,17 @@ PROCESS_THREAD(spim_trx_process)
       
       // Send CRC footer bytes
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-      if (read_response_byte() != TYPE_RX_PROCESSING) {
-	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);	
+      response = read_response_byte();
+      if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	handle_response_error(response);
+	goto start;
       }
       tx_byte((uint8_t)(crc >> 8));
       timer_restart(&trx_timer);
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-      if (read_response_byte() != TYPE_RX_PROCESSING) {
-	end_transfer(SPIM_TRX_ERR_SLAVE_NOT_READY);
+      response = read_response_byte();
+      if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	handle_response_error(response);
 	goto start;
       }
       tx_byte((uint8_t)(crc & 0x00FF));
@@ -340,31 +351,31 @@ PROCESS_THREAD(spim_trx_process)
       timer_restart(&trx_timer);
       wait_for_tx_complete();
       while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
-	     read_response_byte() == TYPE_RX_PROCESSING) {
+	     read_response_byte() == SPI_TYPE_PREPARING_RESPONSE) {
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	tx_dummy_byte();
 	timer_restart(&trx_timer);	
 	decrement_rx_delay_remaining(trx_q_hd_llp);
 	wait_for_tx_complete();
       }
-      
-      if (read_response_byte() == TYPE_RX_PROCESSING) {
+
+      response = read_response_byte();
+      if (response == SPI_TYPE_PREPARING_RESPONSE) {
 	// Response is taking too long, abort the transfer
-	end_transfer(SPIM_TRX_ERR_NO_RESPONSE);
+	trx_q_hd_llp->error = SPIM_TRX_ERR_NO_RESPONSE;
+	end_transfer(SPIM_TRX_ERROR);
+	goto start;
+      } else if (response >= SPI_ERR_TYPE_MIN) {
+	handle_response_error(response);
 	goto start;
       }
 
       // Receive response header (first byte has already been received)
       crc16_init(&crc);
-      trx_q_hd_llp->rx_type = read_response_byte();
+      trx_q_hd_llp->rx_type = response;
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte(); // for the size byte
       timer_restart(&trx_timer); 
-      if (is_error_response_type(trx_q_hd_llp->rx_type)) {
-	// Error on slave side, abort the transfer
-	end_transfer(SPIM_TRX_ERR_SLAVE);
-	goto start;
-      }
       crc16_update(&crc, trx_q_hd_llp->rx_type);
 
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
@@ -373,7 +384,8 @@ PROCESS_THREAD(spim_trx_process)
       timer_restart(&trx_timer); 
       if (size > trx_q_hd_llp->rx_size) {
 	// rx_buf is too small for the response, abort the transfer
-	end_transfer(SPIM_TRX_ERR_RESPONSE_TOO_LARGE);
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_TOO_LARGE;
+	end_transfer(SPIM_TRX_ERROR);
 	goto start;
       }
       trx_q_hd_llp->rx_size = size;
@@ -399,7 +411,8 @@ PROCESS_THREAD(spim_trx_process)
       rx_crc |= read_response_byte();
       if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
-	end_transfer(SPIM_TRX_ERR_RESPONSE_CRC_FAILURE);
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_CRC_FAILURE;
+	end_transfer(SPIM_TRX_ERROR);
 	goto start;
       }
     } else {
@@ -428,4 +441,34 @@ PROCESS_THREAD(spim_trx_process)
   }
 
   PROCESS_END();
+}
+
+uint8_t
+spim_trx_llp_get_tx_size(spim_trx_llp* trx)
+{
+  return trx->tx_size;
+}
+
+uint8_t*
+spim_trx_llp_get_tx_buf(spim_trx_llp* trx)
+{
+  return trx->tx_buf;
+}
+
+uint8_t
+spim_trx_llp_get_rx_size(spim_trx_llp* trx)
+{
+  return trx->rx_size;
+}
+
+uint8_t*
+spim_trx_llp_get_rx_buf(spim_trx_llp* trx)
+{
+  return trx->rx_buf;
+}
+
+spim_trx_error_type
+spim_trx_llp_get_error_type(spim_trx_llp* trx)
+{
+  return trx->error;
 }

@@ -35,12 +35,13 @@
 
 #define MAX_RX_DELAY 15
 
-#define MAX_RESPONSE_TYPE              0xF9
-#define TYPE_RX_PROCESSING             0xFA
-#define TYPE_ERR_NO_PROCESS_LISTENING  0xFB
-#define TYPE_ERR_CRC_FAILURE           0xFC
-#define TYPE_ERR_MESSAGE_TOO_LARGE     0xFD
-#define TYPE_ERR_SLAVE_NOT_READY       0xFE
-#define TYPE_ERR_RESPONSE_INVALID      0xFF
+#define SPI_TYPE_PREPARING_RESPONSE          0xF0
+#define SPI_TYPE_ERR_SLAVE_RESPONSE_INVALID  0xF1
+#define SPI_TYPE_ERR_SLAVE_NOT_READY         0xF3
+#define SPI_TYPE_ERR_CRC_FAILURE             0xF3
+#define SPI_TYPE_ERR_MESSAGE_TOO_LARGE       0xF4
+
+#define SPI_ERR_TYPE_MIN  0xF1
+#define SPI_ERR_TYPE_MAX  0xF4
 
 #endif

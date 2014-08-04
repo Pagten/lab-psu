@@ -50,55 +50,66 @@
  *  3) The master sends the user-specified payload.
  *  4) The master sends a two-byte CRC checksum footer calculated over the
  *     two-byte header and the payload.
- *  From the second byte transmitted during these steps, the slave should
- *  continually send the value 0xFB to indicate it is successfully receiving
- *  the message. Any other value indicates an error. If the master receives a
- *  value different from 0xFB during this phase (except for the first byte 
- *  received from the slave), it should abort the transfer.
+ *  The slave should confirm reception of each byte by sending the value 0xF0
+ *  in response. The slave can respond with a value different from 0xF0 to
+ *  indicate various error conditions (see Table 1 below). The master must
+ *  check each response and must abort the transfer if a value different from
+ *  0xF0 is detected. Note that the first response from the slave is
+ *  transmitted during the second SPI transfer, and the master should hence
+ *  ignore the byte received from the slave during the first SPI transfer.
  *
  *  After these steps, the master receive phase begins, in which the slave
- *  should send its response. This phase proceeds as follows.
- *  1) The slave sends the value 0xFB as long it is not yet ready to send its
- *     actual response (the value indicates the slave is still calculating the
- *     response). The master will ignore these values (i.e., not copy them 
- *     into the receive buffer). The master will stay in this phase for 16 
+ *  sends its response. This phase proceeds as follows.
+ *  5) The slave sends the value 0xF0 as long it is not yet ready to send its
+ *     actual response (the value indicates the slave is preparing the
+ *     response). The master must ignore these values (i.e., not copy them 
+ *     into the receive buffer). The master must stay in this phase for 16 
  *     SPI byte transfers, or until the slave sends a value different from
- *     0xFB, whichever comes first.
- *  2) The slave sends a two-byte response header. The first byte of which is
- *     an identifier indicating the type of the response being sent. This byte
- *     MUST NOT be 0xFB. A response type of 0xFC indicates there is no process
- *     listening for incoming SPI messages on the slave. A response type of
- *     0xFD indicates a CRC checksum failure on the data sent by the master, a
- *     response type of 0xFE indicates the master payload is too large for the
- *     slave's receive buffer and a response type of 0xFF indicates the slave
- *     cannot free its receive buffer yet. The second header byte indicates
- *     the length of the response payload that follows.
- *  3) The slave sends the response payload.
- *  4) The slave sends a two-byte CRC checksum footer calculated over the
+ *     0xF0, whichever comes first. If the slave does not send a value
+ *     different from 0xF0 within 16 SPI transfers, the master must abort the
+ *     transfer. Otherwise, the first byte different from 0xF0 should be 
+ *     considered the first response byte (see the next step).
+ *  6) The slave sends its response, starting with a response header. The
+ *     first byte of which indicates the response type. Values greater than
+ *     0xF0 indicate various error conditions (see Table 1 below) while values
+ *     lower than 0xF0 are valid user-defined response types. If the response
+ *     type indicates an error, the master must end the transfer. Otherwise,
+ *     the second response byte indicates the length of the payload that
+ *     follows (see the next step).
+ *  7) The slave sends the response payload.
+ *  8) The slave sends a two-byte CRC checksum footer calculated over the
  *     two-byte response header and the response payload.
  *  The transfer ends successfully when (1) the master has sent its data
  *  according to the scheme above, (2) the master has received the slave's
- *  footer, (3) the slave's CRC checksum is correct and (4) the slave's
- *  response type is not 0xFC, 0xFD, 0xFE or 0xFF.
+ *  footer, (3) the slave's CRC checksum is correct and (4) no error condition
+ *  was indicated by the slave.
  *
  *  In order for the slave to have enough time to read its SPI receive
- *  register and set up its SPI transmit register, the master will wait at
- *  least 30us between each byte during the master transmit phase and at least
- *  40us between each byte during the master receive phase.
+ *  register and set up its SPI transmit register, the master must wait at
+ *  least 40us between each byte during the master transmit phase and at least
+ *  50us between each byte during the master receive phase.
  *
- *  From the viewpoint of the master, the following exceptions can occur
- *  during this process:
- *   * The slave delays its response for more than 16 bytes after the master
- *     has sent its footer (by continually sending 0xFC)
- *   * The slave indicates a CRC checksum failure.
- *   * The slave indicates its receive buffer is too small for the payload
- *     sent by the master.
- *   * The slave indicates its receive buffer cannot yet be freed.
- *   * The response size indicated by the slave is larger than the maximum
- *     response size specified by the user.
- *   * The CRC checksum fails, indicating the response is corrupt.
- *  In each of these cases, the master will abort the transfer as soon as it
- *  detects the exception.
+ *
+ * Table 1: Error conditions that can be raised by the slave
+ *  +-------------+----------------------------------------------------------+
+ *  | Response    |                                                          |
+ *  | type value  | Description                                              |
+ *  +-------------+----------------------------------------------------------+
+ *  |             | The slave is not ready to receive a message, because it  |
+ *  | 0xF1        | is still processing a previously received message        |
+ *  +-------------+----------------------------------------------------------|
+ *  |             | The slave client process tried to send an invalid        |
+ *  | 0xF2        | response                                                 |
+ *  |-------------|----------------------------------------------------------|
+ *  |             | The CRC checksum check of the message sent by the master |
+ *  | 0xF3        | has failed                                               |
+ *  |-------------|----------------------------------------------------------|
+ *  |             | The message sent by the master is too large for the      |
+ *  | 0xF4        | receive buffer of the slave                              |
+ *  |-------------|----------------------------------------------------------|
+ *  | 0xF5 - 0xFF | Reserved for future use                                  |
+ *  +-------------+----------------------------------------------------------+
+ *
  *
  *
  * The follow figure depicts the packet format used by both the master and the
@@ -130,18 +141,34 @@ typedef enum {
   SPIM_TRX_LLP_OK,
   SPIM_TRX_LLP_TX_BUF_IS_NULL,
   SPIM_TRX_LLP_RX_BUF_IS_NULL,
-} spim_trx_set_llp_status;
+} spim_trx_llp_set_status;
 
 typedef enum {
   SPIM_TRX_SIMPLE_OK,
   SPIM_TRX_SIMPLE_TX_BUF_IS_NULL,
   SPIM_TRX_SIMPLE_RX_BUF_IS_NULL,
-} spim_trx_set_simple_status;
+} spim_trx_simple_set_status;
 
 typedef enum {
   SPIM_TRX_QUEUE_OK,
   SPIM_TRX_QUEUE_ALREADY_QUEUED,
 } spim_trx_queue_status;
+
+typedef enum {
+  SPIM_TRX_ERR_NONE = 0,
+
+  // Errors detected master-side
+  SPIM_TRX_ERR_RESPONSE_TOO_LARGE,
+  SPIM_TRX_ERR_RESPONSE_CRC_FAILURE,
+  SPIM_TRX_ERR_NO_RESPONSE,
+
+  // Errors detected slave-side
+  SPIM_TRX_ERR_SLAVE_UNKNOWN,
+  SPIM_TRX_ERR_SLAVE_RESPONSE_INVALID = SPI_TYPE_ERR_SLAVE_RESPONSE_INVALID,
+  SPIM_TRX_ERR_SLAVE_NOT_READY = SPI_TYPE_ERR_SLAVE_NOT_READY,
+  SPIM_TRX_ERR_SLAVE_CRC_FAILURE = SPI_TYPE_ERR_CRC_FAILURE,
+  SPIM_TRX_ERR_SLAVE_MSG_TOO_LARGE = SPI_TYPE_ERR_MESSAGE_TOO_LARGE,
+} spim_trx_error_type;
 
 
 typedef struct spim_trx spim_trx;
@@ -169,7 +196,7 @@ typedef struct {
 typedef struct {
   uint8_t flags_rx_delay_remaining;
   uint8_t ss_mask;
-  volatile uint8_t *ss_port;  
+  volatile uint8_t *ss_port;
   process* p;
   struct spim_trx* next;
 
@@ -179,6 +206,7 @@ typedef struct {
   uint8_t rx_type;
   uint8_t rx_size;
   uint8_t* rx_buf;
+  spim_trx_error_type error;
 } spim_trx_llp;
 
 
@@ -229,8 +257,8 @@ void spim_trx_init(spim_trx* trx);
  *         than 0 but tx_buf is NULL, SPIM_TRX_SIMPLE_RX_BUF_IS_NULL if
  *         rx_size is greater than 0 but rx_buf is NULL.
  */
-spim_trx_set_simple_status
-spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
+spim_trx_simple_set_status
+spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
 		    volatile uint8_t* ss_port, uint8_t tx_size,
 		    uint8_t* tx_buf, uint8_t rx_size, uint8_t* rx_buf,
 		    process* p);
@@ -255,8 +283,8 @@ spim_trx_set_simple(spim_trx_simple* trx, uint8_t ss_pin,
  *         tx_buf is NULL, or SPIM_TRX_LLP_RX_BUF_IS_NULL if rx_size is
  *         greater than 0 but rx_buf is NULL.
  */
-spim_trx_set_llp_status
-spim_trx_set_llp(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+spim_trx_llp_set_status
+spim_trx_llp_set(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
 		 uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
 		 uint8_t rx_max, uint8_t* rx_buf, process* p);
 
@@ -280,7 +308,6 @@ bool spim_trx_is_in_transmission(spim_trx* trx);
  */
 bool spim_trx_is_queued(spim_trx* trx);
 
-
 /**
  * Queue an SPI transfer for execution.
  *
@@ -294,6 +321,55 @@ bool spim_trx_is_queued(spim_trx* trx);
  *         transfer queue.
  */
 spim_trx_queue_status spim_trx_queue(spim_trx* trx);
+
+/**
+ * Return the size of the transmit buffer of a given SPI transfer.
+ *
+ * @param trx The transfer of which to return the transmit buffer size
+ * @return The transmit buffer size of the given transfer.
+ */
+uint8_t
+spim_trx_llp_get_tx_size(spim_trx_llp* trx);
+
+/**
+ * Return the ransmit buffer of a given SPI transfer.
+ *
+ * @param trx The transfer of which to return the transmit buffer
+ * @return The transmit buffer of the given transfer.
+ */
+uint8_t*
+spim_trx_llp_get_tx_buf(spim_trx_llp* trx);
+
+/**
+ * Return the size of the receive buffer or the number of bytes received of a
+ * given SPI transfer. If the given transfer has been completed successfully,
+ * the return value indicates the number of bytes received, otherwise the
+ * return value indicates the size of the receive buffer.
+ *
+ * @param trx The transfer of which to return the receive buffer size or the
+ *            number of bytes received.
+ * @return The size of the receive buffer or the number of byte received.
+ */
+uint8_t
+spim_trx_llp_get_rx_size(spim_trx_llp* trx);
+
+/**
+ * Return the receive buffer of a given SPI transfer.
+ *
+ * @param trx The transfer of which to return the receive buffer
+ * @return The receive buffer of the given transfer.
+ */
+uint8_t*
+spim_trx_llp_get_rx_buf(spim_trx_llp* trx);
+
+/**
+ * Return the type of error encountered by a given SPI transfer.
+ *
+ * @param trx The transfer for which to get the error type
+ * @return The type of error encountered by the given transfer
+ */
+spim_trx_error_type
+spim_trx_llp_get_error_type(spim_trx_llp* trx);
 
 
 #endif

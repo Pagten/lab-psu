@@ -54,7 +54,7 @@ void
 mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, port_ptr port,
 		mcp4922_channel ch, uint16_t value)
 {
-  spim_trx_set_simple(&(pkt->spim_trx), pin, port,
+  spim_trx_simple_set(&(pkt->spim_trx), pin, port,
 		      2, pkt->data,      // tx_buf
 		      0, NULL,           // rx_buf
 		      NULL);             // process

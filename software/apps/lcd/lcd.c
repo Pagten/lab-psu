@@ -96,7 +96,7 @@ PROCESS_THREAD(spi_handler)
       hd44780_lcd_set_ddram_address(&lcd, 0x00);
       print_string("Msg received: ");
       if (spis_get_rx_size() == 1) {
-        hd44780_lcd_write(&lcd, *spis_get_rx_data());
+        hd44780_lcd_write(&lcd, *spis_get_rx_buf());
 	hd44780_lcd_write(&lcd, ' ');
 	hd44780_lcd_write(&lcd, ' ');
       } else {
@@ -152,10 +152,9 @@ int main(void)
   init_pins();
   clock_init();
   process_init();
-  spis_init();
-
   process_start(&spi_handler);
-  spis_register_callback(&spi_handler);
+  spis_init(&spi_handler);
+
 
   // Init LCD
   init_lcd();

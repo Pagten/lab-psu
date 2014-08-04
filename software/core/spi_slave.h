@@ -39,6 +39,10 @@
 #include "core/events.h"
 #include "core/process.h"
 
+typedef enum {
+  SPIS_INIT_OK,
+  SPIS_INIT_CALLBACK_IS_NULL,
+} spis_init_status;
 
 typedef enum {
   SPIS_SEND_RESPONSE_OK,
@@ -53,8 +57,12 @@ typedef enum {
  *
  * Modules that should be initialized first:
  *  - process
+ * 
+ * @param p The process to notify when an SPI message is received
+ * @param SPIS_INIT_OK if the SPI slave module was initialized successfully, 
+ *        or SPIS_INIT_CALLBACK_IS_NULL if the given callback was NULL.
  */
-void spis_init();
+spis_init_status spis_init(process* p);
 
 /**
  * Set the process to notify on incoming data.
@@ -131,7 +139,7 @@ uint8_t spis_get_rx_size(void);
  *
  * @return A pointer to the last payload received from the SPI master.
  */
-uint8_t* spis_get_rx_data(void);
+uint8_t* spis_get_rx_buf(void);
 
 
 #endif

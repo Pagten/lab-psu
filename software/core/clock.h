@@ -28,8 +28,8 @@
  * @date 02 Feb 2014
  *
  * The clock is a monotic counter that is incremented periodically. It can be
- * used as a reference for short periods of time (it overflows every 3 to 10
- * seconds, depending on the MCU's clock speed).
+ * used as a reference for short to medium periods of time (it overflows every
+ * 19 hours at an MCU clock speed of 16MHz)
  */
 
 
@@ -65,7 +65,7 @@ void clock_init(void);
  * Return the current clock time.
  *
  * The clock ticks every 256 CPU clock cycles and hence overflows every 
- * (256 * 2^32)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 16 us
+ * (256 * 2^32)/F_CPU seconds. For F_CPU=16MHz, the clock ticks every 16 us
  * and overflows every 19 hours.
  */
 clock_time_t clock_get_time(void);
