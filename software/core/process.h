@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/events.h"
 #include "lib/pt/pt.h"
 
 typedef uint8_t process_event_t;
@@ -51,10 +52,6 @@ typedef struct process {
   PT_THREAD((*thread)(struct process*, process_event_t, process_data_t));
 } process;
 
-
-// Predefined events
-#define PROCESS_EVENT_INIT     0x80
-#define PROCESS_EVENT_CONTINUE 0x81
 
 // Empty data
 #define PROCESS_DATA_NULL   ((process_data_t)NULL)

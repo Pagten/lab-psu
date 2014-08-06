@@ -1,7 +1,5 @@
 /*
- * timer.c
- *
- * Based on the timer implementation of Contiki (http://www.contiki-os.org).
+ * crc16.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -21,37 +19,38 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef CRC16_H
+#define CRC16_H
 
 /**
- * @file timer.c
- * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 Jan 2014
+ * @file crc16.h
+ * @author Pieter Agten (pieter.agten@gmail.com)
+ * @date 6 Jul 2014
  */
 
-#include "timer.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <util/crc16.h>
 
-void timer_set(timer* t, clock_time_t delay)
+
+typedef uint16_t crc16;
+
+static inline 
+void crc16_init(crc16* crc)
 {
-  t->start = clock_get_time();
-  t->delay = delay;
+  *crc = 0xFFFF;
 }
 
-void timer_reset(timer* t)
+static inline
+void crc16_update(crc16* crc, uint8_t val)
 {
-  t->start += t->delay;
+  *crc = _crc16_update(*crc, val);
 }
 
-void timer_restart(timer* t)
+static inline
+bool crc16_equal(crc16* crc0, crc16* crc1)
 {
-  t->start = clock_get_time();
+  return *crc0 == *crc1;
 }
 
-bool timer_expired(timer* t)
-{
-  return (clock_get_time() - t->start) >= t->delay;
-}
-
-clock_time_t timer_remaining(timer* t)
-{
-  return timer_expired(t) ? 0 : (t->start + t->delay - clock_get_time());
-}
+#endif

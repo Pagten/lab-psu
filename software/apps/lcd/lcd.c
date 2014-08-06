@@ -23,13 +23,23 @@
 /**
  * @file lcd.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 15 mar 2014
+ * @date 15 Mar 2014
  *
  * This is the main file for a small LCD test program.
  */
 
-#include "hal/gpio.h"
+#include "core/clock.h"
+#include "core/process.h"
+#include "core/spi_slave.h"
+#include "core/timer.h"
 #include "drivers/hd44780.h"
+#include "hal/interrupt.h"
+#include "hal/gpio.h"
+
+#include <stdio.h>
+
+#include <avr/io.h> // For fuses
+#include <util/delay.h>
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -42,74 +52,117 @@ FUSES =
 
 
 #define LCD_DATA_PORT       PORTD
-#define LCD_CTRL_PORT       PORTC
-#define LCD_FIRST_DATA_PIN  1
-#define LCD_E_PIN           1
-#define LCD_RS_PIN          5
-#define LCD_RW_PIN          4
+#define LCD_CTRL_PORT       PORTD
+#define LCD_FIRST_DATA_PIN  0
+#define LCD_E_PIN           4
+#define LCD_RS_PIN          7
+#define LCD_RW_PIN          6
 
+#define DEBUG0 C,5
 
+PROCESS(spi_handler);
 
 static hd44780_lcd lcd;
 
 
-static inline
-void init_pins(void)
+static void print_string(char* s)
+{
+  while (*s) {
+    hd44780_lcd_write(&lcd, *s);
+    s += 1;
+  }
+}
+
+static void print_lcd_welcome(void)
 {
 
+  hd44780_lcd_set_ddram_address(&lcd, 0x04);
+  print_string("Hello world!");
+}
+
+
+PROCESS_THREAD(spi_handler)
+{
+  PROCESS_BEGIN();
+
+  static uint8_t response_error_counter = 0;
+  static char buf[4];
+
+  while (true) {
+    PROCESS_WAIT_EVENT();
+
+    if (ev == SPIS_MESSAGE_RECEIVED) {
+      spis_send_response(0x00, NULL, 0);
+      hd44780_lcd_set_ddram_address(&lcd, 0x00);
+      print_string("Msg received: ");
+      if (spis_get_rx_size() == 1) {
+        hd44780_lcd_write(&lcd, *spis_get_rx_buf());
+	hd44780_lcd_write(&lcd, ' ');
+	hd44780_lcd_write(&lcd, ' ');
+      } else {
+	hd44780_lcd_write(&lcd, 'E');
+	hd44780_lcd_write(&lcd, 'R');
+	hd44780_lcd_write(&lcd, 'R');
+      }
+    } else if (ev == SPIS_RESPONSE_TRANSMITTED) {
+      hd44780_lcd_set_ddram_address(&lcd, 0x40);
+      print_string("Response transmitted");
+    } else if (ev == SPIS_RESPONSE_ERROR) {
+      if (response_error_counter < UINT8_MAX) {
+	response_error_counter += 1;
+      }
+      hd44780_lcd_set_ddram_address(&lcd, 0x14);
+      sprintf(buf,"%d",response_error_counter);
+      print_string("Response errors: ");
+      print_string(buf);
+    } else {
+      hd44780_lcd_set_ddram_address(&lcd, 0x40);
+      print_string("Unknown event       ");
+    }
+  }
+
+  PROCESS_END();
+}
+
+
+static void init_lcd(void)
+{
+  hd44780_init();
+  hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
+		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
+  hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
+  hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, NO_SHIFT_DISPLAY);
+  hd44780_lcd_set_display(&lcd, ENABLE_DISPLAY, DISABLE_CURSOR,
+			  DISABLE_CURSOR_BLINK);
+}
+
+
+// For debugging:
+extern volatile uint8_t* spis_trx_status;
+
+static void init_pins(void)
+{
+  SET_PIN_DIR_OUTPUT(DEBUG0);
+  CLR_PIN(DEBUG0);
 }
 
 int main(void)
 {
+  ENABLE_INTERRUPTS();
   init_pins();
-  hd44780_init();
-
-  hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
-		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
-  hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
-    hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, false);
-  hd44780_lcd_set_display(&lcd, true, false, false);
-  hd44780_lcd_home(&lcd);
-
-  hd44780_lcd_set_ddram_address(&lcd, 0x04);
-  hd44780_lcd_write(&lcd, 'H');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, 'l');
-  hd44780_lcd_write(&lcd, 'l');
-  hd44780_lcd_write(&lcd, 'o');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, 'w');
-  hd44780_lcd_write(&lcd, 'o');
-  hd44780_lcd_write(&lcd, 'r');
-  hd44780_lcd_write(&lcd, 'l');
-  hd44780_lcd_write(&lcd, 'd');
-  hd44780_lcd_write(&lcd, '!');
-
-  hd44780_lcd_set_ddram_address(&lcd, 0x40);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '2');
-
-  hd44780_lcd_set_ddram_address(&lcd, 0x14);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '3');
-
-  hd44780_lcd_set_ddram_address(&lcd, 0x54);
-  hd44780_lcd_write(&lcd, 'L');
-  hd44780_lcd_write(&lcd, 'i');
-  hd44780_lcd_write(&lcd, 'n');
-  hd44780_lcd_write(&lcd, 'e');
-  hd44780_lcd_write(&lcd, ' ');
-  hd44780_lcd_write(&lcd, '4');
+  clock_init();
+  process_init();
+  process_start(&spi_handler);
+  spis_init(&spi_handler);
 
 
-  while (true);
+  // Init LCD
+  init_lcd();
+  print_lcd_welcome();
+  
+  // Event loop
+  while (true) {
+    process_execute();
+  } 
 }
 

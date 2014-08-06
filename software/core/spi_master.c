@@ -22,24 +22,44 @@
 /**
  * @file spi_master.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 6 jun 2013
+ * @date 6 Jun 2013
  */
 
 #include "spi_master.h"
-
+#include "core/crc16.h"
+#include "core/events.h"
 #include "core/process.h"
+#include "core/spi_common.h"
 #include "core/timer.h"
+#include "hal/gpio.h"
 #include "hal/spi.h"
 #include "util/bit.h"
 #include "util/log.h"
 
+struct spim_trx {
+  uint8_t flags;
+  uint8_t ss_mask;
+  volatile uint8_t *ss_port;
+  process* p;
+  struct spim_trx* next;
+};
+
 
 PROCESS(spim_trx_process);
 
-static timer trx_timer;
 static spim_trx* trx_queue_head;
 static spim_trx* trx_queue_tail;
 
+#define trx_q_hd_simple ((spim_trx_simple*)trx_queue_head)
+#define trx_q_hd_llp    ((spim_trx_llp*)trx_queue_head)
+
+#define RX_DELAY_REMAINING_MASK  0x0F
+#define TRX_QUEUED_BIT           7
+#define TRX_IN_TRANSMISSION_BIT  6
+#define TRX_USE_LLP_BIT          5
+
+#define LLP_TX_DELAY  (40.0 * CLOCK_USEC)
+#define LLP_RX_DELAY  (50.0 * CLOCK_USEC)
 
 void spim_init(void)
 {
@@ -51,6 +71,7 @@ void spim_init(void)
   SPI_SET_DATA_ORDER_MSB();
   SPI_SET_MODE(0,0);
   SPI_SET_CLOCK_RATE_DIV_4();
+  SPI_TC_INTERRUPT_DISABLE();
   SPI_ENABLE();
 
   process_start(&spim_trx_process);
@@ -59,48 +80,112 @@ void spim_init(void)
 
 void spim_trx_init(spim_trx* trx)
 {
-  trx->in_transmission = false;
-  trx->ss_port = NULL;
+  trx->flags = 0;
 }
 
 
-spim_trx_set_status
-spim_trx_set(spim_trx* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
-	     uint8_t* tx_buf, size_t tx_size, uint8_t* rx_buf, size_t rx_size,
-	     clock_time_t delay)
+spim_trx_simple_set_status
+spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
+		    volatile uint8_t* ss_port, uint8_t tx_size,
+		    uint8_t* tx_buf, uint8_t rx_size, uint8_t* rx_buf,
+		    process* p)
 {
-  if (tx_size == 0 && rx_size == 0) {
-    return SPIM_TRX_SET_INVALID;
+  if (tx_buf == NULL && tx_size > 0) {
+    return SPIM_TRX_SIMPLE_TX_BUF_IS_NULL;
+  }
+  if (rx_buf == NULL && rx_size > 0) {
+    return SPIM_TRX_SIMPLE_RX_BUF_IS_NULL;
   }
 
-  trx->in_transmission = false;
+  trx->flags = 0;
   trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
+  trx->tx_size = tx_size;
   trx->tx_buf = tx_buf;
-  trx->tx_remaining = tx_size;
+  trx->rx_size = rx_size;
   trx->rx_buf = rx_buf;
-  trx->rx_remaining = rx_size;
-  trx->delay = delay;
-  return SPIM_TRX_SET_OK;
+  trx->p = p;
+  return SPIM_TRX_SIMPLE_OK;
 }
+
+
+spim_trx_llp_set_status
+spim_trx_llp_set(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
+		 uint8_t tx_type, uint8_t tx_size, uint8_t* tx_buf,
+		 uint8_t rx_max, uint8_t* rx_buf, process* p)
+{
+  if (tx_buf == NULL && tx_size > 0) {
+    return SPIM_TRX_LLP_TX_BUF_IS_NULL;
+  }
+  if (rx_buf == NULL && rx_max > 0) {
+    return SPIM_TRX_LLP_RX_BUF_IS_NULL;
+  }
+
+  trx->flags_rx_delay_remaining = _BV(TRX_USE_LLP_BIT) | MAX_RX_DELAY;
+  trx->ss_mask = bv8(ss_pin & 0x07);
+  trx->ss_port = ss_port;
+  trx->tx_type = tx_type;
+  trx->tx_size = tx_size;
+  trx->tx_buf = tx_buf;
+  trx->rx_size = rx_max;
+  trx->rx_buf = rx_buf;
+  trx->p = p;
+  trx->error = SPIM_TRX_ERR_NONE;
+  return SPIM_TRX_LLP_OK;
+}
+
+
 
 inline
 bool spim_trx_is_in_transmission(spim_trx* trx)
 {
-  return trx->in_transmission;
+  return trx->flags & _BV(TRX_IN_TRANSMISSION_BIT);
 }
 
+static inline
+void trx_set_in_transmission(spim_trx* trx, bool v)
+{
+  if (v) {
+    trx->flags |= _BV(TRX_IN_TRANSMISSION_BIT);
+  } else {
+    trx->flags &= ~_BV(TRX_IN_TRANSMISSION_BIT);    
+  }
+}
+
+inline
 bool spim_trx_is_queued(spim_trx* trx)
 {
-  spim_trx* t = trx_queue_head;
-  while (t != NULL) {
-    if (t == trx) return true;
-    t = t->next;
-  }
-  return false;
+  return trx->flags & _BV(TRX_QUEUED_BIT);
 }
 
-spim_trx_queue_status spim_trx_queue(spim_trx* trx)
+static inline
+void trx_set_queued(spim_trx* trx, bool v)
+{
+  if (v) {
+    trx->flags |= _BV(TRX_QUEUED_BIT);
+  } else {
+    trx->flags &= ~_BV(TRX_QUEUED_BIT);    
+  }
+}
+
+static inline
+uint8_t get_rx_delay_remaining(spim_trx_llp* trx)
+{
+  return trx->flags_rx_delay_remaining & RX_DELAY_REMAINING_MASK;
+}
+
+/**
+ * It is only allowed to call this function if get_rx_delay_remaining(trx)
+ * is greater than 0!
+ */
+static inline
+void decrement_rx_delay_remaining(spim_trx_llp* trx)
+{
+  trx->flags_rx_delay_remaining -= 1;
+}
+
+spim_trx_queue_status
+spim_trx_queue(spim_trx* trx)
 {
   if (spim_trx_is_queued(trx)) {
     return SPIM_TRX_QUEUE_ALREADY_QUEUED;
@@ -108,104 +193,282 @@ spim_trx_queue_status spim_trx_queue(spim_trx* trx)
 
   if (trx_queue_tail == NULL) {
     // Queue is empty
-    trx_queue_head = trx_queue_tail = trx;
+    trx_queue_head = trx;
   } else {
     // Append to queue
     trx_queue_tail->next = trx;
   }
+  trx_queue_tail = trx;
   trx->next = NULL;
+  trx_set_queued(trx, true);
   return SPIM_TRX_QUEUE_OK;
 }
+     
 
-static inline 
-void rx_byte(spim_trx* trx)
+static inline
+void tx_byte(uint8_t byte)
 {
-  if (trx->rx_remaining > 0) {
-    *(trx->rx_buf) = SPI_GET_DATA_REG();
-    trx->rx_buf += 1;
-    trx->rx_remaining -= 1;
+  SPI_SET_DATA_REG(byte);
+}
+
+static inline
+void tx_dummy_byte()
+{
+  tx_byte(0);
+}
+
+#define DEBUG0 B,0
+
+static inline
+void wait_for_tx_complete()
+{
+  while (! IS_SPI_INTERRUPT_FLAG_SET()) {
+    TGL_PIN(DEBUG0);
   }
 }
 
 static inline
-void tx_byte(spim_trx* trx)
+uint8_t read_response_byte()
 {
-  if (trx->tx_remaining > 0) {
-    SPI_SET_DATA_REG(*(trx->tx_buf));
-    trx->tx_buf += 1;
-    trx->tx_remaining -= 1;
-  } else {
-    // Transmit null byte
-    SPI_SET_DATA_REG(0);
+  return SPI_GET_DATA_REG();
+}
+
+static inline
+void shift_trx_queue(void)
+{
+  trx_queue_head = trx_queue_head->next;
+  if (trx_queue_head == NULL) {
+    trx_queue_tail = NULL;
   }
 }
 
+static
+void end_transfer(process_event_t ev)
+{
+  if (trx_queue_head->p != NULL) {
+    process_post_event(trx_queue_head->p, ev, (process_data_t)trx_queue_head);
+  }
 
-// As an alternative (more efficient) way of yielding, an event timer can be
-// implemented (using a hardware timer) that posts an event when it expires.
-// The PROCESS_WAIT_EVENT() function can be used to wait for such
-// timers (this function should not post an event before yielding, because the
-// timer will post an event when necessary).
+  // Make the slave select pin high
+  *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
+
+  // Update transfer status
+  trx_set_in_transmission(trx_queue_head, false);
+  trx_set_queued(trx_queue_head, false);
+  
+  // Shift transfer queue for next transfer
+  shift_trx_queue();
+}
+
+
+static
+void handle_response_error(uint8_t response_type)
+{
+  spim_trx_error_type err;
+  if (SPI_ERR_TYPE_MIN <= response_type &&
+      response_type <= SPI_ERR_TYPE_MAX) {
+    err = (spim_trx_error_type)response_type;
+  } else {
+    err = SPIM_TRX_ERR_SLAVE_UNKNOWN;
+  }
+  trx_q_hd_llp->error = err;
+  end_transfer(SPIM_TRX_ERROR);
+}
+
+
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
+  static timer trx_timer;
+  static uint8_t tx_counter;
+  static uint8_t rx_counter;
+  static crc16 crc;
+  static crc16 rx_crc; 
 
   while (true) {
+  start:
+    PROCESS_YIELD();
     // Wait until there's something in the queue
     PROCESS_WAIT_WHILE(trx_queue_head == NULL);
 
     // Update transfer status
-    trx_queue_head->in_transmission = true;
+    trx_set_in_transmission(trx_queue_head, true);
 
     // Start transfer by pulling the slave select pin low
     *(trx_queue_head->ss_port) &= ~(trx_queue_head->ss_mask);
+    if (trx_queue_head->flags & _BV(TRX_USE_LLP_BIT)) {
+      // Link-layer protocol
+      uint8_t response;
 
-    // Wait before sending first byte 
-    timer_set(&trx_timer, trx_queue_head->delay);
-    PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-    
-    // Send first byte
-    tx_byte(trx_queue_head);
-    
-    // Send/receive next bytes
-    while (trx_queue_head->tx_remaining > 0 || 
-	   trx_queue_head->rx_remaining > 0) {
-      // Wait before sending/receiving each byte
+      // Send first header byte (message type id)
+      tx_byte(trx_q_hd_llp->tx_type);
+      timer_set(&trx_timer, CLK_AT_LEAST(LLP_TX_DELAY));
+      crc16_init(&crc);
+      crc16_update(&crc, trx_q_hd_llp->tx_type);
+      crc16_update(&crc, trx_q_hd_llp->tx_size);
+
+      // Send second header byte (message size)
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      tx_byte(trx_q_hd_llp->tx_size);
+      timer_restart(&trx_timer);
+
+      // Send message bytes
+      tx_counter = 0;
+      while (tx_counter < trx_q_hd_llp->tx_size) {
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	response = read_response_byte();
+	if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	  handle_response_error(response);
+	  goto start;
+	}
+	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
+	timer_restart(&trx_timer);
+	crc16_update(&crc, trx_q_hd_llp->tx_buf[tx_counter]);
+	tx_counter += 1;
+      }
+      
+      // Send CRC footer bytes
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      response = read_response_byte();
+      if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	handle_response_error(response);
+	goto start;
+      }
+      tx_byte((uint8_t)(crc >> 8));
       timer_restart(&trx_timer);
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      response = read_response_byte();
+      if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	handle_response_error(response);
+	goto start;
+      }
+      tx_byte((uint8_t)(crc & 0x00FF));
+      timer_set(&trx_timer, CLK_AT_LEAST(LLP_RX_DELAY));
+
+      // Wait for response
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      tx_dummy_byte();
+      timer_restart(&trx_timer);
+      wait_for_tx_complete();
+      while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
+	     read_response_byte() == SPI_TYPE_PREPARING_RESPONSE) {
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	tx_dummy_byte();
+	timer_restart(&trx_timer);	
+	decrement_rx_delay_remaining(trx_q_hd_llp);
+	wait_for_tx_complete();
+      }
+
+      response = read_response_byte();
+      if (response == SPI_TYPE_PREPARING_RESPONSE) {
+	// Response is taking too long, abort the transfer
+	trx_q_hd_llp->error = SPIM_TRX_ERR_NO_RESPONSE;
+	end_transfer(SPIM_TRX_ERROR);
+	goto start;
+      } else if (response >= SPI_ERR_TYPE_MIN) {
+	handle_response_error(response);
+	goto start;
+      }
+
+      // Receive response header (first byte has already been received)
+      crc16_init(&crc);
+      trx_q_hd_llp->rx_type = response;
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      tx_dummy_byte(); // for the size byte
+      timer_restart(&trx_timer); 
+      crc16_update(&crc, trx_q_hd_llp->rx_type);
+
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      uint8_t size = read_response_byte();
+      tx_dummy_byte(); // for the first payload or footer byte
+      timer_restart(&trx_timer); 
+      if (size > trx_q_hd_llp->rx_size) {
+	// rx_buf is too small for the response, abort the transfer
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_TOO_LARGE;
+	end_transfer(SPIM_TRX_ERROR);
+	goto start;
+      }
+      trx_q_hd_llp->rx_size = size;
+      crc16_update(&crc, trx_q_hd_llp->rx_size);
       
-      // Make sure previous transfer is complete
-      while (! IS_SPI_INTERRUPT_FLAG_SET());
+      // Receive response payload
+      rx_counter = 0;
+      while (rx_counter < trx_q_hd_llp->rx_size) {
+	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	trx_q_hd_llp->rx_buf[rx_counter] = read_response_byte();
+	tx_dummy_byte();
+	timer_restart(&trx_timer); 
+	crc16_update(&crc, trx_q_hd_llp->rx_buf[rx_counter]);
+	rx_counter += 1;
+      }
+      
+      // Receive response footer (first byte has already been received)
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      rx_crc = ((crc16)read_response_byte()) << 8;
+      tx_dummy_byte();
+      timer_restart(&trx_timer); 
+      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      rx_crc |= read_response_byte();
+      if (! crc16_equal(&crc, &rx_crc)) {
+	// CRC failure, abort transfer
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_CRC_FAILURE;
+	end_transfer(SPIM_TRX_ERROR);
+	goto start;
+      }
+    } else {
+      // Simple transfer
+      tx_counter = 0;
+      rx_counter = 0;
+      while (tx_counter < trx_q_hd_simple->tx_size) {
+	tx_byte(trx_q_hd_simple->tx_buf[tx_counter]);
+	tx_counter += 1;
+	wait_for_tx_complete();
+	if (rx_counter < trx_q_hd_simple->rx_size) {
+	  trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
+	  rx_counter += 1;
+	}
+      }
 
-      rx_byte(trx_queue_head);
-      tx_byte(trx_queue_head);
+      while (rx_counter < trx_q_hd_simple->rx_size) {
+	tx_dummy_byte();
+	wait_for_tx_complete();	
+	trx_q_hd_simple->rx_buf[rx_counter] = read_response_byte();
+	rx_counter += 1;
+      }
     }
-
-    // Wait before ending transfer
-    timer_restart(&trx_timer);
-    PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
-
-    // Make sure the transfer is complete
-    while (! IS_SPI_INTERRUPT_FLAG_SET());
-
-    // End transfer by making the slave select pin high again
-    *(trx_queue_head->ss_port) |= trx_queue_head->ss_mask;
-
-    // Update transfer status
-    trx_queue_head->in_transmission = false;
-
-    // Shift queue
-    trx_queue_head = trx_queue_head->next;
-    if (trx_queue_head == NULL) {
-      trx_queue_tail = NULL;
-    }
-
-    // Yield CPU for other threads to ensure there is some time between making
-    // the slave select pin high and pulling it low again for the next
-    // transfer, which can be an issue if there are two subsequent transfers
-    // to the same slave device.
-    PROCESS_YIELD();
+    // End current transfer
+    end_transfer(SPIM_TRX_COMPLETED_SUCCESSFULLY);
   }
 
   PROCESS_END();
+}
+
+uint8_t
+spim_trx_llp_get_tx_size(spim_trx_llp* trx)
+{
+  return trx->tx_size;
+}
+
+uint8_t*
+spim_trx_llp_get_tx_buf(spim_trx_llp* trx)
+{
+  return trx->tx_buf;
+}
+
+uint8_t
+spim_trx_llp_get_rx_size(spim_trx_llp* trx)
+{
+  return trx->rx_size;
+}
+
+uint8_t*
+spim_trx_llp_get_rx_buf(spim_trx_llp* trx)
+{
+  return trx->rx_buf;
+}
+
+spim_trx_error_type
+spim_trx_llp_get_error_type(spim_trx_llp* trx)
+{
+  return trx->error;
 }

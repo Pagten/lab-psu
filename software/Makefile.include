@@ -29,7 +29,7 @@ OBJECTDIR = build
 
 
 SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core drivers hal utils}
-SOURCEFILES += clock.c timer.c process.c spi_master.c mcp4922.c hd44780.c \
+SOURCEFILES += clock.c timer.c process.c spi_master.c spi_slave.c mcp4922.c hd44780.c \
                rotary.c io_monitor.c
 OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
@@ -124,11 +124,11 @@ flashprof: $(PROJECT_NAME)
 upload: $(PROJECT_NAME)
 	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U flash:w:$<:e
 
-eeupload:
+eeupload: $(PROJECT_NAME)
 	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U eeprom:w:$<:e
 
-fuseupload:
-	$(AVRDUDE) $(AVRDUDE_OPTIONS) -U lfuse:w:$<:e -U hfuse:w:$<:e -U efuse:w:$<:e
+fuseupload: $(PROJECT_NAME)
+	$(AVRDUDE) $(AVRDUDE_OPTIONS) -u -U lfuse:w:$<:e -U hfuse:w:$<:e -U efuse:w:$<:e
 
 # Don't treat $(PROJECT_NAME) as an intermediate file because it is
 # in fact the primary target.

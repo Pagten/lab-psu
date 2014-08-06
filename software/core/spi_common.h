@@ -1,7 +1,5 @@
 /*
- * timer.c
- *
- * Based on the timer implementation of Contiki (http://www.contiki-os.org).
+ * spi_common.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -21,37 +19,29 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SPI_COMMON_H
+#define SPI_COMMON_H
 
 /**
- * @file timer.c
+ * @file spi_common.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 Jan 2014
+ * @date 3 Jul 2014
+ *
+ * This file contains some constants shared by the SPI master and slave.
  */
 
-#include "timer.h"
+#define LLP_HEADER_LENGTH 2
+#define LLP_FOOTER_LENGTH 2
 
-void timer_set(timer* t, clock_time_t delay)
-{
-  t->start = clock_get_time();
-  t->delay = delay;
-}
+#define MAX_RX_DELAY 15
 
-void timer_reset(timer* t)
-{
-  t->start += t->delay;
-}
+#define SPI_TYPE_PREPARING_RESPONSE          0xF0
+#define SPI_TYPE_ERR_SLAVE_RESPONSE_INVALID  0xF1
+#define SPI_TYPE_ERR_SLAVE_NOT_READY         0xF3
+#define SPI_TYPE_ERR_CRC_FAILURE             0xF3
+#define SPI_TYPE_ERR_MESSAGE_TOO_LARGE       0xF4
 
-void timer_restart(timer* t)
-{
-  t->start = clock_get_time();
-}
+#define SPI_ERR_TYPE_MIN  0xF1
+#define SPI_ERR_TYPE_MAX  0xF4
 
-bool timer_expired(timer* t)
-{
-  return (clock_get_time() - t->start) >= t->delay;
-}
-
-clock_time_t timer_remaining(timer* t)
-{
-  return timer_expired(t) ? 0 : (t->start + t->delay - clock_get_time());
-}
+#endif

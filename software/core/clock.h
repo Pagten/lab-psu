@@ -28,8 +28,8 @@
  * @date 02 Feb 2014
  *
  * The clock is a monotic counter that is incremented periodically. It can be
- * used as a reference for short periods of time (it overflows every 3 to 10
- * seconds, depending on the MCU's clock speed).
+ * used as a reference for short to medium periods of time (it overflows every
+ * 19 hours at an MCU clock speed of 16MHz)
  */
 
 
@@ -41,16 +41,19 @@
 #warning "F_CPU not defined in clock.h!"
 #endif
 
-typedef uint16_t clock_time_t;
+typedef uint32_t clock_time_t;
 
 #define CLOCK_TMR            TIMER0
-#define CLOCK_TMR_PRESCALER  1024
+#define CLOCK_TMR_PRESCALER  256
 
 #define CLOCK_SEC    ((double)F_CPU/CLOCK_TMR_PRESCALER)  /** 1 second */
 #define CLOCK_MSEC   (CLOCK_SEC/1000.0)                   /** 1 millisecond */
 #define CLOCK_USEC   (CLOCK_SEC/1000000.0)                /** 1 microsecond */
 
-#define CLOCK_TIME_MAX UINT16_MAX
+#define CLOCK_TIME_MAX UINT32_MAX
+
+#define CLK_NEAREST(t)  (t + 0.5)
+#define CLK_AT_LEAST(t) (t + 1.0)
 
 /**
  * Initialize the clock module.
@@ -61,9 +64,9 @@ void clock_init(void);
 /**
  * Return the current clock time.
  *
- * The clock ticks every 1024 CPU clock cycles and hence overflows every 
- * (1024 * 2^16)/F_CPU seconds. For F_CPU=16Mhz, the clock ticks every 64 us
- * and overflows every 4 seconds.
+ * The clock ticks every 256 CPU clock cycles and hence overflows every 
+ * (256 * 2^32)/F_CPU seconds. For F_CPU=16MHz, the clock ticks every 16 us
+ * and overflows every 19 hours.
  */
 clock_time_t clock_get_time(void);
 

@@ -77,6 +77,7 @@
 #define TMR_CHANNEL_DISCONNECT(tmr,ch)  CAT(tmr,_,ch,_DISCONNECT)
 #define TMR_INTERRUPT_ENABLE(tmr,intr)  CAT(tmr,_,intr,_INTR_ENABLE)
 #define TMR_SET_MODE(tmr,mode)          CAT(tmr,_SET_MODE_,mode)
+#define TMR_DISABLE(tmr)                CAT(tmr,_DISABLE)
 #define TMR_SET_PRESCALER(tmr,val)      TMR_SET_CLOCK(tmr, CAT(PRESCALE_,val))
 #define TMR_SET_CLOCK(tmr,val)          CAT(tmr,_SET_CLOCK_,val)
 #define TMR_SET_OCR(tmr,ch,val)         CAT(tmr,_,ch,_SET_OCR(val))
@@ -84,7 +85,8 @@
 #define TMR_SET_CNTR(tmr,val)           CAT(tmr,_SET_CNTR(val))
 #define TMR_GET_CNTR(tmr)               CAT(tmr,_GET_CNTR)
 
-#define TIMER0_SIZE 8
+#define TMR_IS_INTERRUPT_FLAG_SET(tmr,intr)	\
+  CAT(tmr,_IS_,intr,_INTERRUPT_FLAG_SET)
 
 // Constants
 #define TMR_SIZE(tmr)                   CAT(tmr,_SIZE)

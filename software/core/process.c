@@ -46,7 +46,7 @@ struct event {
 };
 
 static struct event event_queue[PROCESS_CONF_EVENT_QUEUE_SIZE];
-static uint8_t event_queue_count;
+static volatile uint8_t event_queue_count;
 static uint8_t event_queue_first;
 
 void process_init(void)
@@ -65,7 +65,7 @@ void process_start(process* p)
   p->thread(p, PROCESS_EVENT_INIT, PROCESS_DATA_NULL);
 }
 
-
+// Can be called from an interrupt:
 process_post_event_status
 process_post_event(process* p, process_event_t ev, process_data_t data)
 {

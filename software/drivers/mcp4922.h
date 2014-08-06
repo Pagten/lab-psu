@@ -58,7 +58,7 @@ typedef enum {
  */
 typedef struct {
   uint8_t data[2];
-  spim_trx spim_trx;
+  spim_trx_simple spim_trx;
 } mcp4922_pkt;
 
 

@@ -45,18 +45,19 @@ void mcp4922_init()
 inline
 void mcp4922_pkt_init(mcp4922_pkt* pkt)
 {
-  spim_trx_init(&(pkt->spim_trx));
+  spim_trx_init((spim_trx*)&(pkt->spim_trx));
 }
+
 
 
 void
 mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, port_ptr port,
 		mcp4922_channel ch, uint16_t value)
 {
-  spim_trx_set(&(pkt->spim_trx), pin, port,
-	       pkt->data, 2,      // tx_buf
-	       NULL, 0,           // rx_buf
-	       SPIM_NO_DELAY);
+  spim_trx_simple_set(&(pkt->spim_trx), pin, port,
+		      2, pkt->data,      // tx_buf
+		      0, NULL,           // rx_buf
+		      NULL);             // process
 
   // This assumes MSB-first SPI data transfer
   pkt->data[0] = (value >> 8) & 0x0F;
@@ -71,7 +72,7 @@ mcp4922_pkt_set(mcp4922_pkt* pkt, uint8_t pin, port_ptr port,
 inline 
 bool mcp4922_pkt_is_in_transmission(mcp4922_pkt* pkt)
 {
-  return spim_trx_is_in_transmission(&(pkt->spim_trx));
+  return spim_trx_is_in_transmission((spim_trx*)&(pkt->spim_trx));
 }
 
 
@@ -79,7 +80,7 @@ mcp4922_pkt_queue_status
 mcp4922_pkt_queue(mcp4922_pkt* pkt)
 {
   spim_trx_queue_status stat;
-  stat = spim_trx_queue(&(pkt->spim_trx));
+  stat = spim_trx_queue((spim_trx*)&(pkt->spim_trx));
   if (stat != SPIM_TRX_QUEUE_OK) {
     return MCP4922_PKT_QUEUE_ERROR;
   }

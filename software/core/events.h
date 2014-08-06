@@ -1,7 +1,5 @@
 /*
- * timer.c
- *
- * Based on the timer implementation of Contiki (http://www.contiki-os.org).
+ * events.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -21,37 +19,32 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef EVENTS_H
+#define EVENTS_H
 
 /**
- * @file timer.c
+ * @file events.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 Jan 2014
+ * @date 11 Jul 2014
+ *
+ * This file contains the list of global events. Global events have an id 
+ * greater than or equal to 128. User-defined events should have an id smaller
+ * than 128.
  */
 
-#include "timer.h"
+enum {
+  // Process
+  PROCESS_EVENT_INIT = 0x80,
+  PROCESS_EVENT_CONTINUE,
 
-void timer_set(timer* t, clock_time_t delay)
-{
-  t->start = clock_get_time();
-  t->delay = delay;
-}
+  // SPI Master
+  SPIM_TRX_COMPLETED_SUCCESSFULLY,
+  SPIM_TRX_ERROR,
 
-void timer_reset(timer* t)
-{
-  t->start += t->delay;
-}
+  // SPI Slave
+  SPIS_MESSAGE_RECEIVED,
+  SPIS_RESPONSE_TRANSMITTED,
+  SPIS_RESPONSE_ERROR,
+};
 
-void timer_restart(timer* t)
-{
-  t->start = clock_get_time();
-}
-
-bool timer_expired(timer* t)
-{
-  return (clock_get_time() - t->start) >= t->delay;
-}
-
-clock_time_t timer_remaining(timer* t)
-{
-  return timer_expired(t) ? 0 : (t->start + t->delay - clock_get_time());
-}
+#endif
