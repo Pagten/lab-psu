@@ -1,4 +1,4 @@
-PROJECT_NAME = lcd
+PROJECT_NAME = spi-lcd
 all: $(PROJECT_NAME)
 
 #NO_LTO = 1
