@@ -1,4 +1,4 @@
-PROJECT_NAME = psu-core
+PROJECT_NAME = psu-main
 all: $(PROJECT_NAME)
 
 #OPTI=0
