@@ -30,16 +30,48 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <stdio.h>
+typedef enum {
+  #define LOG_COUNTER_ON(name)   LOG_CNTR_#name,
+  #define LOG_COUNTER_OFF(name)  
+  #include "log_counters.h"
 
-#ifdef LOGGING_ENABLED
-#define IFLE(c) (x)
-#else
-#define IFLE(c)
-#endif
+  LOG_NB_COUNTERS,
+
+  #define LOG_COUNTER_ON(name)
+  #define LOG_COUNTER_OFF(name)  LOG_CNTR_#name,
+  #include "log_counters.h"
+} log_cntr;
 
 
-#define LOG_ERROR(msg)  IFLE(puts(msg);)
+void log_counter_inc(log_cntr cntr);
+
+#define LOG_COUNTER_INC(name)			\
+  do {						\
+    if (LOG_CNTR_#name <= LOG_NB_COUNTERS) {	\
+      log_counter_inc(LOG_CNTR_#name);		\
+    }						\
+  } while(false)
+
+
+
+
+// in .c
+
+struct log_counter {
+  char* name; // TODO: move to program memory
+  uint8_t value;
+};
+
+
+#define LOG_COUNTER_ON(name)   { name, 0 },
+#define LOG_COUNTER_OFF(name)
+
+static struct log_counter[] =
+  {
+#include "log_counters.h"
+  }
+
+
 
 
 #endif
