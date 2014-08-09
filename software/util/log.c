@@ -1,7 +1,7 @@
 /*
  * log.h
  *
- * Copyright 2013 Pieter Agten
+ * Copyright 2014 Pieter Agten
  *
  * This file is part of the lab-psu firmware.
  *
@@ -22,43 +22,53 @@
 /**
  * @file log.h
  * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 14 Jul 2013
+ * @date 09 Aug 2014
  *
  * Logging functions
  */
 
-#ifndef LOG_H
-#define LOG_H
 
+#include "log.h"
 #include <stdbool.h>
+#include <avr/pgmspace.h>
 
-typedef enum {
-  #define LOG_COUNTER_ON(name)   LOG_CNTR_#name,
-  #define LOG_COUNTER_OFF(name)  
+#define STRINGIFY(s) #s
+
+#define LOG_COUNTER_OFF(name)
+
+// Values
+static uint8_t log_cntrs[_LOG_CNTR_COUNT];
+
+
+// Names (in program memory)
+#define LOG_COUNTER_ON(name)   char _log_cntr_##name##_name = STRINGIFY(name);
+#include "log_counters.h"
+
+PGM_P log_cntr_names[] PROGMEM = 
+{
+  #define LOG_COUNTER_ON(name)   _log_cntr_##name##_name,
   #include "log_counters.h"
-
-  _LOG_CNTR_COUNT,
-
-  #define LOG_COUNTER_ON(name)
-  #define LOG_COUNTER_OFF(name)  LOG_CNTR_#name,
-  #include "log_counters.h"
-} log_cntr;
+};
 
 
-extern uint8_t log_cntrs[];
+uint8_t log_cntr_get_value(uint8_t index)
+{
+  if (index >= _LOG_CNTR_COUNT) {
+    return 0;
+  }
 
-#define LOG_COUNTER_INC(name)			      \
-  do {						      \
-    if (LOG_CNTR_#name < _LOG_CNTR_COUNT) {	      \
-      if (log_cntrs[LOG_CNTR_#name] < UINT8_MAX) {    \
-	log_cntrs[LOG_CNTR_#name] += 1;		      \
-      }						      \
-    }						      \
-  } while(false)
+  return log_cntrs[index];
+}
 
-
-uint8_t log_cntr_get_value(uint8_t index);
 
 bool log_cntr_get_name(uint8_t index, char* buf, uint8_t n)
+{
+  if (index >= _LOG_CNTR_COUNT) {
+    return false;
+  }
 
-#endif
+  strncpy_P(buf, (PGM_P)pgm_read_word(&(log_cntr_names[index])), n);
+  return true;  
+}
+
+
