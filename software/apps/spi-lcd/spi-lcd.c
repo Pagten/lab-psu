@@ -137,9 +137,6 @@ static void init_lcd(void)
 }
 
 
-// For debugging:
-extern volatile uint8_t* spis_trx_status;
-
 static void init_pins(void)
 {
   SET_PIN_DIR_OUTPUT(DEBUG0);

@@ -203,9 +203,6 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
   }
 }
 
-// For debugging:
-uint8_t* spis_trx_status = &(trx.status);
-
 INTERRUPT(SPI_TC_VECT)
 {
   uint8_t data = SPI_GET_DATA_REG();
