@@ -30,6 +30,7 @@
 
 #include "log.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <avr/pgmspace.h>
 
 #define STRINGIFY(s) #s
@@ -37,21 +38,31 @@
 #define LOG_COUNTER_OFF(name)
 
 // Values
-static uint8_t log_cntrs[_LOG_CNTR_COUNT];
+uint8_t log_cntrs[_LOG_CNTR_COUNT];
 
 
 // Names (in program memory)
-#define LOG_COUNTER_ON(name)   char _log_cntr_##name##_name = STRINGIFY(name);
+#define LOG_COUNTER_ON(name) \
+  static const char _log_cntr_##name##_name[] PROGMEM = STRINGIFY(name);
 #include "log_counters.h"
 #undef LOG_COUNTER_ON
 
-PGM_P log_cntr_names[] PROGMEM = 
+static PGM_P const log_cntr_names[] PROGMEM =
 {
   #define LOG_COUNTER_ON(name)   _log_cntr_##name##_name,
   #include "log_counters.h"
   #undef LOG_COUNTER_ON
 };
 
+
+void log_cntr_inc(uint8_t index)
+{
+  if (index < _LOG_CNTR_COUNT) {
+    if (log_cntrs[index] < UINT8_MAX) {
+      log_cntrs[index] += 1;
+    }
+  }
+}
 
 uint8_t log_cntr_get_value(uint8_t index)
 {

@@ -31,8 +31,9 @@
 #define LOG_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef enum {
+enum {
   #define LOG_COUNTER_ON(name)   LOG_CNTR_##name,
   #define LOG_COUNTER_OFF(name)  
   #include "log_counters.h"
@@ -46,20 +47,17 @@ typedef enum {
   #include "log_counters.h"
   #undef LOG_COUNTER_ON
   #undef LOG_COUNTER_OFF
-} log_cntr;
+};
 
-
-extern uint8_t log_cntrs[];
 
 #define LOG_COUNTER_INC(name)			      \
   do {						      \
     if (LOG_CNTR_##name < _LOG_CNTR_COUNT) {	      \
-      if (log_cntrs[LOG_CNTR_##name] < UINT8_MAX) {   \
-        log_cntrs[LOG_CNTR_##name] += 1;	      \
-      }						      \
-    }						      \
+      log_cntr_inc((uint8_t)LOG_CNTR_##name);	      \
+     }						      \
   } while(false)
 
+void log_cntr_inc(uint8_t index);
 
 uint8_t log_cntr_get_value(uint8_t index);
 

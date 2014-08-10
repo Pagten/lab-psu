@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <util/atomic.h>
 #include "process.h"
+#include "util/log.h"
 
 // Should preferably be a power of 2
 #define PROCESS_CONF_EVENT_QUEUE_SIZE 32
@@ -72,6 +73,7 @@ process_post_event(process* p, process_event_t ev, process_data_t data)
   uint8_t i;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     if (event_queue_count == PROCESS_CONF_EVENT_QUEUE_SIZE) {
+      LOG_COUNTER_INC(EVENT_QUEUE_FULL);
       return PROCESS_POST_EVENT_QUEUE_FULL;
     }
 
