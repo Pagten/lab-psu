@@ -1,5 +1,5 @@
 /*
- * log.h
+ * log.c
  *
  * Copyright 2014 Pieter Agten
  *
@@ -20,7 +20,7 @@
  */
 
 /**
- * @file log.h
+ * @file log.c
  * @author Pieter Agten <pieter.agten@gmail.com>
  * @date 09 Aug 2014
  *
@@ -43,11 +43,13 @@ static uint8_t log_cntrs[_LOG_CNTR_COUNT];
 // Names (in program memory)
 #define LOG_COUNTER_ON(name)   char _log_cntr_##name##_name = STRINGIFY(name);
 #include "log_counters.h"
+#undef LOG_COUNTER_ON
 
 PGM_P log_cntr_names[] PROGMEM = 
 {
   #define LOG_COUNTER_ON(name)   _log_cntr_##name##_name,
   #include "log_counters.h"
+  #undef LOG_COUNTER_ON
 };
 
 
@@ -71,4 +73,8 @@ bool log_cntr_get_name(uint8_t index, char* buf, uint8_t n)
   return true;  
 }
 
+uint8_t log_cntr_get_nb_counters(void)
+{
+  return _LOG_CNTR_COUNT;
+}
 
