@@ -217,14 +217,11 @@ void tx_dummy_byte()
   tx_byte(0);
 }
 
-#define DEBUG0 B,0
 
 static inline
 void wait_for_tx_complete()
 {
-  while (! IS_SPI_INTERRUPT_FLAG_SET()) {
-    TGL_PIN(DEBUG0);
-  }
+  while (! IS_SPI_INTERRUPT_FLAG_SET());
 }
 
 static inline
@@ -319,6 +316,7 @@ PROCESS_THREAD(spim_trx_process)
 	response = read_response_byte();
 	if (response != SPI_TYPE_PREPARING_RESPONSE) {
 	  handle_response_error(response);
+	  LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
 	  goto start;
 	}
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
@@ -331,6 +329,7 @@ PROCESS_THREAD(spim_trx_process)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       response = read_response_byte();
       if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
 	handle_response_error(response);
 	goto start;
       }
@@ -364,8 +363,10 @@ PROCESS_THREAD(spim_trx_process)
 	// Response is taking too long, abort the transfer
 	trx_q_hd_llp->error = SPIM_TRX_ERR_NO_RESPONSE;
 	end_transfer(SPIM_TRX_ERROR);
+	LOG_COUNTER_INC(SPIM_RESPONSE_TIMEOUT);
 	goto start;
       } else if (response >= SPI_ERR_TYPE_MIN) {
+	LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
 	handle_response_error(response);
 	goto start;
       }

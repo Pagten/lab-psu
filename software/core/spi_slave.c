@@ -40,6 +40,7 @@
 #include "hal/gpio.h"
 #include "hal/interrupt.h"
 #include "hal/spi.h"
+#include "util/log.h"
 
 // Note: SPIS_RX_BUF_SIZE must be between 0 and 255
 #define SPIS_RX_BUF_SIZE 32
@@ -135,7 +136,7 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
     if (trx.status != SPIS_TRX_WAITING_FOR_CALLBACK) {
       if (trx.status == SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
 	if (transfer_in_progress) {
-	  end_transfer(SPI_TYPE_ERR_SLAVE_NOT_READY);
+	  trx.status = SPIS_TRX_WAITING_FOR_TRANSFER_TO_END;
 	} else {
 	  set_spi_data_reg(SPI_TYPE_PREPARING_RESPONSE);
 	  trx.status = SPIS_TRX_READY;
@@ -196,6 +197,7 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
       } else {
 	trx.status = SPIS_TRX_READY;
       }
+      LOG_COUNTER_INC(SPIS_TIMEOUT_WAITING_FOR_CALLBACK);
     } else if (trx.status != SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
       trx.status = SPIS_TRX_READY;
     }
@@ -222,6 +224,7 @@ INTERRUPT(SPI_TC_VECT)
     if (trx.rx_size > SPIS_RX_BUF_SIZE) {
       // Message size too large for receive buffer
       end_transfer(SPI_TYPE_ERR_MESSAGE_TOO_LARGE);
+      LOG_COUNTER_INC(SPIS_MESSAGE_TOO_LARGE);
     } else {
       SPI_SET_DATA_REG(SPI_TYPE_PREPARING_RESPONSE);
       crc16_update(&(trx.crc), trx.rx_size);
@@ -240,6 +243,7 @@ INTERRUPT(SPI_TC_VECT)
   case SPIS_TRX_RECEIVING_FOOTER0:
     if ((trx.crc >> 8) != data) {
       end_transfer(SPI_TYPE_ERR_CRC_FAILURE);
+      LOG_COUNTER_INC(SPIS_CRC_FAILURE);
       break;
     }
     SPI_SET_DATA_REG(SPI_TYPE_PREPARING_RESPONSE);
@@ -249,6 +253,7 @@ INTERRUPT(SPI_TC_VECT)
   case SPIS_TRX_RECEIVING_FOOTER1:
     if ((trx.crc & 0x00FF) != data) {
       end_transfer(SPI_TYPE_ERR_CRC_FAILURE);
+      LOG_COUNTER_INC(SPIS_CRC_FAILURE);
       break;
     }
     SPI_SET_DATA_REG(SPI_TYPE_PREPARING_RESPONSE);
@@ -289,6 +294,7 @@ INTERRUPT(SPI_TC_VECT)
   case SPIS_TRX_COMPLETED:
     end_transfer(SPI_TYPE_PREPARING_RESPONSE);
     process_post_event(callback, SPIS_RESPONSE_TRANSMITTED,PROCESS_DATA_NULL);
+    LOG_COUNTER_INC(SPIS_TRX_COMPLETED);    
     break;
   default:
     // includes case SPIS_TRX_WAITING_FOR_TRANSFER_TO_END
