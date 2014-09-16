@@ -29,17 +29,12 @@
  */
 
 #include <stdlib.h>
-#include <util/delay.h>
 
 #include "hal/gpio.h" 
 #include "hal/fuses.h"
 #include "hal/interrupt.h"
-#include "core/io_monitor.h"
 #include "core/spi_master.h"
-#include "core/rotary.h"
 #include "drivers/mcp4922.h"
-
-#include "util/debug.h"
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -59,14 +54,9 @@ FUSES =
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
-#define DAC_STEP 32
 
-PROCESS(dacs_process);
+PROCESS(iopanel_process);
 
-static rotary rot0;
-static iomon_event rot_tick;
-
-#define EVENT_ROTARY_TICK        0x00
 #define EVENT_MCP4922_WAS_BUSY   0x01
 
 static inline
@@ -80,55 +70,71 @@ void init_pins(void)
   SET_PIN_DIR_OUTPUT(DAC_CS);
 }
 
+#define IOPANEL_REQUEST_TYPE 0x01
+struct iopanel_request {
+  uint8_t flags;
+  uint16_t voltage;
+  uint16_t current;
+};
 
-PROCESS_THREAD(dacs_process)
+struct iopanel_response {
+  uint8_t flags;
+  uint16_t voltage;
+  uint16_t current;
+};
+
+#define DAC_VOLTAGE_CHANNEL MCP4922_CHANNEL_A
+#define DAC_CURRENT_CHANNEL MCP4922_CHANNEL_B
+
+PROCESS_THREAD(iopanel_process)
 {
   PROCESS_BEGIN();
-  static uint16_t dac_values[2] = { DAC_MIN, DAC_MIN };
-  static uint8_t dac_idx = 0;
-  static mcp4922_pkt mcp4922_pkt;
 
+  static timer tmr;
+  static spim_trx_llp trx;
+  static iopanel_request tx_buf;
+  static iopanel_response rx_buf;
+  static mcp4922_pkt voltage_pkt;
+  static mcp4922_pkt current_pkt;
+
+  tx_buf.flags = 0;
+  tx_buf.voltage = DAC_MIN;
+  tx_buf.current = DAC_MIN;
+  timer_set(&tmr, CLOCK_SEC);
+  spim_trx_init((spim_trx*)&trx);
   mcp4922_pkt_init(&mcp4922_pkt);
 
   while (true) {
-    PROCESS_WAIT_EVENT();
+    timer_restart(&tmr);
+    PROCESS_WAIT_UNTIL(timer_expired(&tmr));
 
-    if (ev == EVENT_ROTARY_TICK) {
-      if (DEBOUNCED(data) & _BV(GET_BIT(ROT0_PUSH))) {
-	// Rotary button pushed
-	dac_idx = (dac_idx + 1) % 2;
-      }
+    if (! spim_trx_is_queued((spim_trx*)&trx)) {
+      spim_trx_llp_set(&trx, GET_BIT(LCD_CS), &GET_PORT(LCD_CS),
+		       IOPANEL_REQUEST_TYPE, sizeof(tx_buf), &tx_buf,
+		       sizeof(rx_buf), &rx_buf, PROCESS_CURRENT());
+      spim_trx_queue((spim_trx*)&trx);
 
-      uint8_t input = rot_input(DEBOUNCED(data), GET_BIT(ROT0_A),
-				GET_BIT(ROT0_B));
-      rot_step_status step = rot_process_step(&rot0, input);
-      switch (step) {
-      case ROT_STEP_CW:
-	if (dac_values[dac_idx] <= DAC_MAX - DAC_STEP) {
-	  dac_values[dac_idx] += DAC_STEP;
-	} else {
-	  dac_values[dac_idx] = DAC_MAX;
-	}
-	break;
-      case ROT_STEP_CCW:
-	if (dac_values[dac_idx] >= DAC_MIN + DAC_STEP) {
-	  dac_values[dac_idx] -= DAC_STEP;
-	} else {
-	  dac_values[dac_idx] = DAC_MIN;
-	}
-	break;
-      default:
+      PROCESS_WAIT_EVENT(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||
+			 ev == SPIM_TRX_ERROR);
+      if (ev == SPIM_TRX_ERROR) {
 	continue;
       }
-    }
+      if (spim_trx_llp_get_rx_size(&trx) != sizeof(rx_buf)) {
+	continue;
+      }
 
-    if (mcp4922_pkt_is_in_transmission(&mcp4922_pkt)) {
-      process_post_event(PROCESS_CURRENT(), EVENT_MCP4922_WAS_BUSY,
-			 PROCESS_DATA_NULL);
-    } else {
-      mcp4922_pkt_set(&mcp4922_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      dac_idx, dac_values[dac_idx]);
-      mcp4922_pkt_queue(&mcp4922_pkt);
+      PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
+      mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
+		      DAC_VOLTAGE_CHANNEL, rx_buf.voltage >> 4);
+      mcp4922_pkt_queue(&voltage_pkt);
+
+      PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
+      mcp4922_pkt_set(&current_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
+		      DAC_CURRENT_CHANNEL, rx_buf.current >> 4);
+      mcp4922_pkt_queue(&current_pkt);
+
+      tx_buf.voltage = rx_buf.voltage;
+      tx_buf.current = rx_buf.current;
     }
   }
 
@@ -139,24 +145,15 @@ PROCESS_THREAD(dacs_process)
 
 int main(void)
 {
-  debug_init();
-
   init_pins();
   clock_init();
   process_init();
   spim_init();
-  rot_init(&rot0);
   mcp4922_init();
-  iomon_init();
 
   ENABLE_INTERRUPTS();
 
-  process_start(&dacs_process);
-  iomon_event_init(&rot_tick, PORT_PTR_TO_IOMON_PORT(&GET_PORT(ROT0_A)),
-		   GET_PIN_MASK(GET_BIT(ROT0_A), GET_BIT(ROT0_B),
-				GET_BIT(ROT0_PUSH)),
-		   &dacs_process, EVENT_ROTARY_TICK);
-  iomon_event_enable(&rot_tick);
+  process_start(&iopanel_process);
 
   while (true) {
     process_execute();
