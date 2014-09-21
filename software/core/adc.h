@@ -19,8 +19,8 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ADC_H
-#define ADC_H
+#ifndef CORE_ADC_H
+#define CORE_ADC_H
 
 /**
  * @file adc.h
@@ -32,26 +32,17 @@
  */
 
 
-typedef struct {
+struct {
   uint16_t value;
   uint16_t next_value;
   uint8_t channel; // only 4 LSBs used
   uint8_t oversamples;
   uint8_t oversamples_remaining;
   uint8_t skip;
+  struct adc* next;
 } adc;
+typedef struct adc adc;
 
-
-typedef enum {
-  ADC_CHANNEL_0,
-  ADC_CHANNEL_1,
-  ADC_CHANNEL_2,
-  ADC_CHANNEL_3,
-  ADC_CHANNEL_4,
-  ADC_CHANNEL_5,
-  ADC_CHANNEL_6,
-  ADC_CHANNEL_7,
-} adc_channel;
 
 typedef enum {
   ADC_NO_OVERSAMPLING = 0,
@@ -71,6 +62,7 @@ typedef enum {
 
 typedef enum {
   ADC_INIT_OK,
+  ADC_INIT_ALREADY_ENABLED,
   ADC_INIT_INVALID_CHANNEL,
   ADC_INIT_INVALID_NB_OVERSAMPLES,
   ADC_INIT_INVALID_SKIP,
@@ -91,8 +83,9 @@ void init_adc(void);
  * @param oversamples The number of oversamples to perform each measurement
  * @param skip        The number of sample slots to skip each period
  * @return ADC_INIT_OK if the structure was initialized successfully, 
- *         ADC_INIT_INVALID_CHANNEL if the specified channel is invalid,
- *         ADC_INIT_INVALID_NB_OVERSAMPLES if the specified number of
+ *         ADC_INIT_ALREADY_ENABLED if the specified ADC structure is already
+ *         enabled, ADC_INIT_INVALID_CHANNEL if the specified channel is
+ *         invalid, ADC_INIT_INVALID_NB_OVERSAMPLES if the specified number of
  *         oversamples is invalid, or ADC_INIT_INVALID_SKIP if the specified
  *         number of sample slots to skip is invalid.
  */
@@ -100,6 +93,31 @@ adc_init_status
 adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
 	 adc_skip skip); 
 
+/**
+ * Returns whether an adc measurement is enabled.
+ *
+ * @param adc The ADC measurement structure for which to check if it's enabled
+ * @return true if the ADC measurement is enabled, false otherwise.
+ */
+bool adc_is_enabled(adc* adc);
+
+/**
+ * Enable an ADC measurement.
+ *
+ * @param adc The ADC measurement structure to enable
+ * @return true if the ADC measurement was enabled successfully, false if the
+ *         measurement was already enabled.
+ */
+bool adc_enable(adc* adc);
+
+/**
+ * Disable an ADC measurement.
+ *
+ * @param adc The ADC measurement structure to disable
+ * @return true if the ADC measurement was disabled successfully, false if the
+ *         measurement was already disabled.
+ */
+bool adc_disable(adc* adc);
 
 /**
  * Returns the latest measurement of an ADC channel.
