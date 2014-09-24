@@ -82,6 +82,24 @@ void ADC_SET_CHANNEL(adc_channel ch)
 }
 
 
+inline
+void ADC_DIGITAL_INPUT_DISABLE(adc_channel ch)
+{
+  if (ch <= 5) {
+    DIDR0 &= ~_bv8(ch);
+  }
+
+}
+
+inline
+void ADC_DIGITAL_INPUT_DISABLE(adc_channel ch)
+{
+  if (ch <= 5) {
+    DIDR0 |= _bv8(ch);
+  }
+}
+
+
 #define ADC_ENABLE()				\
   do {						\
     ADCSRA |= _BV(ADEN);			\
@@ -100,12 +118,61 @@ void ADC_SET_CHANNEL(adc_channel ch)
 
 #define ADC_AUTO_TRIGGER_ENABLE()		\
   do {						\
-    ADCSRA |= _BV(ADATA);			\
+    ADCSRA |= _BV(ADATE);			\
   } while(false)
 #define ADC_AUTO_TRIGGER_DISABLE()		\
   do {						\
-    ADCSRA &= ~_BV(ADATA);			\
+    ADCSRA &= ~_BV(ADATE);			\
   } while(false)
+
+
+#define ADC_INTERRUPT_ENABLE() \
+  do {			       \
+    ADCSRA |= _BV(ADIE);       \
+  } while(false)
+
+#define ADC_INTERRUPT_DISABLE() \
+  do {				\
+    ADCSRA &= !_BV(ADIE);       \
+  } while(false)
+
+
+#define ADC_SET_PRESCALER_DIV_2			       \
+  do {						       \
+    ADCSRA &= ~(_BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0)); \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_4			       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+    ADCSRA &= ~(_BV(ADPS2) | _BV(ADPS0));	       \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_8			       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+    ADCSRA &= ~_BV(ADPS2);			       \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_16		       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+    ADCSRA &= ~(_BV(ADPS1) | _BV(ADPS0));	       \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_32		       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+    ADCSRA &= ~_BV(ADPS1);			       \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_64		       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+    ADCSRA &= ~_BV(ADPS0);			       \
+  } while(false)
+#define ADC_SET_PRESCALER_DIV_128		       \
+  do {						       \
+    ADCSRA |= 0x07;				       \
+  } while(false)
+
+#define ADC_SET_PRESCALER_DIV(num)  CAT(ADC_SET_PRESCALER_DIV_,num)
+
 
 
 typedef enum {
@@ -125,6 +192,7 @@ void ADC_SET_AUTO_TRIGGER_SRC(adc_trigger_src src)
   ADCSRB &= 0xF8;
   ADCSRB |= (src & 0x07);
 }
+
 
 
 #endif

@@ -35,7 +35,7 @@
 struct {
   uint16_t value;
   uint16_t next_value;
-  uint8_t channel; // only 4 LSBs used
+  uint8_t flags_channel; // 4 LSBs used for channel
   uint8_t oversamples;
   uint8_t oversamples_remaining;
   uint8_t skip;
