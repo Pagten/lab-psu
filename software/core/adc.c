@@ -31,12 +31,20 @@
 #include "adc.h"
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <util/atomic.h>
+
 #include "core/process.h"
 #include "hal/adc.h"
+
 
 PROCESS(adc_process);
 
 #define FLAG_ADC_ENABLED 0x10
+
+#define EVENT_ADC_LIST_CHANGED         (process_event_t)0x00
+#define EVENT_ADC_CONVERSION_COMPLETE  (process_event_t)0x01
 
 static adc* adcs;
 static volatile adc* next_next_adc;
@@ -46,10 +54,10 @@ void init_adc(void)
 {
   adcs = NULL;
 
-  ADC_SET_VREF_AREF(AREF);
-  ADC_SET_ADJUST_RIGHT();
+  ADC_SET_VREF(AREF);
+  ADC_SET_ADJUST(RIGHT);
   ADC_SET_AUTO_TRIGGER_SRC(ADC_TRIGGER_FREERUNNING);  
-  ADC_SET_PRESCALER(128);
+  ADC_SET_PRESCALER_DIV(128);
   ADC_SET_CHANNEL(ADC_CHANNEL_GND);
   ADC_ENABLE();
   ADC_START_CONVERSION();
@@ -83,23 +91,12 @@ is_valid_skip(adc_skip skip)
     || skip == ADC_SKIP_15;
 }
 
-bool adc_is_enabled(adc* adc)
-{
-  return adc->flags_channel & FLAG_ADC_ENABLED;
-}
-
-adc_channel adc_get_channel(adc* adc)
-{
-  return adc->flags_channel & 0x0F;
-}
-
-
 static
-bool adc_in_list(adc* adc)
+bool adc_in_list(adc* adc0)
 {
   adc** a = &adcs;
   while (*a != NULL) {
-    if (*a == adc) {
+    if (*a == adc0) {
       return true;
     }
     a = &((*a)->next);
@@ -111,7 +108,7 @@ bool adc_in_list(adc* adc)
 
 adc_init_status
 adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
-	 adc_skip skip)
+	 adc_skip skip, process* process)
 {
   if (adc_in_list(adc)) {
     return ADC_INIT_ALREADY_IN_LIST;
@@ -127,62 +124,60 @@ adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
   }
 
   adc->value = 0;
-  adc->next_value = 0;
   adc->flags_channel = channel;
   adc->oversamples = oversamples;
   adc->skip = skip;
-  adc->next = NULL;
+  adc->process = process;
   return ADC_INIT_OK;
 }
 
+bool adc_is_enabled(adc* adc)
+{
+  return adc->flags_channel & FLAG_ADC_ENABLED;
+}
 
-/**
- * Enable an ADC measurement.
- *
- * @param adc The ADC measurement structure to enable
- * @return true if the ADC measurement was enabled successfully, false if the
- *         measurement was already enabled.
- */
-bool adc_enable(adc* adc)
+adc_channel adc_get_channel(adc* adc)
+{
+  return adc->flags_channel & 0x0F;
+}
+
+bool adc_enable(adc* adc0)
 {
   // Find position in ADC list
   adc** a = &adcs;
-  while (*a != NULL && adc_get_channel(*a) <= adc_get_channel(adc)) {
-    if (*a == adc) {
+  while (*a != NULL && adc_get_channel(*a) <= adc_get_channel(adc0)) {
+    if (*a == adc0) {
       return false;
     }
     a = &((*a)->next);
   }
 
+  // Initialize ADC
+  adc0->next_value = 0;
+  adc0->oversamples_remaining = adc0->oversamples;
+
   // Add new ADC to list
-  adc->next = *a;
-  *a = adc;
-  adc->flags_channel |= FLAG_ADC_ENABLED;
+  adc0->next = *a;
+  *a = adc0;
+  adc0->flags_channel |= FLAG_ADC_ENABLED;
 
   // Disable digital input on channel to save power
-  ADC_DIGITAL_INPUT_DISABLE(adc_get_channel(adc));
+  ADC_DIGITAL_INPUT_DISABLE(adc_get_channel(adc0));
 
   // Notify the ADC process that the ADC list has changed
-  process_post_event(adc_process, EVENT_ADC_LIST_CHANGED, PROCESS_DATA_NULL);
+  process_post_event(&adc_process, EVENT_ADC_LIST_CHANGED, PROCESS_DATA_NULL);
   return true;
 }
 
-/**
- * Disable an ADC measurement.
- *
- * @param adc The ADC measurement structure to disable
- * @return true if the ADC measurement was disabled successfully, false if the
- *         measurement was already disabled.
- */
-bool adc_disable(adc* adc)
+bool adc_disable(adc* adc0)
 {
   bool only_adc_for_channel = true;
 
   // Find position in list
   adc** a = &adcs;
-  while (*a != NULL && *a != adc) {
-    if (adc_get_channel(*a) == adc_get_channel(adc)) {
-      other_adc_for_channel = false;
+  while (*a != NULL && *a != adc0) {
+    if (adc_get_channel(*a) == adc_get_channel(adc0)) {
+      only_adc_for_channel = false;
     }
     a = &((*a)->next);
   }
@@ -191,27 +186,27 @@ bool adc_disable(adc* adc)
     return false;
   }
 
+  // Make sure we do not consider this ADC for the next channel to queue.
+  if (next_adc_to_consider == adc0) {
+    next_adc_to_consider = adc0->next;
+  }
+
   // Remove ADC from list
   *a = (*a)->next;
-  ATOMIC_BLOCK {
-    adc->flags_channel &= ~FLAG_ADC_ENABLED;
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    adc0->flags_channel &= ~FLAG_ADC_ENABLED;
   }
-
-  // Make sure we do not consider this ADC for the next channel to queue.
-  if (next_adc_to_consider == adc) {
-    next_adc_to_consider = adc->next;
-  }
+  adc0->next = NULL;
 
   // Check channel of next ADC in list
-  only_adc_for_channel &&= 
-    ((*a) == NULL || adc_get_channel(*a) != adc_get_channel(adc));
+  only_adc_for_channel = only_adc_for_channel &&
+    ((*a) == NULL || adc_get_channel(*a) != adc_get_channel(adc0));
 
   // Re-enable the digital input if there are no other ADC's for the same
   // channel in the list
   if (only_adc_for_channel) {
-    ADC_DIGITAL_INPUT_ENABLE(adc_get_channel(adc));
+    ADC_DIGITAL_INPUT_ENABLE(adc_get_channel(adc0));
   }
-
   return true;
 }
 
@@ -220,40 +215,38 @@ uint16_t adc_get_measurement(adc* adc)
   return adc->value;
 }
 
-
 static inline bool
 should_skip(adc* adc, uint8_t period)
 {
   return (adc->skip & period) != 0;
 }
 
-
 static inline void
 left_align_value(adc* adc)
 {
   uint8_t i = ~(adc->oversamples);
-  adc->value << 2;
+  adc->value <<= 2;
   while (i != 0) {
-    adc->value << 1;
-    i << 2;
+    adc->value <<= 1;
+    i <<= 2;
   }
 }
 
 static inline void
-handle_completed_conversion(adc* adc)
+handle_completed_conversion(adc* adc0)
 {
-  if (adc_is_enabled(adc) && adc->oversamples_remaining == 0) {
+  if (adc_is_enabled(adc0) && adc0->oversamples_remaining == 0) {
     // We have enough samples for a full measurement
-    adc->value = adc->next_value;
-    adc->next_value = 0;
-    adc->oversamples_remaining = adc->oversamples;
-    left_align_value(adc);
-    if (adc->process != NULL) {
-      process_post_event(adc->process, ADC_MEASUREMENT_COMPLETED,
-			 (process_event_t)adc);
+    adc0->value = adc0->next_value;
+    adc0->next_value = 0;
+    adc0->oversamples_remaining = adc0->oversamples;
+    left_align_value(adc0);
+    if (adc0->process != NULL) {
+      process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
+			 (process_data_t)adc0);
     }
   } else {
-    adc->oversamples_remaining -= 1;
+    adc0->oversamples_remaining -= 1;
   }
 }
 
@@ -269,7 +262,7 @@ queue_next_next_adc()
     
     if (adc != NULL) {
       // Found next next adc, let's append it to the queue
-      ATOMIC_BLOCK {
+      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 	next_next_adc = adc;
       }
       next_adc_to_consider = adc->next;
@@ -308,12 +301,11 @@ INTERRUPT(ADC_CONVERSION_COMPLETE)
     ADC_CHANNEL_GND : adc_get_channel(next_next_adc);
   ADC_SET_CHANNEL(ch);
 
-
   // Read sample from completed conversion
   if (current_adc != NULL && adc_is_enabled(current_adc)) {
     uint16_t sample = (ADCH << 8) | ADCL;
     current_adc->next_value += sample;
-    process_post_event(adc_process, EVENT_ADC_CONVERSION_COMPLETE,
+    process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
 		       (process_event_t)current_adc);
   }
 

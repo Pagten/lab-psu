@@ -31,16 +31,21 @@
  * converters.
  */
 
+#include <stdbool.h>
+#include <stdint.h>
+#include "core/process.h"
+#include "hal/adc.h"
 
-struct {
+struct adc {
   uint16_t value;
   uint16_t next_value;
   uint8_t flags_channel; // 4 LSBs used for channel
   uint8_t oversamples;
   uint8_t oversamples_remaining;
   uint8_t skip;
+  process* process;
   struct adc* next;
-} adc;
+};
 typedef struct adc adc;
 
 
@@ -62,7 +67,7 @@ typedef enum {
 
 typedef enum {
   ADC_INIT_OK,
-  ADC_INIT_ALREADY_ENABLED,
+  ADC_INIT_ALREADY_IN_LIST,
   ADC_INIT_INVALID_CHANNEL,
   ADC_INIT_INVALID_NB_OVERSAMPLES,
   ADC_INIT_INVALID_SKIP,
@@ -82,24 +87,34 @@ void init_adc(void);
  * @param channel     The ADC channel to measure
  * @param oversamples The number of oversamples to perform each measurement
  * @param skip        The number of sample slots to skip each period
+ * @param process     The process to notify when a new measurement is
+ *                    available (can be NULL)
  * @return ADC_INIT_OK if the structure was initialized successfully, 
- *         ADC_INIT_ALREADY_ENABLED if the specified ADC structure is already
+ *         ADC_INIT_ALREADY_IN_LIST if the specified ADC structure is already
  *         enabled, ADC_INIT_INVALID_CHANNEL if the specified channel is
  *         invalid, ADC_INIT_INVALID_NB_OVERSAMPLES if the specified number of
  *         oversamples is invalid, or ADC_INIT_INVALID_SKIP if the specified
  *         number of sample slots to skip is invalid.
  */
 adc_init_status
-adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
-	 adc_skip skip); 
+adc_init(adc* adc_, adc_channel channel, adc_oversamples oversamples,
+	 adc_skip skip, process* process); 
 
 /**
- * Returns whether an adc measurement is enabled.
+ * Returns whether an ADC measurement is enabled.
  *
  * @param adc The ADC measurement structure for which to check if it's enabled
  * @return true if the ADC measurement is enabled, false otherwise.
  */
 bool adc_is_enabled(adc* adc);
+
+/**
+ * Returns the channel of an ADC measurement structure.
+ *
+ * @param adc The ADC measurement structure for which to get the channel.
+ * @return The channel of the given ADC measurement structure.
+ */
+adc_channel adc_get_channel(adc* adc);
 
 /**
  * Enable an ADC measurement.

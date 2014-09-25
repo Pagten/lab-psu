@@ -22,6 +22,8 @@
 #ifndef HAL_ADC_H
 #define HAL_ADC_H
 
+#include <avr/io.h>
+#include "util/bit.h"
 #include "util/pp_magic.h"
 
 // Available voltage references:
@@ -83,10 +85,10 @@ void ADC_SET_CHANNEL(adc_channel ch)
 
 
 inline
-void ADC_DIGITAL_INPUT_DISABLE(adc_channel ch)
+void ADC_DIGITAL_INPUT_ENABLE(adc_channel ch)
 {
   if (ch <= 5) {
-    DIDR0 &= ~_bv8(ch);
+    DIDR0 &= ~bv8(ch);
   }
 
 }
@@ -95,7 +97,7 @@ inline
 void ADC_DIGITAL_INPUT_DISABLE(adc_channel ch)
 {
   if (ch <= 5) {
-    DIDR0 |= _bv8(ch);
+    DIDR0 |= bv8(ch);
   }
 }
 
