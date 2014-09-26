@@ -101,6 +101,6 @@
 #define IS_SPI_WRITE_COLLISION_FLAG_SET() (SPSR & _BV(WCOL))
 
 // Transfer complete interrupt
-#define SPI_TC_VECT  SPI_STC_vect
+#define SPI_TRANSFER_COMPLETE_VECT  SPI_STC_vect
 
 #endif
