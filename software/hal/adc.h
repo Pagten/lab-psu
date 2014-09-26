@@ -74,7 +74,7 @@ typedef enum {
   ADC_CHANNEL_GND = 15
 } adc_channel;
 
-inline
+static inline
 void ADC_SET_CHANNEL(adc_channel ch)
 {
   if (ch <= 8 || ch == 14 || ch == 15) {
@@ -84,7 +84,7 @@ void ADC_SET_CHANNEL(adc_channel ch)
 }
 
 
-inline
+static inline
 void ADC_DIGITAL_INPUT_ENABLE(adc_channel ch)
 {
   if (ch <= 5) {
@@ -93,7 +93,7 @@ void ADC_DIGITAL_INPUT_ENABLE(adc_channel ch)
 
 }
 
-inline
+static inline
 void ADC_DIGITAL_INPUT_DISABLE(adc_channel ch)
 {
   if (ch <= 5) {
@@ -188,13 +188,17 @@ typedef enum {
   ADC_TRIGGER_TIMER1_CAPTURE_EVENT,
 } adc_trigger_src;
 
-inline
+static inline
 void ADC_SET_AUTO_TRIGGER_SRC(adc_trigger_src src)
 {
   ADCSRB &= 0xF8;
   ADCSRB |= (src & 0x07);
 }
 
+#define IS_ADC_INTERRUPT_FLAG_SET()       (ADCSRAR & _BV(ADIF))
+
+// Transfer complete interrupt
+#define ADC_CONVERSION_COMPLETE_VECT  ADC_vect
 
 
 #endif

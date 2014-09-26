@@ -37,7 +37,7 @@
 
 #include "core/process.h"
 #include "hal/adc.h"
-
+#include "hal/interrupt.h"
 
 PROCESS(adc_process);
 
@@ -47,7 +47,7 @@ PROCESS(adc_process);
 #define EVENT_ADC_CONVERSION_COMPLETE  (process_event_t)0x01
 
 static adc* adcs;
-static volatile adc* next_next_adc;
+static adc* volatile next_next_adc;
 static adc* next_adc_to_consider;
 
 void init_adc(void)
@@ -291,7 +291,7 @@ PROCESS_THREAD(adc_process)
   PROCESS_END();
 }
 
-INTERRUPT(ADC_CONVERSION_COMPLETE)
+INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
 {
   static adc* current_adc = NULL;
   static adc* next_adc = NULL;
@@ -306,7 +306,7 @@ INTERRUPT(ADC_CONVERSION_COMPLETE)
     uint16_t sample = (ADCH << 8) | ADCL;
     current_adc->next_value += sample;
     process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
-		       (process_event_t)current_adc);
+		       (process_data_t)current_adc);
   }
 
   // Shift the queue
