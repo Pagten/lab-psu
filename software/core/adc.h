@@ -38,7 +38,7 @@
 
 struct adc {
   uint16_t value;
-  uint16_t next_value;
+  volatile uint16_t next_value;
   uint8_t flags_channel; // 4 LSBs used for channel
   uint8_t oversamples;
   uint8_t oversamples_remaining;
@@ -100,13 +100,6 @@ adc_init_status
 adc_init(adc* adc_, adc_channel channel, adc_oversamples oversamples,
 	 adc_skip skip, process* process); 
 
-/**
- * Returns whether an ADC measurement is enabled.
- *
- * @param adc The ADC measurement structure for which to check if it's enabled
- * @return true if the ADC measurement is enabled, false otherwise.
- */
-bool adc_is_enabled(adc* adc);
 
 /**
  * Returns the channel of an ADC measurement structure.

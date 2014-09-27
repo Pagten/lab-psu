@@ -41,7 +41,7 @@
 
 PROCESS(adc_process);
 
-#define FLAG_ADC_ENABLED 0x10
+#define FLAG_ADC_READY 0x10
 
 #define EVENT_ADC_LIST_CHANGED         (process_event_t)0x00
 #define EVENT_ADC_CONVERSION_COMPLETE  (process_event_t)0x01
@@ -131,9 +131,20 @@ adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
   return ADC_INIT_OK;
 }
 
-bool adc_is_enabled(adc* adc)
+static inline
+bool adc_is_ready(adc* adc)
 {
-  return adc->flags_channel & FLAG_ADC_ENABLED;
+  return adc->flags_channel & FLAG_ADC_READY;
+}
+
+static inline
+void adc_set_ready(adc* adc, bool ready)
+{
+  if (ready) {
+    adc->flags_channel |= FLAG_ADC_READY;
+  } else {
+    adc->flags_channel &= ~FLAG_ADC_READY;
+  }
 }
 
 adc_channel adc_get_channel(adc* adc)
@@ -159,7 +170,7 @@ bool adc_enable(adc* adc0)
   // Add new ADC to list
   adc0->next = *a;
   *a = adc0;
-  adc0->flags_channel |= FLAG_ADC_ENABLED;
+  adc_set_ready(adc0, true);
 
   // Disable digital input on channel to save power
   ADC_DIGITAL_INPUT_DISABLE(adc_get_channel(adc0));
@@ -194,7 +205,7 @@ bool adc_disable(adc* adc0)
   // Remove ADC from list
   *a = (*a)->next;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    adc0->flags_channel &= ~FLAG_ADC_ENABLED;
+    adc_set_ready(adc0, false);
   }
   adc0->next = NULL;
 
@@ -235,7 +246,7 @@ left_align_value(adc* adc)
 static inline void
 handle_completed_conversion(adc* adc0)
 {
-  if (adc_is_enabled(adc0) && adc0->oversamples_remaining == 0) {
+  if (adc0->oversamples_remaining == 0) {
     // We have enough samples for a full measurement
     adc0->value = adc0->next_value;
     adc0->next_value = 0;
@@ -245,8 +256,6 @@ handle_completed_conversion(adc* adc0)
       process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
 			 (process_data_t)adc0);
     }
-  } else {
-    adc0->oversamples_remaining -= 1;
   }
 }
 
@@ -302,9 +311,14 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
   ADC_SET_CHANNEL(ch);
 
   // Read sample from completed conversion
-  if (current_adc != NULL && adc_is_enabled(current_adc)) {
+  if (current_adc != NULL && adc_is_ready(current_adc)) {
     uint16_t sample = (ADCH << 8) | ADCL;
     current_adc->next_value += sample;
+    if (current_adc->oversamples_remaining == 0) {
+      adc_set_read(current_adc, false);
+    } else {
+      current_adc->oversamples_remaining -= 1;
+    }
     process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
 		       (process_data_t)current_adc);
   }
