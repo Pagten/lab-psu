@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "hal/gpio.h"
 
 /**
@@ -41,6 +42,11 @@
  * MCU (but the control port can be different from the data port). 
  */
 
+#define HD44780_20X4_LINE0 0x00
+#define HD44780_20X4_LINE1 0x40
+#define HD44780_20X4_LINE2 0x14
+#define HD44780_20X4_LINE3 0x54
+
 typedef struct {
   port_ptr data_port;
   port_ptr ctrl_port;
@@ -49,6 +55,7 @@ typedef struct {
   uint8_t e_mask;
   uint8_t rs_mask;
   uint8_t rw_mask;
+  FILE stream;
 } hd44780_lcd;
 
 typedef enum {
@@ -294,5 +301,18 @@ uint8_t hd44780_lcd_read_address(hd44780_lcd* lcd);
 uint8_t hd44780_lcd_read(hd44780_lcd* lcd);
 
 
+/**
+ * Return a file stream that can be used to write to the DDRAM or CGRAM of an
+ * HD44780 LCD.
+ *
+ * The returned file stream is actually just a wrapper around the 
+ * hd44780_lcd_write() function, hence the documentation of that function also
+ * applies here. In particular, the functions  hd44780_lcd_set_ddram_address()
+ * and hd44780_lcd_set_cgram_address() determine what kind of memory and what
+ * location in that memory is written when writing to the stream. Depending
+ * on the entry mode set using the hd44780_set_entry_mode(), the LCD screen
+ * will behave differently when writing to the stream.
+ */
+FILE* hd44780_lcd_stream(hd44780_lcd* lcd);
 
 #endif

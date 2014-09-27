@@ -28,10 +28,14 @@
 
 #include "hd44780.h"
 
+#include <stdio.h>
+#include <stddef.h>
 #include <util/delay.h>
 #include "hal/cpufunc.h"
 #include "util/bit.h"
+#include "util/def.h"
 
+static int hd44780_putchar(char c, FILE* stream);
 
 
 void hd44780_init(void)
@@ -59,6 +63,7 @@ hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
   lcd->e_mask = bv8(e_pin);
   lcd->rs_mask = bv8(rs_pin);
   lcd->rw_mask = bv8(rw_pin);
+  fdev_setup_stream(&(lcd->stream), hd44780_putchar, NULL, _FDEV_SETUP_WRITE);
   return HD44780_SETUP_OK;
 }
 
@@ -244,4 +249,18 @@ uint8_t hd44780_lcd_read(hd44780_lcd* lcd)
   while (hd44780_lcd_busy(lcd));
   P_SET_PINS(lcd->ctrl_port, lcd->rs_mask);
   return read(lcd);
+}
+
+
+FILE* hd44780_lcd_stream(hd44780_lcd* lcd)
+{
+  return &(lcd->stream);
+}
+
+static int
+hd44780_putchar(char c, FILE* stream)
+{
+  hd44780_lcd* lcd = container_of(stream, hd44780_lcd, stream);
+  hd44780_lcd_write(lcd, (uint8_t)c);
+  return 0;
 }

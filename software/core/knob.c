@@ -45,7 +45,7 @@ void knob_init(knob* k, uint16_t small_step, uint16_t big_step)
   k->big_step = big_step;
 }
 
-void knob_input(knob* k, uint8_t rot_input)
+void knob_update(knob* k, uint8_t rot_input)
 {
   rot_step_status step = rot_process_step(&(k->rot), rot_input);
   switch (step) {
@@ -62,6 +62,9 @@ void knob_input(knob* k, uint8_t rot_input)
     } else {
       k->value = KNOB_MIN;
     }
+    break;
+  default:
+    // Do nothing
     break;
   }
 }

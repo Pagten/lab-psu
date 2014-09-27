@@ -39,6 +39,8 @@
 #include "core/spi_master.h"
 #include "drivers/mcp4922.h"
 
+#include "apps/psu/packets.h"
+
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
 FUSES = 
@@ -78,22 +80,6 @@ static struct {
   adc temperature;
 } psu_status;
 
-
-
-#define IOPANEL_REQUEST_TYPE 0x01
-struct iopanel_request {
-  uint8_t flags;
-  uint16_t set_voltage;
-  uint16_t set_current;
-  uint16_t voltage;
-  uint16_t current;
-};
-
-struct iopanel_response {
-  uint8_t set_flags;
-  uint16_t set_voltage;
-  uint16_t set_current;
-};
 
 
 PROCESS_THREAD(iopanel_update_process)

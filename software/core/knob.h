@@ -81,5 +81,4 @@ uint16_t knob_get_value(knob* k);
  */
 void knob_set_value(knob* k, uint16_t value);
 
-
-#end if
+#endif

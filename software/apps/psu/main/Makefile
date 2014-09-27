@@ -8,6 +8,6 @@ DEBUG=1
 
 #TODO: check that dead code is eliminated
 
-FW_ROOT = ../..
+FW_ROOT = ../../..
 include $(FW_ROOT)/Makefile.include
 
