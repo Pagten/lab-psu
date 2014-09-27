@@ -30,6 +30,7 @@
 
 #include <stdlib.h>
 
+#include "core/adc.h"
 #include "core/process.h"
 #include "core/timer.h"
 #include "hal/gpio.h" 
@@ -58,8 +59,8 @@ FUSES =
 #define DAC_VOLTAGE_CHANNEL MCP4922_CHANNEL_A
 #define DAC_CURRENT_CHANNEL MCP4922_CHANNEL_B
 
-#define ADC_VOLTAGE_CHANNEL ADC_CHANNEL_0;
-#define ADC_CURRENT_CHANNEL ADC_CHANNEL_1;
+#define ADC_VOLTAGE_CHANNEL ADC_CHANNEL_0
+#define ADC_CURRENT_CHANNEL ADC_CHANNEL_1
 
 PROCESS(iopanel_update_process);
 
@@ -77,17 +78,6 @@ static struct {
   adc temperature;
 } psu_status;
 
-
-static inline
-void init_pins(void)
-{
-  SET_PIN_DIR_INPUT(ROT0_A);
-  SET_PIN_DIR_INPUT(ROT0_B);
-  SET_PIN_DIR_INPUT(ROT0_PUSH);
-
-  SET_PIN(DAC_CS);
-  SET_PIN_DIR_OUTPUT(DAC_CS);
-}
 
 
 #define IOPANEL_REQUEST_TYPE 0x01
@@ -123,8 +113,8 @@ PROCESS_THREAD(iopanel_update_process)
   mcp4922_pkt_init(&current_pkt);
 
   spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
-		   IOPANEL_REQUEST_TYPE, sizeof(request), &request,
-		   sizeof(response), &response, PROCESS_CURRENT());
+		   IOPANEL_REQUEST_TYPE, sizeof(request), (uint8_t*)&request,
+		   sizeof(response), (uint8_t*)&response, PROCESS_CURRENT());
 
   while (true) {
     timer_restart(&tmr);
@@ -134,14 +124,14 @@ PROCESS_THREAD(iopanel_update_process)
       request.flags = psu_status.flags;
       request.set_voltage = psu_status.set_voltage;
       request.set_current = psu_status.set_current;
-      request.voltage = adc_get_measurement(&request.voltage);
-      request.current = adc_get_measurement(&request.current);
+      request.voltage = adc_get_measurement(&psu_status.voltage);
+      request.current = adc_get_measurement(&psu_status.current);
       spim_trx_queue((spim_trx*)&trx);
 
       PROCESS_WAIT_EVENT_UNTIL(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||
 			       ev == SPIM_TRX_ERROR);
       if (ev == SPIM_TRX_ERROR || 
-	  spim_trx_llp_get_rx_size(&trx) != sizeof(rx_buf)) {
+	  spim_trx_llp_get_rx_size(&trx) != sizeof(response)) {
 	// Error occurred while communicating with IO panel. We will exit the
 	// loop and try to communicate again.
 	continue;
@@ -149,8 +139,8 @@ PROCESS_THREAD(iopanel_update_process)
 
       // Data exchanged successfully with IO panel. Now we will update the
       // psu state according to the values received from the IO panel.
-      psu_status.set_voltage = rx_buf.set_voltage;
-      psu_status.set_current = rx_buf.set_current;
+      psu_status.set_voltage = response.set_voltage;
+      psu_status.set_current = response.set_current;
 
       // Immediately update the DAC values according to the psu status
       // TODO: refactor this into a separate process?
@@ -175,7 +165,6 @@ PROCESS_THREAD(iopanel_update_process)
 
 int main(void)
 {
-  init_pins();
   clock_init();
   process_init();
   spim_init();

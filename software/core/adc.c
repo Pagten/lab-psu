@@ -315,7 +315,7 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
     uint16_t sample = (ADCH << 8) | ADCL;
     current_adc->next_value += sample;
     if (current_adc->oversamples_remaining == 0) {
-      adc_set_read(current_adc, false);
+      adc_set_ready(current_adc, false);
     } else {
       current_adc->oversamples_remaining -= 1;
     }

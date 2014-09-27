@@ -97,7 +97,7 @@ void init_adc(void);
  *         number of sample slots to skip is invalid.
  */
 adc_init_status
-adc_init(adc* adc_, adc_channel channel, adc_oversamples oversamples,
+adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
 	 adc_skip skip, process* process); 
 
 
