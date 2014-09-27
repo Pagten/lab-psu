@@ -30,6 +30,8 @@
 
 #include <stdlib.h>
 
+#include "core/process.h"
+#include "core/timer.h"
 #include "hal/gpio.h" 
 #include "hal/fuses.h"
 #include "hal/interrupt.h"
@@ -45,19 +47,36 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
+#define IOPANEL_UPDATE_RATE  (500 * CLOCK_MSEC)
 
-#define ROT0_A    D,0
-#define ROT0_B    D,1
-#define ROT0_PUSH D,2
-#define DAC_CS    B,1
-
+#define DAC_CS      B,1
+#define IOPANEL_CS  B,2
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
 
-PROCESS(iopanel_process);
+#define DAC_VOLTAGE_CHANNEL MCP4922_CHANNEL_A
+#define DAC_CURRENT_CHANNEL MCP4922_CHANNEL_B
 
-#define EVENT_MCP4922_WAS_BUSY   0x01
+#define ADC_VOLTAGE_CHANNEL ADC_CHANNEL_0;
+#define ADC_CURRENT_CHANNEL ADC_CHANNEL_1;
+
+PROCESS(iopanel_update_process);
+
+//#define EVENT_MCP4922_WAS_BUSY   0x01
+
+#define PSU_FLAG_OUTPUT_ENABLED  0x01
+
+static struct {
+  uint8_t flags;
+  uint16_t set_voltage;
+  uint16_t set_current;
+  adc voltage;
+  adc current;
+  adc line_voltage;
+  adc temperature;
+} psu_status;
+
 
 static inline
 void init_pins(void)
@@ -70,71 +89,82 @@ void init_pins(void)
   SET_PIN_DIR_OUTPUT(DAC_CS);
 }
 
+
 #define IOPANEL_REQUEST_TYPE 0x01
 struct iopanel_request {
   uint8_t flags;
+  uint16_t set_voltage;
+  uint16_t set_current;
   uint16_t voltage;
   uint16_t current;
 };
 
 struct iopanel_response {
-  uint8_t flags;
-  uint16_t voltage;
-  uint16_t current;
+  uint8_t set_flags;
+  uint16_t set_voltage;
+  uint16_t set_current;
 };
 
-#define DAC_VOLTAGE_CHANNEL MCP4922_CHANNEL_A
-#define DAC_CURRENT_CHANNEL MCP4922_CHANNEL_B
 
-PROCESS_THREAD(iopanel_process)
+PROCESS_THREAD(iopanel_update_process)
 {
   PROCESS_BEGIN();
 
   static timer tmr;
   static spim_trx_llp trx;
-  static iopanel_request tx_buf;
-  static iopanel_response rx_buf;
+  static struct iopanel_request request;
+  static struct iopanel_response response;
   static mcp4922_pkt voltage_pkt;
   static mcp4922_pkt current_pkt;
 
-  tx_buf.flags = 0;
-  tx_buf.voltage = DAC_MIN;
-  tx_buf.current = DAC_MIN;
-  timer_set(&tmr, CLOCK_SEC);
+  timer_set(&tmr, IOPANEL_UPDATE_RATE);
   spim_trx_init((spim_trx*)&trx);
-  mcp4922_pkt_init(&mcp4922_pkt);
+  mcp4922_pkt_init(&voltage_pkt);
+  mcp4922_pkt_init(&current_pkt);
+
+  spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
+		   IOPANEL_REQUEST_TYPE, sizeof(request), &request,
+		   sizeof(response), &response, PROCESS_CURRENT());
 
   while (true) {
     timer_restart(&tmr);
     PROCESS_WAIT_UNTIL(timer_expired(&tmr));
 
     if (! spim_trx_is_queued((spim_trx*)&trx)) {
-      spim_trx_llp_set(&trx, GET_BIT(LCD_CS), &GET_PORT(LCD_CS),
-		       IOPANEL_REQUEST_TYPE, sizeof(tx_buf), &tx_buf,
-		       sizeof(rx_buf), &rx_buf, PROCESS_CURRENT());
+      request.flags = psu_status.flags;
+      request.set_voltage = psu_status.set_voltage;
+      request.set_current = psu_status.set_current;
+      request.voltage = adc_get_measurement(&request.voltage);
+      request.current = adc_get_measurement(&request.current);
       spim_trx_queue((spim_trx*)&trx);
 
-      PROCESS_WAIT_EVENT(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||
-			 ev == SPIM_TRX_ERROR);
-      if (ev == SPIM_TRX_ERROR) {
-	continue;
-      }
-      if (spim_trx_llp_get_rx_size(&trx) != sizeof(rx_buf)) {
+      PROCESS_WAIT_EVENT_UNTIL(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||
+			       ev == SPIM_TRX_ERROR);
+      if (ev == SPIM_TRX_ERROR || 
+	  spim_trx_llp_get_rx_size(&trx) != sizeof(rx_buf)) {
+	// Error occurred while communicating with IO panel. We will exit the
+	// loop and try to communicate again.
 	continue;
       }
 
+      // Data exchanged successfully with IO panel. Now we will update the
+      // psu state according to the values received from the IO panel.
+      psu_status.set_voltage = rx_buf.set_voltage;
+      psu_status.set_current = rx_buf.set_current;
+
+      // Immediately update the DAC values according to the psu status
+      // TODO: refactor this into a separate process?
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
       mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_VOLTAGE_CHANNEL, rx_buf.voltage >> 4);
+		      DAC_VOLTAGE_CHANNEL, psu_status.set_voltage >> 4);
       mcp4922_pkt_queue(&voltage_pkt);
 
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
+      // TODO: change mcp4922 interface so we don't have to repeat all
+      // information whenever we want to transmit a packet
       mcp4922_pkt_set(&current_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_CURRENT_CHANNEL, rx_buf.current >> 4);
+		      DAC_CURRENT_CHANNEL, psu_status.set_current >> 4);
       mcp4922_pkt_queue(&current_pkt);
-
-      tx_buf.voltage = rx_buf.voltage;
-      tx_buf.current = rx_buf.current;
     }
   }
 
@@ -149,11 +179,21 @@ int main(void)
   clock_init();
   process_init();
   spim_init();
+  init_adc();
   mcp4922_init();
+
+  // Enable ADC measurements
+  adc_init(&psu_status.voltage, ADC_VOLTAGE_CHANNEL, ADC_256X_SAMPLING,
+	   ADC_SKIP_0, NULL);
+  adc_init(&psu_status.current, ADC_CURRENT_CHANNEL, ADC_256X_SAMPLING,
+	   ADC_SKIP_0, NULL);
+  adc_enable(&psu_status.voltage);
+  adc_enable(&psu_status.current);
+
 
   ENABLE_INTERRUPTS();
 
-  process_start(&iopanel_process);
+  process_start(&iopanel_update_process);
 
   while (true) {
     process_execute();
