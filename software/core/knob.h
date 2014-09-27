@@ -41,13 +41,44 @@ typedef struct {
   uint16_t big_step;
 } knob;
 
-
+/**
+ * Initialize a knob data structure.
+ *
+ * @param k          The knob data structure to initialize
+ * @param small_step The amount the knob's value increases/decreases on a small
+ *                   step increment/decrement
+ * @param big_step   The amount the knob's value increases/decreases on a big
+ *                   step increment/decrement
+ */
 void knob_init(knob* k, uint16_t small_step, uint16_t big_step);
 
-void knob_input(knob* k, uint8_t rot_input);
+/**
+ * Signal that the state of a knob's rotary encoder has changed.
+ *
+ * This function should be called whenever a change is detected in the outputs
+ * of the knob's rotary encoder. If the change in the rotary encoder's outputs
+ * indicates the rotary encoder has turned, the knob's value will be updated
+ * accordingly.
+ *
+ * @param k          The knob of which the rotary encoder's state has changed
+ * @param rot_values The new state (output) of the rotary encoder
+ */
+void knob_update(knob* k, uint8_t rot_values);
 
+/**
+ * Return the current value of a knob.
+ *
+ * @param k The knob of which to return the current value
+ * @return The current value of the given knob
+ */
 uint16_t knob_get_value(knob* k);
 
+/**
+ * Set (override) the current value of a knob.
+ *
+ * @param k     The knob of which to set the current value
+ * @param value The value to set as the knob's current value
+ */
 void knob_set_value(knob* k, uint16_t value);
 
 
