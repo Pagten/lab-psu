@@ -53,10 +53,35 @@ typedef enum {
 
 
 /**
- * Initialize the SPI slave module.
+ * Initialize the SPI slave module, specifying the process to notify on
+ * incoming SPI messages.
  *
  * Modules that should be initialized first:
  *  - process
+ *
+ * The SPI slave module will send the SPIS_MESSAGE_RECEIVED event to the given
+ * process when a message has been successfully received. The process then has
+ * some time (15 SPI transmission periods) to calculate a response and register
+ * it with the SPI slave module using the spis_send_response() function. When
+ * the response has been sent successfully, the SPIS_RESPONSE_TRANSMITTED event
+ * will be sent to the process. If the master ends the transfer before the
+ * response can be delivered completely, the SPIS_RESPONSE_ERROR will be sent
+ * to the process. Note that there is no guarantee that the master has success-
+ * fully received the response, even when the SPIS_RESPONSE_TRANSMITTED event
+ * is sent. The SPIS_RESPONSE_TRANSMITTED event only indicates the response
+ * was transmitted completely, but transmission errors are still possible. Note
+ * that there is no way to ensure that both parties agree on the fact that the
+ * request and response were delivered successfully (this is the so-called
+ * Two Generals' Problem).
+ *
+ * The SPI slave module will ensure the integrity of the buffer containing the
+ * received message between sending the SPI_MESSAGE_RECEIVED event and
+ * receiving the spis_send_response() function call. Hence, the callback
+ * process must copy any data it needs from the message before making such
+ * call. It is important that the spis_send_response() function is called for
+ * each received message, even if no payload needs to be sent in response,
+ * since otherwise the SPI receive buffer will not be freed (and hence the
+ * slave cannot receive any new messages from the master).
  * 
  * @param p The process to notify when an SPI message is received
  * @param SPIS_INIT_OK if the SPI slave module was initialized successfully, 
@@ -64,31 +89,30 @@ typedef enum {
  */
 spis_init_status spis_init(process* p);
 
+
 /**
- * Set the process to notify on incoming data.
+ * Return the size (in bytes) of the last payload received from the SPI master.
  *
- * The SPI slave module will send the SPIS_MESSAGE_RECEIVED event to the 
- * process when a message has been successfully received. The process then has
- * some time (15 SPI transmission periods) to calculate a response and register
- * it with the SPI slave module using the spis_send_response() function. When
- * response has been sent successfully, the SPIS_RESPONSE_TRANSMITTED event
- * will be sent to the process. If the master ends the transfer before the
- * response can be delivered completely, the SPIS_RESPONSE_ERROR will be sent
- * to the process. Note that there is no guarantee that the master has success-
- * fully received the response, even when the SPIS_TRX_COMPLETED event is sent.
+ * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event
+ * has been sent to the callback process and before the corresponding call to
+ * the spis_send_response() function.
  *
- * The SPI slave module will ensure the integrity of the received message
- * until the spis_send_response() function is called. Hence, the callback 
- * process must copy any data it needs from the message before making this
- * call. It is important that the spis_send_response() function is called for
- * each received message, even if no payload needs to be sent in response,
- * since otherwise the SPI receive buffer will not be freed (and hence the
- * slave cannot receive any new messages from the master).
- *
- * @param p  The process to notify when a message from the SPI master was
- *           received
+ * @return The size (in bytes) of the last received SPI payload.
  */
-void spis_register_callback(process* p);
+uint8_t spis_get_rx_size(void);
+
+
+/**
+ * Return a pointer to the last payload received from the SPI master.
+ *
+ * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event
+ * has been sent to the callback process and before the corresponding call to
+ * the spis_send_response() function.
+ *
+ * @return A pointer to the last payload received from the SPI master.
+ */
+uint8_t* spis_get_rx_buf(void);
+
 
 /**
  * Send a response in reply to a message from the SPI master. This function
@@ -116,30 +140,6 @@ void spis_register_callback(process* p);
  */
 spis_send_response_status
 spis_send_response(uint8_t type, uint8_t* payload, uint8_t size);
-
-
-/**
- * Return the size (in bytes) of the last payload received from the SPI master.
- *
- * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event
- * has been sent to the callback process and before the corresponding call to
- * the spis_send_response() function.
- *
- * @return The size (in bytes) of the last received SPI payload.
- */
-uint8_t spis_get_rx_size(void);
-
-
-/**
- * Return a pointer to the last payload received from the SPI master.
- *
- * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event
- * has been sent to the callback process and before the corresponding call to
- * the spis_send_response() function.
- *
- * @return A pointer to the last payload received from the SPI master.
- */
-uint8_t* spis_get_rx_buf(void);
 
 
 #endif
