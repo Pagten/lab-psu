@@ -91,6 +91,18 @@ spis_init_status spis_init(process* p);
 
 
 /**
+ * Return the type of the last message received from the SPI master.
+ *
+ * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event
+ * has been sent to the callback process and before the corresponding call to
+ * the spis_send_response() function.
+ *
+ * @return The type of the last received SPI payload.
+ */
+uint8_t spis_get_rx_type(void);
+
+
+/**
  * Return the size (in bytes) of the last payload received from the SPI master.
  *
  * It is only safe to call this function after the SPIS_MESSAGE_RECEIVED event

@@ -167,6 +167,12 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 }
 
 inline
+uint8_t spis_get_rx_type(void)
+{
+  return trx.rx_type;
+}
+
+inline
 uint8_t spis_get_rx_size(void)
 {
   return trx.rx_size;
