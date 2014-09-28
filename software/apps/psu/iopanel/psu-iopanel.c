@@ -37,9 +37,11 @@
 #include "core/clock.h"
 #include "core/io_monitor.h"
 #include "core/knob.h"
-#include "core/spi_slave.h"
 #include "core/rotary.h"
+#include "core/spi_slave.h"
+#include "core/timer.h"
 #include "drivers/hd44780.h"
+#include "util/log.h"
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -184,20 +186,41 @@ PROCESS_THREAD(lcd_process)
     // Voltage
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE0);
-    fprintf(hd44780_lcd_stream(&lcd), "V: %u (%u)",
-	    psu_status.voltage, psu_status.set_voltage);
+    fprintf(hd44780_lcd_stream(&lcd), "V: %5u %5u %5u",
+	    psu_status.voltage, psu_status.set_voltage,
+	    knob_get_value(&knob_v));
 
     // Current
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE1);
-    fprintf(hd44780_lcd_stream(&lcd), "C: %u (%u)",
-	    psu_status.current, psu_status.set_current);
+    fprintf(hd44780_lcd_stream(&lcd), "C: %5u %5u %5u",
+	    psu_status.current, psu_status.set_current,
+	    knob_get_value(&knob_v));
 
     // Transfer stats
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE2);
-    fprintf(hd44780_lcd_stream(&lcd), "Trx: %u s %u f",
+    fprintf(hd44780_lcd_stream(&lcd), "Trx: %3u s %3u f",
 	    trx_success, trx_failed);
+    
+
+    // Transfer errors
+    /*    static char str[21];
+    static uint8_t i;
+    PROCESS_WAIT_UNTIL(! hd44780_lcd_busy(&lcd));
+    hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE0);
+    sprintf(str, "%u / %u / %u ",
+	    trx_success,
+	    log_cntr_get_value(LOG_CNTR_SPIS_TIMEOUT_WAITING_FOR_CALLBACK),
+	    log_cntr_get_value(LOG_CNTR_EVENT_QUEUE_FULL));
+
+    PROCESS_YIELD();
+    i = 0;
+    while(str[i] != 0) {
+      PROCESS_WAIT_UNTIL(! hd44780_lcd_busy(&lcd));
+      hd44780_lcd_write(&lcd, str[i]);
+      i += 1;
+      }*/
   }
 
   PROCESS_END();

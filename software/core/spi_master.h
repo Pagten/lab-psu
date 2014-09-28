@@ -38,7 +38,7 @@
  * The other kind of transfer implements a simple link layer protocol designed
  * for request-response type messages. The protocol allows the slave device to
  * specify the length of its response (up to a pre-specified maximum). It also
- * allows the slave device to delay its response for up to 16 bytes after the
+ * allows the slave device to delay its response for up to 31 bytes after the
  * master has sent its message, which can be useful if the slave needs some
  * time to generate its response. The protocol consists of a master transmit
  * phase and master receive phase. The master transmit phase proceeds as
@@ -66,7 +66,7 @@
  *     into the receive buffer). The master must stay in this phase for 16 
  *     SPI byte transfers, or until the slave sends a value different from
  *     0xF0, whichever comes first. If the slave does not send a value
- *     different from 0xF0 within 16 SPI transfers, the master must abort the
+ *     different from 0xF0 within 31 SPI transfers, the master must abort the
  *     transfer. Otherwise, the first byte different from 0xF0 should be 
  *     considered the first response byte (see the next step).
  *  6) The slave sends its response, starting with a response header. The

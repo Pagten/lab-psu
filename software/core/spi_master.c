@@ -53,7 +53,8 @@ static spim_trx* trx_queue_tail;
 #define trx_q_hd_simple ((spim_trx_simple*)trx_queue_head)
 #define trx_q_hd_llp    ((spim_trx_llp*)trx_queue_head)
 
-#define RX_DELAY_REMAINING_MASK  0x0F
+#define MAX_RX_DELAY             31
+#define RX_DELAY_REMAINING_MASK  0x1F
 #define TRX_QUEUED_BIT           7
 #define TRX_IN_TRANSMISSION_BIT  6
 #define TRX_USE_LLP_BIT          5
@@ -121,7 +122,7 @@ spim_trx_llp_set(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
     return SPIM_TRX_LLP_RX_BUF_IS_NULL;
   }
 
-  trx->flags_rx_delay_remaining = _BV(TRX_USE_LLP_BIT) | MAX_RX_DELAY;
+  trx->flags_rx_delay_remaining = _BV(TRX_USE_LLP_BIT);
   trx->ss_mask = bv8(ss_pin & 0x07);
   trx->ss_port = ss_port;
   trx->tx_type = tx_type;
@@ -182,6 +183,13 @@ static inline
 void decrement_rx_delay_remaining(spim_trx_llp* trx)
 {
   trx->flags_rx_delay_remaining -= 1;
+}
+
+static inline
+void reset_rx_delay_remaining(spim_trx_llp* trx)
+{
+  trx->flags_rx_delay_remaining &= ~RX_DELAY_REMAINING_MASK;
+  trx->flags_rx_delay_remaining |= MAX_RX_DELAY;
 }
 
 spim_trx_queue_status
@@ -297,6 +305,9 @@ PROCESS_THREAD(spim_trx_process)
       // Link-layer protocol
       uint8_t response;
 
+      // Initialize trx fields
+      trx_q_hd_llp->error = SPIM_TRX_ERR_NONE;
+
       // Send first header byte (message type id)
       tx_byte(trx_q_hd_llp->tx_type);
       timer_set(&trx_timer, CLK_AT_LEAST(LLP_TX_DELAY));
@@ -348,6 +359,7 @@ PROCESS_THREAD(spim_trx_process)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       tx_dummy_byte();
       timer_restart(&trx_timer);
+      reset_rx_delay_remaining(trx_q_hd_llp);
       wait_for_tx_complete();
       while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
 	     read_response_byte() == SPI_TYPE_PREPARING_RESPONSE) {

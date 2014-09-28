@@ -38,7 +38,7 @@
 #include "util/log.h"
 
 // Should preferably be a power of 2
-#define PROCESS_CONF_EVENT_QUEUE_SIZE 32
+#define PROCESS_CONF_EVENT_QUEUE_SIZE 16
 
 struct event {
   process* p;
@@ -46,14 +46,21 @@ struct event {
   process_data_t data;
 };
 
-static struct event event_queue[PROCESS_CONF_EVENT_QUEUE_SIZE];
-static volatile uint8_t event_queue_count;
-static uint8_t event_queue_first;
+struct event_queue {
+  struct event queue[PROCESS_CONF_EVENT_QUEUE_SIZE];
+  volatile uint8_t count;
+  uint8_t first;
+};
+
+static struct event_queue queues[NB_PROCESS_EVENT_PRIORITIES];
 
 void process_init(void)
 {
-  event_queue_count = 0;
-  event_queue_first = 0;
+  int i;
+  for (i = 0; i < NB_PROCESS_EVENT_PRIORITIES; ++i) {
+    queues[i].count = 0;
+    queues[i].first = 0;
+  }
 }
 
 
@@ -67,39 +74,64 @@ void process_start(process* p)
 }
 
 // Can be called from an interrupt:
-process_post_event_status
-process_post_event(process* p, process_event_t ev, process_data_t data)
+static inline process_post_event_status
+post_event(process* p, struct event_queue* q, process_event_t ev,
+	   process_data_t data)
 {
   uint8_t i;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    if (event_queue_count == PROCESS_CONF_EVENT_QUEUE_SIZE) {
+    if (q->count == PROCESS_CONF_EVENT_QUEUE_SIZE) {
       LOG_COUNTER_INC(EVENT_QUEUE_FULL);
       return PROCESS_POST_EVENT_QUEUE_FULL;
     }
 
-    i = (event_queue_first + event_queue_count) % PROCESS_CONF_EVENT_QUEUE_SIZE;
-    event_queue_count += 1;  
+    i = (q->first + q->count) % PROCESS_CONF_EVENT_QUEUE_SIZE;
+    q->count += 1;
   }
-  event_queue[i].p = p;
-  event_queue[i].ev = ev;
-  event_queue[i].data = data;
+  q->queue[i].p = p;
+  q->queue[i].ev = ev;
+  q->queue[i].data = data;
   
   return PROCESS_POST_EVENT_OK;
 }
 
+process_post_event_status
+process_post_event(process* p, process_event_t ev, process_data_t data)
+{
+  return post_event(p, &queues[0], ev, data);
+}
+
+process_post_event_status
+process_post_priority_event(process* p, process_event_t ev, process_data_t data,
+		   process_event_priority pri)
+{
+  if (pri >= NB_PROCESS_EVENT_PRIORITIES) {
+    return PROCESS_POST_EVENT_INVALID_PRIORITY;
+  }
+  return post_event(p, &queues[pri], ev, data);
+}
+
+
 
 void process_execute(void)
 {
-  if (event_queue_count == 0) {
+  // Find first non-empty queue
+  int qi = 0;
+  while (qi < NB_PROCESS_EVENT_PRIORITIES && queues[qi].count == 0) {
+    qi += 1;
+  }
+  if (qi == NB_PROCESS_EVENT_PRIORITIES) {
     // No events to process
     return;
   }
 
-  // Process one event
-  struct event e = event_queue[event_queue_first];
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { 
-    event_queue_count -= 1;
-    event_queue_first = (event_queue_first + 1) % PROCESS_CONF_EVENT_QUEUE_SIZE;
+  // Process one event from the selected queue
+  struct event e;
+  struct event_queue* q = &queues[qi];
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    e = q->queue[q->first];
+    q->count -= 1;
+    q->first = (q->first + 1) % PROCESS_CONF_EVENT_QUEUE_SIZE;
   }
   e.p->thread(e.p, e.ev, e.data);
 }

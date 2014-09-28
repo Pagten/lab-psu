@@ -179,8 +179,14 @@ typedef struct process {
 typedef enum {
   PROCESS_POST_EVENT_OK,
   PROCESS_POST_EVENT_QUEUE_FULL,
+  PROCESS_POST_EVENT_INVALID_PRIORITY,
 } process_post_event_status;
 
+typedef enum {
+  PROCESS_EVENT_PRIORITY_HIGH,
+  PROCESS_EVENT_PRIORITY_NORMAL,
+  NB_PROCESS_EVENT_PRIORITIES
+} process_event_priority;
 
 
 /**
@@ -201,8 +207,8 @@ void process_start(process* p);
  *
  * It is safe to call this function from an interrupt service routine. Although
  * this function guarantees the event will be delivered to the process, there
- * is ofcourse no guarantee that the process will respond to it. 
- * 
+ * is of course no guarantee that the process will respond to it.
+ *
  * @param p     The process to post the event to
  * @param event The event to post
  * @param data  The data associated with the event
@@ -212,6 +218,33 @@ void process_start(process* p);
  */
 process_post_event_status
 process_post_event(process* p, process_event_t ev, process_data_t data);
+
+/**
+ * Asynchronously post an event to a process, specifying a priority.
+ *
+ * Events with a higher priority will be dispatched before events with a lower
+ * priority and events with the same priority will be dispatched on a FIFO
+ * basis.
+ *
+ * It is safe to call this function from an interrupt service routine. Although
+ * this function guarantees the event will be delivered to the process, there
+ * is of course no guarantee that the process will respond to it.
+ *
+ * 
+ * @param p     The process to post the event to
+ * @param event The event to post
+ * @param data  The data associated with the event
+ * @param pri   The priority of the event
+ * @param PROCESS_POST_EVENT_OK if the event was posted successfully,
+ *        PROCESS_POST_EVENT_INVALID_PRIORITY if the given priority is invalid,
+ *        or PROCESS_POST_EVENT_QUEUE_FULL if the event could not be posted
+ *        because the event queue is full.
+ */
+process_post_event_status
+process_post_priority_event(process* p, process_event_t ev,
+			    process_data_t data, process_event_priority pri);
+
+
 
 /**
  * Call the next process in line for execution.

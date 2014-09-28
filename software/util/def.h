@@ -1,5 +1,5 @@
 /*
- * spi_common.h
+ * def.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -19,27 +19,17 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SPI_COMMON_H
-#define SPI_COMMON_H
+#ifndef DEF_H
+#define DEF_H
 
 /**
- * @file spi_common.h
- * @author Pieter Agten <pieter.agten@gmail.com>
- * @date 3 Jul 2014
- *
- * This file contains some constants shared by the SPI master and slave.
+ * @file def.h
+ * @author Pieter Agten (pieter.agten@gmail.com)
+ * @date 27 Sep 2014
  */
 
-#define LLP_HEADER_LENGTH 2
-#define LLP_FOOTER_LENGTH 2
+#include <stddef.h>
 
-#define SPI_TYPE_PREPARING_RESPONSE          0xF0
-#define SPI_TYPE_ERR_SLAVE_RESPONSE_INVALID  0xF1
-#define SPI_TYPE_ERR_SLAVE_NOT_READY         0xF3
-#define SPI_TYPE_ERR_CRC_FAILURE             0xF3
-#define SPI_TYPE_ERR_MESSAGE_TOO_LARGE       0xF4
-
-#define SPI_ERR_TYPE_MIN  0xF1
-#define SPI_ERR_TYPE_MAX  0xF4
+#define container_of(ptr, type, member) ((type*)((char*)ptr - offsetof(type,member)))
 
 #endif

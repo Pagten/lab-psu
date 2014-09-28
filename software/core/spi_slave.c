@@ -195,7 +195,9 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
 	trx.status < SPIS_TRX_COMPLETED) {
       // Transfer was ended prematurely, after notifying the callback that a
       // message was received
-      process_post_event(callback, SPIS_RESPONSE_ERROR, PROCESS_DATA_NULL);
+      process_post_priority_event(callback, SPIS_RESPONSE_ERROR,
+				  PROCESS_DATA_NULL,
+				  PROCESS_EVENT_PRIORITY_HIGH);
       if (trx.status == SPIS_TRX_WAITING_FOR_CALLBACK) {
 	set_spi_data_reg(SPI_TYPE_ERR_SLAVE_NOT_READY);
 	trx.error_code_remaining = SPI_TYPE_ERR_SLAVE_NOT_READY;
@@ -265,7 +267,9 @@ INTERRUPT(SPI_TRANSFER_COMPLETE_VECT)
     SPI_SET_DATA_REG(SPI_TYPE_PREPARING_RESPONSE);
     trx.rx_received += 1;
     trx.status = SPIS_TRX_WAITING_FOR_CALLBACK;
-    process_post_event(callback, SPIS_MESSAGE_RECEIVED, PROCESS_DATA_NULL);
+    process_post_priority_event(callback, SPIS_MESSAGE_RECEIVED,
+				PROCESS_DATA_NULL,
+				PROCESS_EVENT_PRIORITY_HIGH);
     break;
   case SPIS_TRX_WAITING_FOR_CALLBACK:
     // Keep sending SPI_TYPE_PREPARING_RESPONSE until the client process sets a
@@ -299,7 +303,9 @@ INTERRUPT(SPI_TRANSFER_COMPLETE_VECT)
     break;
   case SPIS_TRX_COMPLETED:
     end_transfer(SPI_TYPE_PREPARING_RESPONSE);
-    process_post_event(callback, SPIS_RESPONSE_TRANSMITTED,PROCESS_DATA_NULL);
+    process_post_priority_event(callback, SPIS_RESPONSE_TRANSMITTED,
+				PROCESS_DATA_NULL,
+				PROCESS_EVENT_PRIORITY_HIGH);
     LOG_COUNTER_INC(SPIS_TRX_COMPLETED);    
     break;
   default:

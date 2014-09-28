@@ -27,8 +27,8 @@
  * Logging functions
  */
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef UTIL_LOG_H
+#define UTIL_LOG_H
 
 #include <stdbool.h>
 #include <stdint.h>
