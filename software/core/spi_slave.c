@@ -110,13 +110,13 @@ spis_init(process* p)
   return SPIS_INIT_OK;
 }
 
-// Note: this function might reset the SPIF flag!
+// Note: this function resetS the SPIF flag!
 static inline
 void set_spi_data_reg(uint8_t value)
 {
   do {
     SPI_SET_DATA_REG(value);
-  } while (IS_SPI_WRITE_COLLISION_FLAG_SET());
+  } while (IS_SPI_WRITE_COLLISION_FLAG_SET() || IS_SPI_INTERRUPT_FLAG_SET());
 }
 
 #define DEBUG0 C,5
@@ -142,6 +142,7 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
 	  trx.status = SPIS_TRX_READY;
 	}
       }
+      // Avoid execute SPI ISR:
       SPI_CLEAR_FLAGS();
       return SPIS_SEND_RESPONSE_NO_TRX_IN_PROGRESS;
     }
@@ -157,11 +158,14 @@ spis_send_response(uint8_t type, uint8_t* payload, uint8_t size)
       return SPIS_SEND_RESPONSE_PAYLOAD_IS_NULL;
     }
 
-    set_spi_data_reg(type);
+
+    set_spi_data_reg(type); // Clears the SPI interrupt flag
+    crc16_init(&(trx.crc));
+    crc16_update(&(trx.crc), type);
     trx.tx_buf = payload;
     trx.tx_remaining = size;
     trx.status = SPIS_TRX_SEND_RESPONSE_SIZE;
-    SPI_CLEAR_FLAGS();
+    // Next SPI interrupt will occur when the type byte is transmitted
   }
   return SPIS_SEND_RESPONSE_OK;
 }
@@ -209,6 +213,7 @@ INTERRUPT(PC_INTERRUPT_VECT(SPI_SS_PIN))
     } else if (trx.status != SPIS_TRX_ABORTED_WHILE_WAITING_FOR_CALLBACK) {
       trx.status = SPIS_TRX_READY;
     }
+    // Avoid executing SPI ISR:
     SPI_CLEAR_FLAGS();
   }
 }
@@ -287,6 +292,7 @@ INTERRUPT(SPI_TRANSFER_COMPLETE_VECT)
     break;
   case SPIS_TRX_SEND_RESPONSE_PAYLOAD:
     SPI_SET_DATA_REG(*(trx.tx_buf));
+    crc16_update(&(trx.crc), *(trx.tx_buf));
     trx.tx_buf += 1;
     trx.tx_remaining -= 1;
     if (trx.tx_remaining == 0) {

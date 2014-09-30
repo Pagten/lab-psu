@@ -30,16 +30,17 @@
 
 #include <stdlib.h>
 
+#include "apps/psu/packets.h"
 #include "core/adc.h"
 #include "core/process.h"
-#include "core/timer.h"
-#include "hal/gpio.h" 
-#include "hal/fuses.h"
-#include "hal/interrupt.h"
 #include "core/spi_master.h"
+#include "core/timer.h"
 #include "drivers/mcp4922.h"
+#include "hal/fuses.h"
+#include "hal/gpio.h" 
+#include "hal/interrupt.h"
+#include "util/debug.h"
 
-#include "apps/psu/packets.h"
 
 // NOTE: the default fuse values defined in avr-libc are incorrect (see the 
 // ATmega328p datasheet)
@@ -50,7 +51,7 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
-#define IOPANEL_UPDATE_RATE  (500 * CLOCK_MSEC)
+#define IOPANEL_UPDATE_RATE  (50 * CLOCK_MSEC)
 
 #define DAC_CS      B,1
 #define IOPANEL_CS  B,2
@@ -81,6 +82,13 @@ static struct {
 } psu_status;
 
 
+static inline
+void init_pins(void)
+{
+  SET_PIN_DIR_OUTPUT(DAC_CS);
+  SET_PIN_DIR_OUTPUT(IOPANEL_CS);
+}
+
 
 PROCESS_THREAD(iopanel_update_process)
 {
@@ -98,9 +106,6 @@ PROCESS_THREAD(iopanel_update_process)
   mcp4922_pkt_init(&voltage_pkt);
   mcp4922_pkt_init(&current_pkt);
 
-  spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
-		   IOPANEL_REQUEST_TYPE, sizeof(request), (uint8_t*)&request,
-		   sizeof(response), (uint8_t*)&response, PROCESS_CURRENT());
 
   while (true) {
     timer_restart(&tmr);
@@ -112,16 +117,36 @@ PROCESS_THREAD(iopanel_update_process)
       request.set_current = psu_status.set_current;
       request.voltage = adc_get_measurement(&psu_status.voltage);
       request.current = adc_get_measurement(&psu_status.current);
+
+  // TODO: change SPI interface so that we don't have to enter all this
+  // data each time
+      spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
+		       IOPANEL_REQUEST_TYPE, sizeof(struct iopanel_request),
+		       (uint8_t*)&request, sizeof(struct iopanel_response),
+		       (uint8_t*)&response, PROCESS_CURRENT());
       spim_trx_queue((spim_trx*)&trx);
 
       PROCESS_WAIT_EVENT_UNTIL(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||
 			       ev == SPIM_TRX_ERROR);
-      if (ev == SPIM_TRX_ERROR || 
-	  spim_trx_llp_get_rx_size(&trx) != sizeof(response)) {
+      if (ev == SPIM_TRX_ERROR) {
 	// Error occurred while communicating with IO panel. We will exit the
 	// loop and try to communicate again.
+	spim_trx_error_type err = spim_trx_llp_get_error_type(&trx);
+	if (err == SPIM_TRX_ERR_RESPONSE_TOO_LARGE) {
+	} else if (err == SPIM_TRX_ERR_RESPONSE_CRC_ERROR) {
+	} else if (err == SPIM_TRX_ERR_RESPONSE_TIMEOUT) {
+	  //SET_DEBUG_LED(0);
+	} else {
+	}
+
 	continue;
       }
+
+      if (spim_trx_llp_get_rx_size(&trx) != sizeof(struct iopanel_response)) {
+	continue;
+	//SET_DEBUG_LED(0);
+      }
+
 
       // Data exchanged successfully with IO panel. Now we will update the
       // psu state according to the values received from the IO panel.
@@ -133,7 +158,10 @@ PROCESS_THREAD(iopanel_update_process)
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
       mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
 		      DAC_VOLTAGE_CHANNEL, psu_status.set_voltage >> 4);
-      mcp4922_pkt_queue(&voltage_pkt);
+      mcp4922_pkt_queue_status stat = mcp4922_pkt_queue(&voltage_pkt);
+      if (stat == MCP4922_PKT_QUEUE_OK) {
+	SET_DEBUG_LED(0);
+      }
 
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
       // TODO: change mcp4922 interface so we don't have to repeat all
@@ -151,6 +179,8 @@ PROCESS_THREAD(iopanel_update_process)
 
 int main(void)
 {
+  debug_init();
+  init_pins();
   clock_init();
   process_init();
   spim_init();

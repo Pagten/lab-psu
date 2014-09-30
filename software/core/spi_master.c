@@ -326,8 +326,8 @@ PROCESS_THREAD(spim_trx_process)
 	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
 	response = read_response_byte();
 	if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	  LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
 	  handle_response_error(response);
-	  LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
 	  goto start;
 	}
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
@@ -340,7 +340,7 @@ PROCESS_THREAD(spim_trx_process)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       response = read_response_byte();
       if (response != SPI_TYPE_PREPARING_RESPONSE) {
-	LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
+	LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
 	handle_response_error(response);
 	goto start;
       }
@@ -349,6 +349,7 @@ PROCESS_THREAD(spim_trx_process)
       PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
       response = read_response_byte();
       if (response != SPI_TYPE_PREPARING_RESPONSE) {
+	LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
 	handle_response_error(response);
 	goto start;
       }
@@ -373,12 +374,12 @@ PROCESS_THREAD(spim_trx_process)
       response = read_response_byte();
       if (response == SPI_TYPE_PREPARING_RESPONSE) {
 	// Response is taking too long, abort the transfer
-	trx_q_hd_llp->error = SPIM_TRX_ERR_NO_RESPONSE;
-	end_transfer(SPIM_TRX_ERROR);
 	LOG_COUNTER_INC(SPIM_RESPONSE_TIMEOUT);
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_TIMEOUT;
+	end_transfer(SPIM_TRX_ERROR);
 	goto start;
       } else if (response >= SPI_ERR_TYPE_MIN) {
-	LOG_COUNTER_INC(SPIM_RESPONSE_ERROR);
+	LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
 	handle_response_error(response);
 	goto start;
       }
@@ -397,6 +398,7 @@ PROCESS_THREAD(spim_trx_process)
       timer_restart(&trx_timer); 
       if (size > trx_q_hd_llp->rx_size) {
 	// rx_buf is too small for the response, abort the transfer
+	LOG_COUNTER_INC(SPIM_RESPONSE_TOO_LARGE);
 	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_TOO_LARGE;
 	end_transfer(SPIM_TRX_ERROR);
 	goto start;
@@ -424,7 +426,8 @@ PROCESS_THREAD(spim_trx_process)
       rx_crc |= read_response_byte();
       if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
-	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_CRC_FAILURE;
+	LOG_COUNTER_INC(SPIM_RESPONSE_CRC_ERROR);
+	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_CRC_ERROR;
 	end_transfer(SPIM_TRX_ERROR);
 	goto start;
       }
