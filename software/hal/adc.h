@@ -79,7 +79,7 @@ void ADC_SET_CHANNEL(adc_channel ch)
 {
   if (ch <= 8 || ch == 14 || ch == 15) {
     ADMUX &= 0xF0;
-    ADMUX |= ch;
+    ADMUX |= (ch & 0x0F);
   }
 }
 
@@ -199,6 +199,9 @@ void ADC_SET_AUTO_TRIGGER_SRC(adc_trigger_src src)
 
 // Transfer complete interrupt
 #define ADC_CONVERSION_COMPLETE_VECT  ADC_vect
+
+#define ADC_CC_INTERRUPT_ENABLE()   ADCSRA |= _BV(ADIE)
+#define ADC_CC_INTERRUPT_DISABLE()  ADCSRA &= ~_BV(ADIE)
 
 
 #endif

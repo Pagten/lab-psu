@@ -158,11 +158,8 @@ PROCESS_THREAD(iopanel_update_process)
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
       mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
 		      DAC_VOLTAGE_CHANNEL, psu_status.set_voltage >> 4);
-      mcp4922_pkt_queue_status stat = mcp4922_pkt_queue(&voltage_pkt);
-      if (stat == MCP4922_PKT_QUEUE_OK) {
-	SET_DEBUG_LED(0);
-      }
-
+      mcp4922_pkt_queue(&voltage_pkt);
+      
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
       // TODO: change mcp4922 interface so we don't have to repeat all
       // information whenever we want to transmit a packet

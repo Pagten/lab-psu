@@ -38,6 +38,7 @@
 #include "core/process.h"
 #include "hal/adc.h"
 #include "hal/interrupt.h"
+#include "util/debug.h"
 
 PROCESS(adc_process);
 
@@ -53,12 +54,16 @@ static adc* next_adc_to_consider;
 void init_adc(void)
 {
   adcs = NULL;
+  next_next_adc = NULL;
+  next_adc_to_consider = NULL;
 
   ADC_SET_VREF(AREF);
   ADC_SET_ADJUST(RIGHT);
-  ADC_SET_AUTO_TRIGGER_SRC(ADC_TRIGGER_FREERUNNING);  
+  ADC_SET_AUTO_TRIGGER_SRC(ADC_TRIGGER_FREERUNNING);
+  ADC_AUTO_TRIGGER_ENABLE();
   ADC_SET_PRESCALER_DIV(128);
   ADC_SET_CHANNEL(ADC_CHANNEL_GND);
+  ADC_CC_INTERRUPT_ENABLE();
   ADC_ENABLE();
   ADC_START_CONVERSION();
 
@@ -177,6 +182,7 @@ bool adc_enable(adc* adc0)
 
   // Notify the ADC process that the ADC list has changed
   process_post_event(&adc_process, EVENT_ADC_LIST_CHANGED, PROCESS_DATA_NULL);
+
   return true;
 }
 
@@ -247,6 +253,8 @@ static inline void
 handle_completed_conversion(adc* adc0)
 {
   if (adc0->oversamples_remaining == 0) {
+    TGL_DEBUG_LED(0);
+
     // We have enough samples for a full measurement
     adc0->value = adc0->next_value;
     adc0->next_value = 0;
@@ -300,6 +308,8 @@ PROCESS_THREAD(adc_process)
   PROCESS_END();
 }
 
+//TODO: isr queue is never full when there are less than 3 ADCs in the
+//adc queue!
 INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
 {
   static adc* current_adc = NULL;
@@ -312,7 +322,7 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
 
   // Read sample from completed conversion
   if (current_adc != NULL && adc_is_ready(current_adc)) {
-    uint16_t sample = (ADCH << 8) | ADCL;
+    uint16_t sample = ADCW;
     current_adc->next_value += sample;
     if (current_adc->oversamples_remaining == 0) {
       adc_set_ready(current_adc, false);
