@@ -38,10 +38,10 @@
 
 struct adc {
   uint16_t value;
-  volatile uint16_t next_value;
+  volatile uint24_t next_value;
   uint8_t flags_channel; // 4 LSBs used for channel
-  uint8_t oversamples;
-  uint8_t oversamples_remaining;
+  adc_resolution resolution;
+  uint16_t samples_remaining;
   uint8_t skip;
   process* process;
   struct adc* next;
@@ -50,12 +50,14 @@ typedef struct adc adc;
 
 
 typedef enum {
-  ADC_NO_OVERSAMPLING = 0,
-  ADC_4X_SAMPLING = 3,
-  ADC_16X_SAMPLING = 15,
-  ADC_64X_SAMPLING = 63,
-  ADC_256X_SAMPLING = 255,
-} adc_oversamples;
+  ADC_RESOLUTION_10BIT = 0,
+  ADC_RESOLUTION_11BIT,
+  ADC_RESOLUTION_12BIT,
+  ADC_RESOLUTION_13BIT,
+  ADC_RESOLUTION_14BIT,
+  ADC_RESOLUTION_15BIT,
+  ADC_RESOLUTION_16BIT,
+} adc_resolution;
 
 typedef enum {
   ADC_SKIP_0 = 0,
