@@ -77,13 +77,9 @@ is_valid_adc_channel(adc_channel channel)
 }
 
 static bool
-is_valid_nb_oversamples(adc_oversamples oversamples)
+is_valid_resolution(adc_resolution resolution)
 {
-  return oversamples == ADC_NO_OVERSAMPLING
-    || oversamples == ADC_4X_SAMPLING
-    || oversamples == ADC_16X_SAMPLING
-    || oversamples == ADC_64X_SAMPLING
-    || oversamples == ADC_256X_SAMPLING;
+  return resolution <= ADC_RESOLUTION_16BIT;
 }
 
 static bool
@@ -112,7 +108,7 @@ bool adc_in_list(adc* adc0)
 
 
 adc_init_status
-adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
+adc_init(adc* adc, adc_channel channel, adc_resolution resolution,
 	 adc_skip skip, process* process)
 {
   if (adc_in_list(adc)) {
@@ -121,8 +117,8 @@ adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
   if (! is_valid_adc_channel(channel)) {
     return ADC_INIT_INVALID_CHANNEL;
   }
-  if (! is_valid_nb_oversamples(oversamples)) {
-    return ADC_INIT_INVALID_NB_OVERSAMPLES;
+  if (! is_valid_resolution(resolution)) {
+    return ADC_INIT_INVALID_RESOLUTION;
   }
   if (! is_valid_skip(skip)) {
     return ADC_INIT_INVALID_SKIP;
@@ -130,7 +126,7 @@ adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
 
   adc->value = 0;
   adc->flags_channel = channel;
-  adc->oversamples = oversamples;
+  adc->resolution = resolution;
   adc->skip = skip;
   adc->process = process;
   return ADC_INIT_OK;
@@ -152,6 +148,12 @@ void adc_set_ready(adc* adc, bool ready)
   }
 }
 
+static inline
+void set_samples_remaining(adc* adc)
+{
+  adc->samples_remaining = 1 << adc->resolution;
+}
+
 adc_channel adc_get_channel(adc* adc)
 {
   return adc->flags_channel & 0x0F;
@@ -170,7 +172,7 @@ bool adc_enable(adc* adc0)
 
   // Initialize ADC
   adc0->next_value = 0;
-  adc0->oversamples_remaining = adc0->oversamples;
+  set_samples_remaining(adc0);
 
   // Add new ADC to list
   adc0->next = *a;
@@ -227,7 +229,7 @@ bool adc_disable(adc* adc0)
   return true;
 }
 
-uint16_t adc_get_measurement(adc* adc)
+uint16_t adc_get_value(adc* adc)
 {
   return adc->value;
 }
@@ -239,26 +241,25 @@ should_skip(adc* adc, uint8_t period)
 }
 
 static inline void
-left_align_value(adc* adc)
+set_value(adc* adc)
 {
-  uint8_t i = ~(adc->oversamples);
-  adc->value <<= 2;
-  while (i != 0) {
-    adc->value <<= 1;
-    i <<= 2;
+  if (adc->resolution <= ADC_RESOLUTION_13BIT) {
+    uint8_t shift = 6 - (2 * adc->resolution);
+    adc->value = adc->next_value << shift;
+  } else {
+    uint8_t shift = (2 * adc->resolution) - 6;
+    adc->value = adc->next_value >> shift;
   }
 }
 
 static inline void
 handle_completed_conversion(adc* adc0)
 {
-  if (adc0->oversamples_remaining == 0) {
-    TGL_DEBUG_LED(0);
-
+  if (adc0->samples_remaining == 0) {
     // We have enough samples for a full measurement
-    adc0->value = adc0->next_value;
+    set_value(adc0);
     adc0->next_value = 0;
-    adc0->oversamples_remaining = adc0->oversamples;
+    set_samples_remaining(adc0);
     left_align_value(adc0);
     if (adc0->process != NULL) {
       process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
@@ -324,10 +325,9 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
   if (current_adc != NULL && adc_is_ready(current_adc)) {
     uint16_t sample = ADCW;
     current_adc->next_value += sample;
-    if (current_adc->oversamples_remaining == 0) {
+    current_adc->samples_remaining -= 1;
+    if (current_adc->samples_remaining == 0) {
       adc_set_ready(current_adc, false);
-    } else {
-      current_adc->oversamples_remaining -= 1;
     }
     process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
 		       (process_data_t)current_adc);

@@ -41,7 +41,7 @@ struct adc {
   volatile uint24_t next_value;
   uint8_t flags_channel; // 4 LSBs used for channel
   adc_resolution oversamples;
-  uint8_t oversamples_remaining;
+  uint16_t samples_remaining;
   uint8_t skip;
   process* process;
   struct adc* next;
@@ -51,10 +51,12 @@ typedef struct adc adc;
 
 typedef enum {
   ADC_RESOLUTION_10BIT = 0,
-  ADC_RESOLUTION_11BIT = 3,
-  ADC_RESOLUTION_12BIT = 15,
-  ADC_RESOLUTION_13BIT = 63,
-  ADC_RESOLUTION_14BIT = 255,
+  ADC_RESOLUTION_11BIT,
+  ADC_RESOLUTION_12BIT,
+  ADC_RESOLUTION_13BIT,
+  ADC_RESOLUTION_14BIT,
+  ADC_RESOLUTION_15BIT,
+  ADC_RESOLUTION_16BIT,
 } adc_resolution;
 
 typedef enum {
@@ -85,19 +87,19 @@ void init_adc(void);
  *
  * @param adc         The ADC structure to initialize
  * @param channel     The ADC channel to measure
- * @param oversamples The number of oversamples to perform each measurement
+ * @param resolution  The ADC resolution to achieve using oversampling
  * @param skip        The number of sample slots to skip each period
  * @param process     The process to notify when a new measurement is
  *                    available (can be NULL)
  * @return ADC_INIT_OK if the structure was initialized successfully, 
  *         ADC_INIT_ALREADY_IN_LIST if the specified ADC structure is already
  *         enabled, ADC_INIT_INVALID_CHANNEL if the specified channel is
- *         invalid, ADC_INIT_INVALID_NB_OVERSAMPLES if the specified number of
- *         oversamples is invalid, or ADC_INIT_INVALID_SKIP if the specified
- *         number of sample slots to skip is invalid.
+ *         invalid, ADC_INIT_INVALID_RESOLUTION if the specified resolution is
+ *         invalid, or ADC_INIT_INVALID_SKIP if the specified number of sample
+ *         slots to skip is invalid.
  */
 adc_init_status
-adc_init(adc* adc, adc_channel channel, adc_oversamples oversamples,
+adc_init(adc* adc, adc_channel channel, adc_resolution resolution,
 	 adc_skip skip, process* process); 
 
 
@@ -138,6 +140,6 @@ bool adc_disable(adc* adc);
  * @param adc The ADC structure of which to return the latest measurement
  * @return The latest measurement of the specified ADC channel.
  */
-uint16_t adc_get_measurement(adc* adc);
+uint16_t adc_get_value(adc* adc);
 
 #endif
