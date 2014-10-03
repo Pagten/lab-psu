@@ -115,8 +115,8 @@ PROCESS_THREAD(iopanel_update_process)
       request.flags = psu_status.flags;
       request.set_voltage = psu_status.set_voltage;
       request.set_current = psu_status.set_current;
-      request.voltage = adc_get_measurement(&psu_status.voltage);
-      request.current = adc_get_measurement(&psu_status.current);
+      request.voltage = adc_get_value(&psu_status.voltage);
+      request.current = adc_get_value(&psu_status.current);
 
   // TODO: change SPI interface so that we don't have to enter all this
   // data each time
@@ -185,9 +185,9 @@ int main(void)
   mcp4922_init();
 
   // Enable ADC measurements
-  adc_init(&psu_status.voltage, ADC_VOLTAGE_CHANNEL, ADC_256X_SAMPLING,
+  adc_init(&psu_status.voltage, ADC_VOLTAGE_CHANNEL, ADC_RESOLUTION_15BIT,
 	   ADC_SKIP_0, NULL);
-  adc_init(&psu_status.current, ADC_CURRENT_CHANNEL, ADC_256X_SAMPLING,
+  adc_init(&psu_status.current, ADC_CURRENT_CHANNEL, ADC_RESOLUTION_15BIT,
 	   ADC_SKIP_0, NULL);
   adc_enable(&psu_status.voltage);
   adc_enable(&psu_status.current);

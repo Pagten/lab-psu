@@ -36,18 +36,6 @@
 #include "core/process.h"
 #include "hal/adc.h"
 
-struct adc {
-  uint16_t value;
-  volatile uint24_t next_value;
-  uint8_t flags_channel; // 4 LSBs used for channel
-  adc_resolution oversamples;
-  uint16_t samples_remaining;
-  uint8_t skip;
-  process* process;
-  struct adc* next;
-};
-typedef struct adc adc;
-
 
 typedef enum {
   ADC_RESOLUTION_10BIT = 0,
@@ -67,11 +55,25 @@ typedef enum {
   ADC_SKIP_15 = 15,
 } adc_skip;
 
+
+struct adc {
+  uint16_t value;
+  volatile __uint24 next_value;
+  uint8_t flags_channel; // 4 LSBs used for channel
+  adc_resolution resolution;
+  uint16_t samples_remaining;
+  adc_skip skip;
+  process* process;
+  struct adc* next;
+};
+typedef struct adc adc;
+
+
 typedef enum {
   ADC_INIT_OK,
   ADC_INIT_ALREADY_IN_LIST,
   ADC_INIT_INVALID_CHANNEL,
-  ADC_INIT_INVALID_NB_OVERSAMPLES,
+  ADC_INIT_INVALID_RESOLUTION,
   ADC_INIT_INVALID_SKIP,
 } adc_init_status;
 

@@ -151,7 +151,7 @@ void adc_set_ready(adc* adc, bool ready)
 static inline
 void set_samples_remaining(adc* adc)
 {
-  adc->samples_remaining = 1 << adc->resolution;
+  adc->samples_remaining = 1 << (2 * adc->resolution);
 }
 
 adc_channel adc_get_channel(adc* adc)
@@ -248,23 +248,25 @@ set_value(adc* adc)
     adc->value = adc->next_value << shift;
   } else {
     uint8_t shift = (2 * adc->resolution) - 6;
-    adc->value = adc->next_value >> shift;
+    adc->value = adc->next_value >> (__uint24)shift;
   }
 }
 
 static inline void
 handle_completed_conversion(adc* adc0)
 {
-  if (adc0->samples_remaining == 0) {
+  if (adc0 != NULL && adc0->samples_remaining == 0) {
+    //    SET_DEBUG_LED(0);
+
     // We have enough samples for a full measurement
     set_value(adc0);
     adc0->next_value = 0;
     set_samples_remaining(adc0);
-    left_align_value(adc0);
     if (adc0->process != NULL) {
       process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
 			 (process_data_t)adc0);
     }
+    //    CLR_DEBUG_LED(0);
   }
 }
 
@@ -280,6 +282,7 @@ queue_next_next_adc()
     
     if (adc != NULL) {
       // Found next next adc, let's append it to the queue
+      adc_set_ready(adc, true);
       ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
 	next_next_adc = adc;
       }
@@ -316,10 +319,16 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
   static adc* current_adc = NULL;
   static adc* next_adc = NULL;
 
+  SET_DEBUG_LED(0);
   // Set channel for next next conversion
   adc_channel ch = next_next_adc == NULL ? 
     ADC_CHANNEL_GND : adc_get_channel(next_next_adc);
   ADC_SET_CHANNEL(ch);
+
+  //  if (current_adc == NULL) {
+  //    // Too slow!
+  //    TGL_DEBUG_LED(0);
+  //  }
 
   // Read sample from completed conversion
   if (current_adc != NULL && adc_is_ready(current_adc)) {
@@ -329,12 +338,16 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
     if (current_adc->samples_remaining == 0) {
       adc_set_ready(current_adc, false);
     }
-    process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
-		       (process_data_t)current_adc);
   }
+
+  // Notify the ADC process, to add the next ADC to the queue
+  process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
+		       (process_data_t)current_adc);
 
   // Shift the queue
   current_adc = next_adc;
   next_adc = next_next_adc;
   next_next_adc = NULL;
+
+  CLR_DEBUG_LED(0);
 }
