@@ -46,12 +46,23 @@ void timer_restart(timer* t)
   t->start = clock_get_time();
 }
 
+bool timer_expired_at(timer* t, clock_time_t time)
+{
+  return (time - t->start) >= t->delay;
+}
+
 bool timer_expired(timer* t)
 {
-  return (clock_get_time() - t->start) >= t->delay;
+  return timer_expired_at(t, clock_get_time());
+}
+
+clock_time_t timer_remaining_at(timer* t, clock_time_t time)
+{
+  return timer_expired_at(t, time) ? 0 : (t->start + t->delay - time);
 }
 
 clock_time_t timer_remaining(timer* t)
 {
-  return timer_expired(t) ? 0 : (t->start + t->delay - clock_get_time());
+  return timer_remaining_at(t, clock_get_time());
 }
+

@@ -76,12 +76,33 @@ void timer_reset(timer* t);
 void timer_restart(timer* t);
 
 /**
+ * Check whether a timer is expired at a certain moment in time.
+ *
+ * @param t    The timer to check for expiration
+ * @param time The time at which to check for expiration
+ * @return true if the timer will be expired at the given time, false
+ *         otherwise.
+ */
+bool timer_expired_at(timer* t, clock_time_t time);
+
+/**
  * Check whether a timer has expired.
  *
  * @param t  The timer to check for expiration
  * @return true if the timer has expired, false otherwise.
  */
 bool timer_expired(timer* t);
+
+/**
+ * Return the time between a given moment and the moment the timer expires.
+ *
+ * @param t    The timer for which to return the remaining time
+ * @param time The time from which to count the remaining time
+ * @return The number of clock ticks until the timer expires from the given
+ *         moment in time, or 0 if the timer has already expired at the given
+ *         moment.
+ */
+clock_time_t timer_remaining_at(timer* t, clock_time_t time);
 
 /**
  * Return the time remaining before the timer expires.

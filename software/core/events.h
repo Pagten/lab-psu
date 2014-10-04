@@ -48,6 +48,9 @@ enum {
 
   // ADC
   ADC_MEASUREMENT_COMPLETED,
+
+  // Event Timer
+  EVENT_TIMER_EXPIRED,
 };
 
 #endif
