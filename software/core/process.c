@@ -32,9 +32,11 @@
  * @see http://www.contiki-os.org
  */
 
+#include "process.h"
+
 #include <stdlib.h>
 #include <util/atomic.h>
-#include "process.h"
+#include "core/clock.h"
 #include "util/log.h"
 
 // Should preferably be a power of 2
@@ -133,5 +135,22 @@ void process_execute(void)
     q->count -= 1;
     q->first = (q->first + 1) % PROCESS_CONF_EVENT_QUEUE_SIZE;
   }
+#ifdef PROCESS_STATS
+  clock_time_t clock_before = clock_get_time();
+#endif
   e.p->thread(e.p, e.ev, e.data);
+#ifdef PROCESS_STATS
+  clock_time_t duration = clock_get_time() - clock_before;
+  e.p->time += duration;
+#endif
+}
+
+
+clock_time_t process_get_time(process* p)
+{
+#ifdef PROCESS_STATS
+  return p->time;
+#else
+  return 0;
+#endif
 }

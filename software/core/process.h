@@ -37,6 +37,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/clock.h"
 #include "core/events.h"
 #include "lib/pt/pt.h"
 
@@ -50,6 +51,9 @@ typedef uintptr_t process_data_t;
 typedef struct process {
   struct pt pt;
   PT_THREAD((*thread)(struct process*, process_event_t, process_data_t));
+#ifdef PROCESS_STATS
+  clock_time_t time;
+#endif
 } process;
 
 
@@ -212,7 +216,7 @@ void process_start(process* p);
  * @param p     The process to post the event to
  * @param event The event to post
  * @param data  The data associated with the event
- * @param PROCESS_POST_EVENT_OK if the event was posted successfully, or 
+ * @return PROCESS_POST_EVENT_OK if the event was posted successfully, or 
  *        PROCESS_POST_EVENT_QUEUE_FULL if the event could not be posted
  *        because the event queue is full.
  */
@@ -235,7 +239,7 @@ process_post_event(process* p, process_event_t ev, process_data_t data);
  * @param event The event to post
  * @param data  The data associated with the event
  * @param pri   The priority of the event
- * @param PROCESS_POST_EVENT_OK if the event was posted successfully,
+ * @return PROCESS_POST_EVENT_OK if the event was posted successfully,
  *        PROCESS_POST_EVENT_INVALID_PRIORITY if the given priority is invalid,
  *        or PROCESS_POST_EVENT_QUEUE_FULL if the event could not be posted
  *        because the event queue is full.
@@ -255,6 +259,18 @@ process_post_priority_event(process* p, process_event_t ev,
  * as they are ready to be executed.
  */
 void process_execute(void);
+
+
+/**
+ * Return the amount of time spent executing a given process.
+ *
+ * This is an optional feature, enabled only if the PROCESS_STATS macro is
+ * defined. When disabled, this function always returns 0.
+ *
+ * @param p The process for which to get the total execution time
+ * @return The total execution time for the given process.
+ */
+clock_time_t process_get_time(process* p);
 
 
 #endif
