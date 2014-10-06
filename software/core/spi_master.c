@@ -27,10 +27,10 @@
 
 #include "spi_master.h"
 #include "core/crc16.h"
+#include "core/etimer.h"
 #include "core/events.h"
 #include "core/process.h"
 #include "core/spi_common.h"
-#include "core/timer.h"
 #include "hal/gpio.h"
 #include "hal/spi.h"
 #include "util/bit.h"
@@ -284,7 +284,7 @@ void handle_response_error(uint8_t response_type)
 PROCESS_THREAD(spim_trx_process)
 {
   PROCESS_BEGIN();
-  static timer trx_timer;
+  static etimer trx_etimer;
   static uint8_t tx_counter;
   static uint8_t rx_counter;
   static crc16 crc;
@@ -293,6 +293,7 @@ PROCESS_THREAD(spim_trx_process)
   while (true) {
   start:
     PROCESS_YIELD();
+    // TODO: send event when something is added to the queue
     // Wait until there's something in the queue
     PROCESS_WAIT_WHILE(trx_queue_head == NULL);
 
@@ -310,20 +311,20 @@ PROCESS_THREAD(spim_trx_process)
 
       // Send first header byte (message type id)
       tx_byte(trx_q_hd_llp->tx_type);
-      timer_set(&trx_timer, CLK_AT_LEAST(LLP_TX_DELAY));
+      etimer_set(&trx_etimer, CLK_AT_LEAST(LLP_TX_DELAY), PROCESS_CURRENT());
       crc16_init(&crc);
       crc16_update(&crc, trx_q_hd_llp->tx_type);
       crc16_update(&crc, trx_q_hd_llp->tx_size);
 
       // Send second header byte (message size)
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       tx_byte(trx_q_hd_llp->tx_size);
-      timer_restart(&trx_timer);
+      etimer_restart(&trx_etimer);
 
       // Send message bytes
       tx_counter = 0;
       while (tx_counter < trx_q_hd_llp->tx_size) {
-	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
 	response = read_response_byte();
 	if (response != SPI_TYPE_PREPARING_RESPONSE) {
 	  LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
@@ -331,13 +332,13 @@ PROCESS_THREAD(spim_trx_process)
 	  goto start;
 	}
 	tx_byte(trx_q_hd_llp->tx_buf[tx_counter]);
-	timer_restart(&trx_timer);
+	etimer_restart(&trx_etimer);
 	crc16_update(&crc, trx_q_hd_llp->tx_buf[tx_counter]);
 	tx_counter += 1;
       }
       
       // Send CRC footer bytes
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       response = read_response_byte();
       if (response != SPI_TYPE_PREPARING_RESPONSE) {
 	LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
@@ -345,8 +346,8 @@ PROCESS_THREAD(spim_trx_process)
 	goto start;
       }
       tx_byte((uint8_t)(crc >> 8));
-      timer_restart(&trx_timer);
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      etimer_restart(&trx_etimer);
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       response = read_response_byte();
       if (response != SPI_TYPE_PREPARING_RESPONSE) {
 	LOG_COUNTER_INC(SPIM_ERROR_RESPONSE);
@@ -354,19 +355,19 @@ PROCESS_THREAD(spim_trx_process)
 	goto start;
       }
       tx_byte((uint8_t)(crc & 0x00FF));
-      timer_set(&trx_timer, CLK_AT_LEAST(LLP_RX_DELAY));
+      etimer_set(&trx_etimer, CLK_AT_LEAST(LLP_RX_DELAY), PROCESS_CURRENT());
 
       // Wait for response
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       tx_dummy_byte();
-      timer_restart(&trx_timer);
+      etimer_restart(&trx_etimer);
       reset_rx_delay_remaining(trx_q_hd_llp);
       wait_for_tx_complete();
       while (get_rx_delay_remaining(trx_q_hd_llp) > 0 &&
 	     read_response_byte() == SPI_TYPE_PREPARING_RESPONSE) {
-	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
 	tx_dummy_byte();
-	timer_restart(&trx_timer);	
+	etimer_restart(&trx_etimer);	
 	decrement_rx_delay_remaining(trx_q_hd_llp);
 	wait_for_tx_complete();
       }
@@ -387,15 +388,15 @@ PROCESS_THREAD(spim_trx_process)
       // Receive response header (first byte has already been received)
       crc16_init(&crc);
       trx_q_hd_llp->rx_type = response;
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       tx_dummy_byte(); // for the size byte
-      timer_restart(&trx_timer); 
+      etimer_restart(&trx_etimer); 
       crc16_update(&crc, trx_q_hd_llp->rx_type);
 
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       uint8_t size = read_response_byte();
       tx_dummy_byte(); // for the first payload or footer byte
-      timer_restart(&trx_timer); 
+      etimer_restart(&trx_etimer); 
       if (size > trx_q_hd_llp->rx_size) {
 	// rx_buf is too small for the response, abort the transfer
 	LOG_COUNTER_INC(SPIM_RESPONSE_TOO_LARGE);
@@ -409,20 +410,20 @@ PROCESS_THREAD(spim_trx_process)
       // Receive response payload
       rx_counter = 0;
       while (rx_counter < trx_q_hd_llp->rx_size) {
-	PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+	PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
 	trx_q_hd_llp->rx_buf[rx_counter] = read_response_byte();
 	tx_dummy_byte();
-	timer_restart(&trx_timer); 
+	etimer_restart(&trx_etimer); 
 	crc16_update(&crc, trx_q_hd_llp->rx_buf[rx_counter]);
 	rx_counter += 1;
       }
       
       // Receive response footer (first byte has already been received)
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       rx_crc = ((crc16)read_response_byte()) << 8;
       tx_dummy_byte();
-      timer_restart(&trx_timer); 
-      PROCESS_WAIT_UNTIL(timer_expired(&trx_timer));
+      etimer_restart(&trx_etimer); 
+      PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&trx_etimer));
       rx_crc |= read_response_byte();
       if (! crc16_equal(&crc, &rx_crc)) {
 	// CRC failure, abort transfer
