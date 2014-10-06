@@ -90,6 +90,7 @@
 
 // Constants
 #define TMR_SIZE(tmr)                   CAT(tmr,_SIZE)
+#define TMR_MAX_VALUE(tmr)              CAT(tmr,_MAX_VALUE)
 
 // Interrupt vectors
 #define TMR_INTERRUPT_VECT(tmr,intr)    CAT(tmr,_,intr,_VECT)

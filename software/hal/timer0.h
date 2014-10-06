@@ -121,7 +121,8 @@
 #define TIMER0_IS_OVF_INTERRUPT_FLAG_SET  (TIFR0 & _BV(TOV0))
 
 // Constants
-#define TIMER0_SIZE  8
+#define TIMER0_SIZE         8
+#define TIMER0_MAX_VALUE  255
 
 // Interrupt vectors
 #define TIMER0_OCA_VECT  TIMER0_COMPA_vect
