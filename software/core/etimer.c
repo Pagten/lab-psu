@@ -42,65 +42,69 @@ void init_etimer(void)
   process_start(&etimer_process);
 }
 
+
 static void
-insert_into_queue(etimer* t)
+remove_from_queue(etimer* t)
 {
-  clock_time_t now = clock_get_time();
+  etimer** pt = &queue;
+  while (*pt != NULL && *pt != t) {
+    pt = &((*pt)->next);
+  }
+
+  if (*pt == t) {
+    // Remove from queue
+    *pt = (*pt)->next;
+  }
+}
+
+static inline
+void insert(etimer* t, etimer** pt)
+{
+  t->next = *pt;
+  *pt = t;
+}
+
+
+// Only call this function if you know that either t is not in the queue, or
+// that t can stay in the same position or needs to move backward in the queue.
+static void
+insert_into_queue(etimer* t, clock_time_t now)
+{
   clock_time_t remaining = etimer_remaining_at(t, now);
 
   // Find appropriate location in queue
-  etimer** current = NULL;
   etimer** pt = &queue;
-  while (*pt != NULL && 
-	 (*pt == t || remaining < etimer_remaining_at(*pt, now))) {
+  while (*pt != NULL && remaining >= etimer_remaining_at(*pt, now)) {
     if (*pt == t) {
-      current = pt;
+      // Remove from queue
+      *pt = (*pt)->next;
+    } else {
+      pt = &((*pt)->next);
     }
-    pt = &((*pt)->next);
-  }
-  etimer** should_be = pt;
-
-  // Find current location in queue if exists and not found yet  
-  while (*pt != NULL) {
-    if (*pt == t) {
-      current = pt;
-      break;
-    }
-    pt = &((*pt)->next);
   }
 
-  if (current == should_be) {
-    // Nothing needs to change
-    return;
-  }
-
-  // Remove from queue
-  if (current != NULL) {
-    *current = (*current)->next;
-  }
-
-  // Insert at new location in queue
-  t->next = *should_be;
-  *should_be = t;
+  // Insert at correct position in queue
+  insert(t, pt);
 }
 
 void etimer_set(etimer* t, clock_time_t delay, process* p)
 {
+  remove_from_queue(t);
   timer_set(&(t->tmr), delay);
   t->p = p;
-  insert_into_queue(t);
+  insert_into_queue(t, t->tmr.start);
 }
 
 void etimer_reset(etimer* t)
 {
   timer_reset(&(t->tmr));
-  insert_into_queue(t);
+  insert_into_queue(t, clock_get_time());
 }
 
 void etimer_restart(etimer* t)
 {
   timer_restart(&(t->tmr));
-  insert_into_queue(t);
+  insert_into_queue(t, t->tmr.start);
 }
 
 bool etimer_expired_at(etimer* t, clock_time_t time)

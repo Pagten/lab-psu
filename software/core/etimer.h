@@ -51,6 +51,7 @@ typedef struct etimer etimer;
  *
  * Modules that should be initialized first:
  *  * clock
+ *  * process
  */
 void init_etimer(void);
 
