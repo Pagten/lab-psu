@@ -29,6 +29,7 @@
 #include <util/atomic.h>
 #include "hal/interrupt.h"
 
+
 #if TMR_SIZE(CLOCK_TMR) != 8
 #error "The clock currently only supports 8-bit timers."
 #endif
@@ -46,18 +47,22 @@ void clock_init()
   clock_upper = 0;
 }
 
+
+static clock_time_t previous = 0;
 clock_time_t clock_get_time()
 {
   clock_time_t result;
   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
     uint8_t cntr = TMR_GET_CNTR(CLOCK_TMR);
-    if (cntr == 0 && TMR_IS_INTERRUPT_FLAG_SET(CLOCK_TMR, OVF)) {
+    if (TMR_IS_INTERRUPT_FLAG_SET(CLOCK_TMR, OVF) && cntr == 0) {
       // Timer has just overflowed and interrupt has not been handled yet
-      result = (((clock_time_t)clock_upper << 8) + 1) | cntr;
+      result = ((clock_time_t)(clock_upper + 1) << 8);
     } else {
       result = ((clock_time_t)clock_upper << 8) | cntr;
     }
   }
+
+  previous = result;
   return result;
 }
 
