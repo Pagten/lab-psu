@@ -32,9 +32,9 @@
 
 #include "apps/psu/packets.h"
 #include "core/adc.h"
+#include "core/etimer.h"
 #include "core/process.h"
 #include "core/spi_master.h"
-#include "core/timer.h"
 #include "drivers/mcp4922.h"
 #include "hal/fuses.h"
 #include "hal/gpio.h" 
@@ -94,22 +94,22 @@ PROCESS_THREAD(iopanel_update_process)
 {
   PROCESS_BEGIN();
 
-  static timer tmr;
+  static etimer tmr;
   static spim_trx_llp trx;
   static struct iopanel_request request;
   static struct iopanel_response response;
   static mcp4922_pkt voltage_pkt;
   static mcp4922_pkt current_pkt;
 
-  timer_set(&tmr, IOPANEL_UPDATE_RATE);
+  etimer_set(&tmr, IOPANEL_UPDATE_RATE, PROCESS_CURRENT());
   spim_trx_init((spim_trx*)&trx);
   mcp4922_pkt_init(&voltage_pkt);
   mcp4922_pkt_init(&current_pkt);
 
 
   while (true) {
-    timer_restart(&tmr);
-    PROCESS_WAIT_UNTIL(timer_expired(&tmr));
+    etimer_restart(&tmr);
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&tmr));
 
     if (! spim_trx_is_queued((spim_trx*)&trx)) {
       request.flags = psu_status.flags;
@@ -180,9 +180,12 @@ int main(void)
   init_pins();
   clock_init();
   process_init();
+  init_etimer();
   spim_init();
   init_adc();
   mcp4922_init();
+
+  //SET_DEBUG_LED(0);
 
   // Enable ADC measurements
   adc_init(&psu_status.voltage, ADC_VOLTAGE_CHANNEL, ADC_RESOLUTION_15BIT,
@@ -191,7 +194,7 @@ int main(void)
 	   ADC_SKIP_0, NULL);
   adc_enable(&psu_status.voltage);
   adc_enable(&psu_status.current);
-
+  //CLR_DEBUG_LED(0);
 
   ENABLE_INTERRUPTS();
 
