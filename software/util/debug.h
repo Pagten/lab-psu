@@ -33,13 +33,13 @@
 #if DEBUG
 
 #define LED0    B,0
-//#define LED1    C,4
+#define LED1    D,7
 
 inline static
 void debug_init()
 {
   SET_PIN_DIR_OUTPUT(LED0);
-  //  SET_PIN_DIR_OUTPUT(LED1);
+  SET_PIN_DIR_OUTPUT(LED1);
 }
 
 #define SET_DEBUG_LED(id)  SET_PIN(LED ## id)
