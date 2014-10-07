@@ -38,7 +38,6 @@
 #include "core/process.h"
 #include "hal/adc.h"
 #include "hal/interrupt.h"
-#include "util/debug.h"
 
 PROCESS(adc_process);
 
@@ -308,7 +307,6 @@ handle_completed_conversion(adc* adc0)
 {
   if (adc0 != NULL && adc0->samples_remaining == 0) {
     // We have enough samples for a full measurement
-    TGL_DEBUG_LED(0);
     set_value(adc0);
     adc0->next_value = 0;
     reset_samples_remaining(adc0);
@@ -347,8 +345,6 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
   if (next_next_adc == NULL) {
     // Next next adc to sample is not yet available
     ch = ADC_CHANNEL_GND;   
-    // Too slow!
-    TGL_DEBUG_LED(1);
   } else {
     ch = adc_get_channel(next_next_adc);
   }
