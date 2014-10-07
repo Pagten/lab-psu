@@ -35,8 +35,6 @@
 #include "hal/timers.h"
 #include "hal/interrupt.h"
 
-#include "util/debug.h"
-
 #define NB_PORTS 3
 
 PROCESS(event_dispatcher);
@@ -138,14 +136,12 @@ INTERRUPT(TMR_INTERRUPT_VECT(CLOCK_TMR, OCA))
   static uint8_t counter0[NB_PORTS];
   static uint8_t counter1[NB_PORTS];
 
-  SET_DEBUG_LED(0);
   // avr-gcc is smart enough to transform these into direct reads:
   uint8_t sample[NB_PORTS] = {
     P_GET_VAL(PORTB_PTR) & port_mask[0],
     P_GET_VAL(PORTC_PTR) & port_mask[1],
     P_GET_VAL(PORTD_PTR) & port_mask[2]
   };
-  CLR_DEBUG_LED(0);
 
   for (uint8_t p = 0; p < NB_PORTS; ++p) {
     uint8_t delta = debounced[p] ^ sample[p];
