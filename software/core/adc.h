@@ -59,7 +59,7 @@ typedef enum {
 struct adc {
   uint16_t value;
   volatile __uint24 next_value;
-  uint8_t flags_channel; // 4 LSBs used for channel
+  adc_channel channel;
   adc_resolution resolution;
   uint16_t samples_remaining;
   adc_skip skip;

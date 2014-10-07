@@ -42,26 +42,34 @@
 
 PROCESS(adc_process);
 
-#define FLAG_ADC_READY 0x10
+#define SAMPLE_BUFFER_SIZE 8 // Must be at least 3 and preferably a power of 2
 
 #define EVENT_ADC_LIST_CHANGED         (process_event_t)0x00
 #define EVENT_ADC_CONVERSION_COMPLETE  (process_event_t)0x01
 
 static adc* adcs;
-static adc* volatile next_next_adc;
 static adc* next_adc_to_consider;
+
+static volatile uint8_t sample_buffer_head = 0;
+static volatile uint8_t sample_buffer_count = 2;
+static adc* sample_buffer[SAMPLE_BUFFER_SIZE];
 
 void init_adc(void)
 {
   adcs = NULL;
-  next_next_adc = NULL;
   next_adc_to_consider = NULL;
+  sample_buffer_head = 0;
+  sample_buffer_count = 2;
+  uint8_t i;
+  for (i = 0; i < SAMPLE_BUFFER_SIZE; ++i) {
+    sample_buffer[i] = NULL;
+  }
 
   ADC_SET_VREF(AREF);
   ADC_SET_ADJUST(RIGHT);
   ADC_SET_AUTO_TRIGGER_SRC(ADC_TRIGGER_FREERUNNING);
   ADC_AUTO_TRIGGER_ENABLE();
-  ADC_SET_PRESCALER_DIV(128);
+  ADC_SET_PRESCALER_DIV(64);
   ADC_SET_CHANNEL(ADC_CHANNEL_GND);
   ADC_CC_INTERRUPT_ENABLE();
   ADC_ENABLE();
@@ -125,14 +133,14 @@ adc_init(adc* adc, adc_channel channel, adc_resolution resolution,
   }
 
   adc->value = 0;
-  adc->flags_channel = channel;
+  adc->channel = channel;
   adc->resolution = resolution;
   adc->skip = skip;
   adc->process = process;
   return ADC_INIT_OK;
 }
 
-static inline
+/*static inline
 bool adc_is_ready(adc* adc)
 {
   return adc->flags_channel & FLAG_ADC_READY;
@@ -147,16 +155,17 @@ void adc_set_ready(adc* adc, bool ready)
     adc->flags_channel &= ~FLAG_ADC_READY;
   }
 }
-
+*/
 static inline
-void set_samples_remaining(adc* adc)
+void reset_samples_remaining(adc* adc)
 {
   adc->samples_remaining = 1 << (2 * adc->resolution);
 }
 
+inline
 adc_channel adc_get_channel(adc* adc)
 {
-  return adc->flags_channel & 0x0F;
+  return adc->channel;
 }
 
 bool adc_enable(adc* adc0)
@@ -172,12 +181,11 @@ bool adc_enable(adc* adc0)
 
   // Initialize ADC
   adc0->next_value = 0;
-  set_samples_remaining(adc0);
+  reset_samples_remaining(adc0);
 
   // Add new ADC to list
   adc0->next = *a;
   *a = adc0;
-  adc_set_ready(adc0, true);
 
   // Disable digital input on channel to save power
   ADC_DIGITAL_INPUT_DISABLE(adc_get_channel(adc0));
@@ -209,13 +217,15 @@ bool adc_disable(adc* adc0)
   if (next_adc_to_consider == adc0) {
     next_adc_to_consider = adc0->next;
   }
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+    // Prevent the ISR from messing with this ADC structure
+    adc0->samples_remaining = 0;
+  }
 
   // Remove ADC from list
   *a = (*a)->next;
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-    adc_set_ready(adc0, false);
-  }
   adc0->next = NULL;
+  
 
   // Check channel of next ADC in list
   only_adc_for_channel = only_adc_for_channel &&
@@ -252,45 +262,59 @@ set_value(adc* adc)
   }
 }
 
-static inline void
-handle_completed_conversion(adc* adc0)
-{
-  if (adc0 != NULL && adc0->samples_remaining == 0) {
-    //    SET_DEBUG_LED(0);
-
-    // We have enough samples for a full measurement
-    set_value(adc0);
-    adc0->next_value = 0;
-    set_samples_remaining(adc0);
-    if (adc0->process != NULL) {
-      process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
-			 (process_data_t)adc0);
-    }
-    //    CLR_DEBUG_LED(0);
-  }
-}
-
-static inline void
-queue_next_next_adc()
+static inline adc*
+find_next_adc_to_queue(void)
 {
   static uint8_t period = 0;
   adc* adc = next_adc_to_consider;
-  while(next_next_adc == NULL && adcs != NULL) {
+  while(adcs != NULL) {
     while(adc != NULL && should_skip(adc, period)) {
       adc = adc->next;
     }
     
     if (adc != NULL) {
-      // Found next next adc, let's append it to the queue
-      adc_set_ready(adc, true);
-      ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-	next_next_adc = adc;
-      }
+      // Found next adc to queue
       next_adc_to_consider = adc->next;
-    } else {
-      // Finished current period
-      adc = adcs;
-      period += 1;
+      return adc;
+    }
+
+    // Finished current period
+    adc = adcs;
+    period += 1;
+  }
+  return NULL;
+}
+
+static inline
+void fill_sample_buffer(void)
+{
+  while (sample_buffer_count < SAMPLE_BUFFER_SIZE) {
+    adc* next = find_next_adc_to_queue();
+    if (next == NULL) {
+      return;
+    }
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+      uint8_t sample_buffer_tail =
+	(sample_buffer_head + sample_buffer_count) % SAMPLE_BUFFER_SIZE;
+      sample_buffer[sample_buffer_tail] = next;
+      sample_buffer_count += 1;
+    }
+  }
+}
+
+static inline void
+handle_completed_conversion(adc* adc0)
+{
+  if (adc0 != NULL && adc0->samples_remaining == 0) {
+    // We have enough samples for a full measurement
+    TGL_DEBUG_LED(0);
+    set_value(adc0);
+    adc0->next_value = 0;
+    reset_samples_remaining(adc0);
+    if (adc0->process != NULL) {
+      process_post_event(adc0->process, ADC_MEASUREMENT_COMPLETED,
+			 (process_data_t)adc0);
     }
   }
 }
@@ -300,54 +324,59 @@ PROCESS_THREAD(adc_process)
   PROCESS_BEGIN();
 
   while(true) {
-    PROCESS_WAIT_EVENT_UNTIL(ev == EVENT_ADC_CONVERSION_COMPLETE || 
-			     ev == EVENT_ADC_LIST_CHANGED);
+    PROCESS_WAIT_EVENT();
 
+    fill_sample_buffer();
     if (ev == EVENT_ADC_CONVERSION_COMPLETE) {
       handle_completed_conversion((adc*)data);
     }
-    queue_next_next_adc();
   }
 
   PROCESS_END();
 }
 
-//TODO: isr queue is never full when there are less than 3 ADCs in the
-//adc queue!
+
 INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
 {
-  static adc* current_adc = NULL;
-  static adc* next_adc = NULL;
+  uint8_t current = sample_buffer_head;
+  uint8_t count = sample_buffer_count;
 
-  SET_DEBUG_LED(0);
   // Set channel for next next conversion
-  adc_channel ch = next_next_adc == NULL ? 
-    ADC_CHANNEL_GND : adc_get_channel(next_next_adc);
+  adc_channel ch;
+  adc* next_next_adc = sample_buffer[(current + 2) % SAMPLE_BUFFER_SIZE];
+  if (next_next_adc == NULL) {
+    // Next next adc to sample is not yet available
+    ch = ADC_CHANNEL_GND;   
+    // Too slow!
+    TGL_DEBUG_LED(1);
+  } else {
+    ch = adc_get_channel(next_next_adc);
+  }
   ADC_SET_CHANNEL(ch);
 
-  //  if (current_adc == NULL) {
-  //    // Too slow!
-  //    TGL_DEBUG_LED(0);
-  //  }
-
   // Read sample from completed conversion
-  if (current_adc != NULL && adc_is_ready(current_adc)) {
-    uint16_t sample = ADCW;
-    current_adc->next_value += sample;
-    current_adc->samples_remaining -= 1;
-    if (current_adc->samples_remaining == 0) {
-      adc_set_ready(current_adc, false);
+  adc* current_adc = sample_buffer[current];
+  if (current_adc != NULL) {
+    if (current_adc->samples_remaining > 0) {
+      uint16_t sample = ADCW;
+      current_adc->next_value += sample;
+      current_adc->samples_remaining -= 1;      
+    } else {
+      current_adc = NULL;
     }
+    sample_buffer[current] = NULL;
   }
 
-  // Notify the ADC process, to add the next ADC to the queue
+  // Notify the ADC process that a sample has been taken
   process_post_event(&adc_process, EVENT_ADC_CONVERSION_COMPLETE,
-		       (process_data_t)current_adc);
+		     (process_data_t)current_adc);
 
-  // Shift the queue
-  current_adc = next_adc;
-  next_adc = next_next_adc;
-  next_next_adc = NULL;
+  // Shift the queue, but make sure we keep a window of at least 2 entries
+  if (count > 2) {
+    count = count - 1;
+  }
+  current = (current + 1) % SAMPLE_BUFFER_SIZE;
 
-  CLR_DEBUG_LED(0);
+  sample_buffer_count = count;
+  sample_buffer_head = current;
 }
