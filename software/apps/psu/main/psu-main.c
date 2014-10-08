@@ -89,6 +89,18 @@ void init_pins(void)
   SET_PIN_DIR_OUTPUT(IOPANEL_CS);
 }
 
+static inline
+uint16_t get_voltage_reading(void)
+{
+  return ~adc_get_value(&psu_status.voltage);
+}
+
+static inline
+uint16_t get_current_reading(void)
+{
+  return adc_get_value(&psu_status.current);
+}
+
 
 PROCESS_THREAD(iopanel_update_process)
 {
@@ -115,8 +127,8 @@ PROCESS_THREAD(iopanel_update_process)
       request.flags = psu_status.flags;
       request.set_voltage = psu_status.set_voltage;
       request.set_current = psu_status.set_current;
-      request.voltage = adc_get_value(&psu_status.voltage);
-      request.current = adc_get_value(&psu_status.current);
+      request.voltage = get_voltage_reading();
+      request.current = get_current_reading();
 
   // TODO: change SPI interface so that we don't have to enter all this
   // data each time
@@ -131,11 +143,11 @@ PROCESS_THREAD(iopanel_update_process)
       if (ev == SPIM_TRX_ERROR) {
 	// Error occurred while communicating with IO panel. We will exit the
 	// loop and try to communicate again.
+	TGL_DEBUG_LED(0);
 	spim_trx_error_type err = spim_trx_llp_get_error_type(&trx);
 	if (err == SPIM_TRX_ERR_RESPONSE_TOO_LARGE) {
 	} else if (err == SPIM_TRX_ERR_RESPONSE_CRC_ERROR) {
 	} else if (err == SPIM_TRX_ERR_RESPONSE_TIMEOUT) {
-	  //SET_DEBUG_LED(0);
 	} else {
 	}
 
