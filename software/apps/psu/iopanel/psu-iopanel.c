@@ -62,8 +62,10 @@ FUSES =
 
 #define VOLTAGE_SMALL_STEP  0x0080
 #define VOLTAGE_BIG_STEP    0X0800
+#define VOLTAGE_MAX         UINT16_MAX
 #define CURRENT_SMALL_STEP  0x0080
 #define CURRENT_BIG_STEP    0X0800
+#define CURRENT_MAX         UINT16_MAX
 
 
 #define ROTV_A    C,0
@@ -108,7 +110,8 @@ void init_pins(void)
   //  SET_PIN_DIR_INPUT(ROTC_PUSH);
 }
 
-static void init_lcd(void)
+static inline
+void init_lcd(void)
 {
   hd44780_init();
   hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
@@ -178,6 +181,19 @@ PROCESS_THREAD(spi_handler)
 }
 
 
+// TODO: avoid floating point arithmetic
+static
+double voltage_utof(uint16_t v)
+{
+  return v * (17.0 / UINT16_MAX) - 0.8;
+}
+
+static
+double current_utof(uint16_t c)
+{
+  return c * (3.4 / UINT16_MAX);
+}
+
 PROCESS_THREAD(lcd_process)
 {
   PROCESS_BEGIN();
@@ -186,16 +202,16 @@ PROCESS_THREAD(lcd_process)
     // Voltage
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE0);
-    fprintf(hd44780_lcd_stream(&lcd), "V: %5u %5u %5u",
-	    psu_status.voltage, psu_status.set_voltage,
-	    knob_get_value(&knob_v));
+    fprintf(hd44780_lcd_stream(&lcd), "V: % #5.2f (%#5.2f)",
+	    voltage_utof(psu_status.voltage),
+	    voltage_utof(psu_status.set_voltage));
 
     // Current
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE1);
-    fprintf(hd44780_lcd_stream(&lcd), "C: %5u %5u %5u",
-	    psu_status.current, psu_status.set_current,
-	    knob_get_value(&knob_v));
+    fprintf(hd44780_lcd_stream(&lcd), "C: % #5.3f (%#5.3f)",
+	    current_utof(psu_status.current),
+	    current_utof(psu_status.set_current));
 
     // Transfer stats
     PROCESS_YIELD();

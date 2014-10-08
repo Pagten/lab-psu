@@ -6,6 +6,8 @@ all: $(PROJECT_NAME)
 
 DEBUG=1
 
+LDFLAGS += -Wl,-u,vfprintf -lprintf_flt -lm
+
 FW_ROOT = ../../..
 include $(FW_ROOT)/Makefile.include
 
