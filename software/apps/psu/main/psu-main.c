@@ -34,6 +34,7 @@
 #include "core/adc.h"
 #include "core/etimer.h"
 #include "core/process.h"
+#include "core/pwlf.h"
 #include "core/spi_master.h"
 #include "drivers/mcp4922.h"
 #include "hal/fuses.h"
@@ -67,7 +68,7 @@ FUSES =
 
 PROCESS(iopanel_update_process);
 
-//#define EVENT_MCP4922_WAS_BUSY   0x01
+
 
 #define PSU_FLAG_OUTPUT_ENABLED  0x01
 
@@ -81,6 +82,8 @@ static struct {
   adc temperature;
 } psu_status;
 
+static pwlf adc_to_mvolt = PWLF_INIT(16);
+static pwlf adc_to_mamp  = PWLF_INIT(16);
 
 static inline
 void init_pins(void)
