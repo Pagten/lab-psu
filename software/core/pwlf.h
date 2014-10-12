@@ -61,7 +61,7 @@ typedef enum {
 
 
 #define PWLF_INIT(SIZE)						\
-  {{ .count = 0, .max_count = SIZE, .values = { [SIZE-1] = 0 } }}
+  { .count = 0, .max_count = SIZE, .values = { [SIZE-1] = {0} } }
 
 
 /**

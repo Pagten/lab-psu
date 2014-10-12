@@ -30,6 +30,7 @@
 
 #include <stdlib.h>
 
+#include "calibration.h"
 #include "apps/psu/packets.h"
 #include "core/adc.h"
 #include "core/etimer.h"
@@ -68,8 +69,6 @@ FUSES =
 
 PROCESS(iopanel_update_process);
 
-
-
 #define PSU_FLAG_OUTPUT_ENABLED  0x01
 
 static struct {
@@ -82,8 +81,7 @@ static struct {
   adc temperature;
 } psu_status;
 
-static pwlf adc_to_mvolt = PWLF_INIT(16);
-static pwlf adc_to_mamp  = PWLF_INIT(16);
+
 
 static inline
 void init_pins(void)
@@ -92,16 +90,26 @@ void init_pins(void)
   SET_PIN_DIR_OUTPUT(IOPANEL_CS);
 }
 
+
 static inline
-uint16_t get_voltage_reading(void)
+void init_calibration(void)
 {
-  return ~adc_get_value(&psu_status.voltage);
+  if (! cal_load_from_eeprom()) {
+    cal_load_defaults();
+  }
+}
+
+
+static inline
+int16_t get_voltage_reading(void)
+{
+  return cal_adc_to_mvolt(adc_get_value(&psu_status.voltage));
 }
 
 static inline
-uint16_t get_current_reading(void)
+int16_t get_current_reading(void)
 {
-  return adc_get_value(&psu_status.current);
+  return cal_adc_to_mamp(adc_get_value(&psu_status.current));
 }
 
 
@@ -194,6 +202,7 @@ int main(void)
   debug_init();
   init_pins();
   clock_init();
+  init_calibration();
   process_init();
   init_etimer();
   spim_init();

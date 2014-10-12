@@ -1,6 +1,7 @@
 PROJECT_NAME = psu-main
 all: $(PROJECT_NAME)
 
+SOURCEFILES += calibration.c
 #OPTI=0
 #NO_LTO=1
 

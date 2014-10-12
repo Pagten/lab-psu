@@ -1,5 +1,5 @@
 /*
- * def.h
+ * eeprom.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -19,19 +19,24 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DEF_H
-#define DEF_H
+#ifndef EEPROM_H
+#define EEPROM_H
 
-/**
- * @file def.h
- * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 27 Sep 2014
- */
-
+#include <avr/eeprom.h>
 #include <stddef.h>
 
-#define container_of(ptr, type, member) ((type*)((char*)ptr - offsetof(type,member)))
+#include "core/crc16.h"
 
-#define member_size(type, member) sizeof(((type*)0)->member);
+/**
+ * @file eeprom.h
+ * @author Pieter Agten (pieter.agten@gmail.com)
+ * @date 11 Oct 2014
+ */
+
+void
+eeprom_read_block_crc(void* dst, const void* src, size_t size, crc16* crc);
+
+void
+eeprom_update_block_crc(const void* src, void* dst, size_t size, crc16* crc);
 
 #endif
