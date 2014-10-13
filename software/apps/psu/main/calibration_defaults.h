@@ -39,11 +39,11 @@
 
 // ADC to voltage
 #define ADC_TO_MVOLT_MIN     ADC_MIN, _S(16000)
-#define ADC_TO_MVOLT_MAX     ADC_MAX, _S(-500)
+#define ADC_TO_MVOLT_MAX     ADC_MAX, _S(-742)
 
 // ADC to current
 #define ADC_TO_MAMP_MIN      ADC_MIN, _S(0)
-#define ADC_TO_MAMP_MAX      ADC_MAX, _S(3400)
+#define ADC_TO_MAMP_MAX      ADC_MAX, _S(3205)
 // ***********************************
 
 
@@ -53,11 +53,11 @@
 
 // Voltage to DAC
 #define MVOLT_TO_DAC_MIN  0,     DAC_MIN
-#define MVOLT_TO_DAC_MAX  16000, DAC_MAX
+#define MVOLT_TO_DAC_MAX  15150, DAC_MAX
 
 // Current to DAC
 #define MAMP_TO_DAC_MIN   0,    DAC_MIN
-#define MAMP_TO_DAC_MAX   3300, DAC_MAX
+#define MAMP_TO_DAC_MAX   3120, DAC_MAX
 // ***********************************
 
 #endif
