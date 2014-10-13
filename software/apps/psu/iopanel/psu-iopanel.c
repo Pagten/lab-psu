@@ -52,6 +52,8 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
+
+// ****************** Pins ******************
 #define LCD_DATA_PORT       PORTD
 #define LCD_CTRL_PORT       PORTD
 #define LCD_FIRST_DATA_PIN  0
@@ -59,18 +61,23 @@ FUSES =
 #define LCD_RS_PIN          7
 #define LCD_RW_PIN          6
 
-
-#define VOLTAGE_SMALL_STEP  0x0080
-#define VOLTAGE_BIG_STEP    0X0800
-#define VOLTAGE_MAX         UINT16_MAX
-#define CURRENT_SMALL_STEP  0x0080
-#define CURRENT_BIG_STEP    0X0800
-#define CURRENT_MAX         UINT16_MAX
-
-
 #define ROTV_A    C,0
 #define ROTV_B    C,1
 #define ROTV_PUSH C,2
+// ******************************************
+
+// ******* Voltage and current limits *******
+#define VOLTAGE_MIN             0
+#define VOLTAGE_MAX         15000
+#define VOLTAGE_SMALL_STEP     10
+#define VOLTAGE_BIG_STEP      100
+
+#define CURRENT_MIN            0
+#define CURRENT_MAX         3000
+#define CURRENT_SMALL_STEP     5
+#define CURRENT_BIG_STEP      50
+// ******************************************
+
 
 
 PROCESS(inputs_process);
@@ -181,37 +188,37 @@ PROCESS_THREAD(spi_handler)
 }
 
 
-// TODO: avoid floating point arithmetic
-static
-double voltage_utof(uint16_t v)
+static inline
+void format_value(char buf[8], int16_t v)
 {
-  return v * (17.0 / UINT16_MAX) - 0.8;
-}
-
-static
-double current_utof(uint16_t c)
-{
-  return c * (3.4 / UINT16_MAX);
+  sprintf(buf, "% 6.4d", v);
+  buf[7] = 0;
+  buf[6] = buf[5];
+  buf[5] = buf[4];
+  buf[4] = buf[3];
+  buf[3] = '.';
 }
 
 PROCESS_THREAD(lcd_process)
 {
   PROCESS_BEGIN();
+  char buf0[8];
+  char buf1[8];
   
   while (true) {
     // Voltage
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE0);
-    fprintf(hd44780_lcd_stream(&lcd), "V: % #5.2f (%#5.2f)",
-	    voltage_utof(psu_status.voltage),
-	    voltage_utof(psu_status.set_voltage));
+    format_value(buf0, psu_status.voltage);
+    format_value(buf1, psu_status.set_voltage);
+    fprintf(hd44780_lcd_stream(&lcd), "V: %s (%s)", buf0, buf1);
 
     // Current
     PROCESS_YIELD();
     hd44780_lcd_set_ddram_address(&lcd, HD44780_20X4_LINE1);
-    fprintf(hd44780_lcd_stream(&lcd), "C: % #5.3f (%#5.3f)",
-	    current_utof(psu_status.current),
-	    current_utof(psu_status.set_current));
+    format_value(buf0, psu_status.current);
+    format_value(buf1, psu_status.set_current);
+    fprintf(hd44780_lcd_stream(&lcd), "C: %s (%s)", buf0, buf1);
 
     // Transfer stats
     PROCESS_YIELD();
@@ -249,8 +256,10 @@ int main(void)
   init_pins();
   clock_init();
   process_init();
-  knob_init(&knob_v, VOLTAGE_SMALL_STEP, VOLTAGE_BIG_STEP);
-  //  knob_init(&knob_c, CURRENT_SMALL_STEP, CURRENT_BIG_STEP);
+  knob_init(&knob_v, VOLTAGE_MIN, VOLTAGE_MAX, VOLTAGE_SMALL_STEP,
+	    VOLTAGE_BIG_STEP);
+  //  knob_init(&knob_c, CURRENT_MIN, CURRENT_MAX, CURRENT_SMALL_STEP,
+  //            CURRENT_BIG_STEP);
   iomon_init();
   init_lcd();
 
