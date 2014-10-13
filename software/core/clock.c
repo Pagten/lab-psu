@@ -26,15 +26,18 @@
  */
 
 #include "clock.h"
-#include <util/atomic.h>
-#include "hal/interrupt.h"
 
+#include <util/atomic.h>
+
+#include "hal/interrupt.h"
+#include "util/int.h"
 
 #if TMR_SIZE(CLOCK_TMR) != 8
 #error "The clock currently only supports 8-bit timers."
 #endif
 
-static volatile __uint24 clock_upper;
+
+static volatile uint24_t clock_upper;
 
 void clock_init()
 {

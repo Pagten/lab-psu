@@ -38,6 +38,7 @@
 #include "core/process.h"
 #include "hal/adc.h"
 #include "hal/interrupt.h"
+#include "util/int.h"
 
 PROCESS(adc_process);
 
@@ -257,7 +258,7 @@ set_value(adc* adc)
     adc->value = adc->next_value << shift;
   } else {
     uint8_t shift = (2 * adc->resolution) - 6;
-    adc->value = adc->next_value >> (__uint24)shift;
+    adc->value = adc->next_value >> (uint24_t)shift;
   }
 }
 

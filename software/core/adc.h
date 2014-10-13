@@ -33,9 +33,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+
 #include "core/process.h"
 #include "hal/adc.h"
-
+#include "util/int.h"
 
 typedef enum {
   ADC_RESOLUTION_10BIT = 0,
@@ -58,7 +59,7 @@ typedef enum {
 
 struct adc {
   uint16_t value;
-  volatile __uint24 next_value;
+  volatile uint24_t next_value;
   adc_channel channel;
   adc_resolution resolution;
   uint16_t samples_remaining;
