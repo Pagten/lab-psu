@@ -37,20 +37,34 @@
 typedef struct {
   rotary rot;
   uint16_t value;
+  uint16_t min;
+  uint16_t max;
   uint16_t small_step;
   uint16_t big_step;
 } knob;
 
+typedef enum {
+  KNOB_INIT_OK,
+  KNOB_INIT_INVALID_LIMITS,
+} knob_init_status;
+
 /**
  * Initialize a knob data structure.
  *
- * @param k          The knob data structure to initialize
+ * @param k          The knob data structure to initialize.
+ * @param min        The minimum knob value.
+ * @param max        The maximum knob value.
  * @param small_step The amount the knob's value increases/decreases on a small
- *                   step increment/decrement
+ *                   step increment/decrement.
  * @param big_step   The amount the knob's value increases/decreases on a big
- *                   step increment/decrement
+ *                   step increment/decrement.
+ * @return KNOB_INIT_OK if the knob was initialized successfully, or
+ *         KNOB_INIT_INVALID_LIMITS if the given minimum is greater than the
+ *         given maximum value.
  */
-void knob_init(knob* k, uint16_t small_step, uint16_t big_step);
+knob_init_status
+knob_init(knob* k, uint16_t min, uint16_t max, uint16_t small_step,
+	  uint16_t big_step);
 
 /**
  * Signal that the state of a knob's rotary encoder has changed.

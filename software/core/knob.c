@@ -34,15 +34,20 @@
 #include <stdint.h>
 #include "core/rotary.h"
 
-#define KNOB_MAX UINT16_MAX
-#define KNOB_MIN 0
-
-void knob_init(knob* k, uint16_t small_step, uint16_t big_step)
+knob_init_status
+knob_init(knob* k, uint16_t min, uint16_t max, uint16_t small_step,
+	  uint16_t big_step)
 {
+  if (min > max) {
+    return KNOB_INIT_INVALID_LIMITS;
+  }
   rot_init(&(k->rot));
-  k->value = 0;
+  k->value = min;
+  k->min = min;
+  k->max = max;
   k->small_step = small_step;
   k->big_step = big_step;
+  return KNOB_INIT_OK;
 }
 
 void knob_update(knob* k, uint8_t rot_input)
@@ -50,17 +55,17 @@ void knob_update(knob* k, uint8_t rot_input)
   rot_step_status step = rot_process_step(&(k->rot), rot_input);
   switch (step) {
   case ROT_STEP_CW:
-    if (k->value <= KNOB_MAX - k->small_step) {
+    if (k->value <= k->max - k->small_step) {
       k->value += k->small_step;
     } else {
-      k->value = KNOB_MAX;
+      k->value = k->max;
     }
     break;
   case ROT_STEP_CCW:
-    if (k->value >= KNOB_MIN + k->small_step) {
+    if (k->value >= k->min + k->small_step) {
       k->value -= k->small_step;
     } else {
-      k->value = KNOB_MIN;
+      k->value = k->min;
     }
     break;
   default:
@@ -78,5 +83,10 @@ uint16_t knob_get_value(knob* k)
 inline
 void knob_set_value(knob* k, uint16_t value)
 {
+  if (value > k->max) {
+    value = k->max;
+  } else if (value < k->min) {
+    value = k->min;
+  }
   k->value = value;
 }
