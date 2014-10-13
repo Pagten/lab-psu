@@ -85,8 +85,17 @@ extern mock_timer MOCK_TMR;
 #define TIMER0_SET_CNTR(val)  mock_timer_set_cntr8(&MOCK_TMR, val)
 #define TIMER0_GET_CNTR       mock_timer_get_cntr8(&MOCK_TMR)
 
+
+#define TIMER0_IS_OCA_INTERRUPT_FLAG_SET  \
+  mock_timer_is_interrupt_flag_set(&MOCK_TMR, INTR_OCA)
+#define TIMER0_IS_OCB_INTERRUPT_FLAG_SET  \
+  mock_timer_is_interrupt_flag_set(&MOCK_TMR, INTR_OCB)
+#define TIMER0_IS_OVF_INTERRUPT_FLAG_SET  \
+  mock_timer_is_interrupt_flag_set(&MOCK_TMR, INTR_OVF)
+
 // Constants
 #define TIMER0_SIZE  8
+#define TIMER0_MAX_VALUE  255
 
 // Interrupt vectors (cannot use MOCK_TMR here)
 #define TIMER0_OCA_VECT  void _mock_timer0_oca_vect(void)

@@ -8,6 +8,7 @@
 #include "rotary_test.h"
 #include "mcp4922_test.h"
 #include "process_test.h"
+#include "pwlf_test.h"
 
 int main(void)
 {
@@ -15,10 +16,11 @@ int main(void)
 
   SRunner *sr = srunner_create(clock_suite());
   srunner_add_suite(sr, timer_suite());
-  srunner_add_suite (sr, spi_master_suite());
-  srunner_add_suite (sr, rotary_suite());
-  srunner_add_suite (sr, mcp4922_suite());
-  srunner_add_suite (sr, process_suite());
+  srunner_add_suite(sr, spi_master_suite());
+  srunner_add_suite(sr, rotary_suite());
+  srunner_add_suite(sr, mcp4922_suite());
+  srunner_add_suite(sr, process_suite());
+  srunner_add_suite(sr, pwlf_suite());
 
   srunner_run_all(sr, CK_NORMAL);
   number_failed = srunner_ntests_failed(sr);

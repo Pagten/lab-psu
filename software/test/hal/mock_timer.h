@@ -92,6 +92,7 @@ void mock_timer_set_cntr16(mock_timer* tmr, uint16_t val);
 uint8_t mock_timer_get_cntr8(mock_timer* tmr);
 uint16_t mock_timer_get_cntr16(mock_timer* tmr);
 
+bool mock_timer_is_interrupt_flag_set(mock_timer* tmr, tmr_interrupt i);
 
 #define MOCK_TIMER_TICK(tmr)  CAT(tmr,_TICK)
 
