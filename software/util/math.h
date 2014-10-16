@@ -33,6 +33,4 @@
 #define MIN(a,b)  (a < b ? a : b)
 #define MAX(a,b)  (a > b ? a : b)
 
-#define UROUND(f) ((uint16_t)((f)+0.5))
-
 #endif
