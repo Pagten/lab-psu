@@ -38,12 +38,12 @@
 #define ADC_MAX  UINT16_MAX
 
 // ADC to voltage
-#define ADC_TO_MVOLT_MIN     ADC_MIN, _S(16000)
-#define ADC_TO_MVOLT_MAX     ADC_MAX, _S(-742)
+#define ADC_TO_MVOLT_MIN     ADC_MIN, 16000
+#define ADC_TO_MVOLT_MAX     ADC_MAX, -735
 
 // ADC to current
-#define ADC_TO_MAMP_MIN      ADC_MIN, _S(0)
-#define ADC_TO_MAMP_MAX      ADC_MAX, _S(3205)
+#define ADC_TO_MAMP_MIN      ADC_MIN, 0
+#define ADC_TO_MAMP_MAX      ADC_MAX, 3205
 // ***********************************
 
 
