@@ -37,7 +37,7 @@
 
 typedef struct {
   uint16_t x;
-  uint16_t y;
+  int16_t y;
 } pwlf_pair;
 
 typedef struct {
@@ -125,7 +125,7 @@ uint16_t pwlf_get_x(pwlf* f, uint8_t i);
  *           between 0 and pwlf_get_count(f).
  * @return The y value of the ith node of f, or 0 if i is out of range.
  */
-uint16_t pwlf_get_y(pwlf* f, uint8_t i);
+int16_t pwlf_get_y(pwlf* f, uint8_t i);
 
 
 /**
@@ -140,7 +140,7 @@ uint16_t pwlf_get_y(pwlf* f, uint8_t i);
  *         equal to the last added node's x value (if any).
  */
 pwlf_add_node_status
-pwlf_add_node(pwlf* f, uint16_t x, uint16_t y);
+pwlf_add_node(pwlf* f, uint16_t x, int16_t y);
 
 
 /**
@@ -161,26 +161,7 @@ pwlf_remove_node(pwlf* f);
  * @param x The x value at which to get the function value.
  * @return The function value at the given x value.
  */
-uint16_t pwlf_value(pwlf* f, uint16_t x);
-
-
-/**
- * Convert a signed integer value to an unsigned integer value, preserving
- * ordering.
- *
- * @param v The value to convert.
- * @return The converted value.
- */
-uint16_t pwlf_itou(int16_t v);
-
-/**
- * Convert an unsigned integer value to a signed integer value, preserving
- * ordering.
- *
- * @param v The value to convert.
- * @return The converted value.
- */
-int16_t pwlf_utoi(uint16_t v);
+int16_t pwlf_value(pwlf* f, uint16_t x);
 
 
 #endif

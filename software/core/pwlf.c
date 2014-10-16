@@ -30,7 +30,7 @@
 
 #include <stdint.h>
 
-#include "util/math.h"
+#include <math.h>
 
 void pwlf_clear(pwlf* f)
 {
@@ -62,7 +62,7 @@ uint16_t pwlf_get_x(pwlf* f, uint8_t i)
 }
 
 
-uint16_t pwlf_get_y(pwlf* f, uint8_t i)
+int16_t pwlf_get_y(pwlf* f, uint8_t i)
 {
   if (i >= f->count) {
     return 0;
@@ -72,12 +72,12 @@ uint16_t pwlf_get_y(pwlf* f, uint8_t i)
 }
 
 pwlf_add_node_status
-pwlf_add_node(pwlf* f, uint16_t x, uint16_t y)
+pwlf_add_node(pwlf* f, uint16_t x, int16_t y)
 {
   if (f->count == f->max_count) {
     return PWLF_ADD_NODE_FULL;
   }
-  if (f->count > 0 && x <= f->values[f->count].x) {
+  if (f->count > 0 && x <= f->values[f->count - 1].x) {
     return PWLF_ADD_NODE_INVALID_X;
   }
 
@@ -100,35 +100,35 @@ pwlf_remove_node(pwlf* f)
 }
 
 
-// p0.x must be <= p1.x
+// requires: p0.x <= x <= p1.x
 static inline
-uint16_t polate(uint16_t x, pwlf_pair p0, pwlf_pair p1)
+int16_t polate(uint16_t x, pwlf_pair p0, pwlf_pair p1)
 {
   float dx = ((float)(p1.y - p0.y)) / (p1.x - p0.x);
-  uint16_t result = p0.y + UROUND(dx * (x - p0.x));
+  int16_t result = p0.y + (int16_t)round(dx * (x - p0.x));
 
   // Detect overflow
   if (p0.y <= p1.y) {
     // Increasing function
     if (x < p0.x && p0.y < result) {
-      return 0;
+      return INT16_MIN;
     }
     if (p1.x < x && result < p1.y) {
-      return UINT16_MAX;
+      return INT16_MAX;
     }
   } else {
     // Decreasing function
     if (x < p0.x && result < p0.y) {
-      return UINT16_MAX;
+      return INT16_MAX;
     }
     if (p1.x < x && p1.y < result) {
-      return 0;
+      return INT16_MIN;
     }
   }
   return result;
 }
 
-uint16_t pwlf_value(pwlf* f, uint16_t x)
+int16_t pwlf_value(pwlf* f, uint16_t x)
 {
   if (f->count <= 1) {
     // Not enough nodes defined to interpolate or extrapolate
@@ -154,15 +154,3 @@ uint16_t pwlf_value(pwlf* f, uint16_t x)
   return polate(x, f->values[i0], f->values[i1]);
 }
 
-
-inline
-uint16_t pwlf_itou(int16_t v)
-{
-  return v + (UINT16_MAX/2 + 1);
-}
-
-inline
-int16_t pwlf_utoi(uint16_t v)
-{
-  return v - (UINT16_MAX/2 + 1);
-}
