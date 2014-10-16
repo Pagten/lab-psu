@@ -36,7 +36,8 @@
 #include "core/eeprom.h"
 #include "core/pwlf.h"
 
-
+#include "util/debug.h"
+#include <math.h>
 
 #define ADC_TO_VOLTAGE_NODES 16
 #define ADC_TO_CURRENT_NODES 16
@@ -45,7 +46,9 @@
 
 
 /********* EEPROM *********/
+static uint8_t EEMEM EE_adc_to_mvolt_count;
 static pwlf_pair EEMEM EE_adc_to_mvolt_pairs[ADC_TO_VOLTAGE_NODES];
+static uint8_t EEMEM EE_adc_to_mamp_count;
 static pwlf_pair EEMEM EE_adc_to_mamp_pairs[ADC_TO_CURRENT_NODES];
 static crc16 EEMEM EE_checksum;
 /**************************/
@@ -59,18 +62,22 @@ static pwlf mamp_to_dac  = PWLF_INIT(CURRENT_TO_DAC_NODES);
 void cal_load_defaults(void)
 {
   // ADC to voltage
+  pwlf_clear(&adc_to_mvolt);
   pwlf_add_node(&adc_to_mvolt, ADC_TO_MVOLT_MIN);
   pwlf_add_node(&adc_to_mvolt, ADC_TO_MVOLT_MAX);
 
   // ADC to current
+  pwlf_clear(&adc_to_mamp);
   pwlf_add_node(&adc_to_mamp, ADC_TO_MAMP_MIN);
   pwlf_add_node(&adc_to_mamp, ADC_TO_MAMP_MAX);
 
   // Voltage to DAC
+  pwlf_clear(&mvolt_to_dac);
   pwlf_add_node(&mvolt_to_dac, MVOLT_TO_DAC_MIN);
   pwlf_add_node(&mvolt_to_dac, MVOLT_TO_DAC_MAX);
 
   // Current to DAC
+  pwlf_clear(&mamp_to_dac);
   pwlf_add_node(&mamp_to_dac, MAMP_TO_DAC_MIN);
   pwlf_add_node(&mamp_to_dac, MAMP_TO_DAC_MAX);  
 }
@@ -81,8 +88,12 @@ bool cal_load_from_eeprom(void)
   crc16 crc;
   crc16_init(&crc);
 
+  eeprom_read_block_crc(&adc_to_mvolt.count, &EE_adc_to_mvolt_count,
+			sizeof(adc_to_mvolt.count), &crc);
   eeprom_read_block_crc(&adc_to_mvolt.values, &EE_adc_to_mvolt_pairs,
 			sizeof(EE_adc_to_mvolt_pairs), &crc);
+  eeprom_read_block_crc(&adc_to_mamp.count, &EE_adc_to_mamp_count,
+			sizeof(adc_to_mamp.count), &crc);
   eeprom_read_block_crc(&adc_to_mamp.values, &EE_adc_to_mamp_pairs,
 			sizeof(EE_adc_to_mamp_pairs), &crc);
 
@@ -100,8 +111,14 @@ bool cal_verify_eeprom(void)
   crc16_init(&crc);
 
   // Recalculate checksum
+  for (i = 0; i < sizeof(EE_adc_to_mvolt_count); ++i) {
+    crc16_update(&crc, eeprom_read_byte((&EE_adc_to_mvolt_count) + i));
+  }
   for (i = 0; i < sizeof(EE_adc_to_mvolt_pairs); ++i) {
     crc16_update(&crc, eeprom_read_byte(((void *)EE_adc_to_mvolt_pairs) + i));
+  }
+  for (i = 0; i < sizeof(EE_adc_to_mamp_count); ++i) {
+    crc16_update(&crc, eeprom_read_byte((&EE_adc_to_mamp_count) + i));
   }
   for (i = 0; i < sizeof(EE_adc_to_mamp_pairs); ++i) {
     crc16_update(&crc, eeprom_read_byte(((void *)EE_adc_to_mamp_pairs) + i));
@@ -119,8 +136,12 @@ void cal_save_to_eeprom(void)
   crc16 crc;
   crc16_init(&crc);
 
+  eeprom_update_block_crc(&adc_to_mvolt.count, &EE_adc_to_mvolt_count,
+			  sizeof(EE_adc_to_mvolt_count), &crc);
   eeprom_update_block_crc(&adc_to_mvolt.values, &EE_adc_to_mvolt_pairs,
 			  sizeof(EE_adc_to_mvolt_pairs), &crc);
+  eeprom_update_block_crc(&adc_to_mamp.count, &EE_adc_to_mamp_count,
+			  sizeof(EE_adc_to_mamp_count), &crc);
   eeprom_update_block_crc(&adc_to_mamp.values, &EE_adc_to_mamp_pairs,
 			  sizeof(EE_adc_to_mamp_pairs), &crc);
 
@@ -132,13 +153,13 @@ void cal_save_to_eeprom(void)
 inline
 int16_t cal_adc_to_mvolt(uint16_t adc)
 {
-  return pwlf_utoi(pwlf_value(&adc_to_mvolt, adc));
+  return pwlf_value(&adc_to_mvolt, adc);
 }
 
 inline
 int16_t cal_adc_to_mamp(uint16_t adc)
 {
-  return pwlf_utoi(pwlf_value(&adc_to_mamp, adc));
+  return pwlf_value(&adc_to_mamp, adc);
 }
 
 inline
