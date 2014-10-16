@@ -69,7 +69,7 @@ FUSES =
 // ******* Voltage and current limits *******
 #define VOLTAGE_MIN             0
 #define VOLTAGE_MAX         15000
-#define VOLTAGE_SMALL_STEP     10
+#define VOLTAGE_SMALL_STEP    100 //10
 #define VOLTAGE_BIG_STEP      100
 
 #define CURRENT_MIN            0
@@ -87,7 +87,7 @@ PROCESS(lcd_process);
 static hd44780_lcd lcd;
 
 static knob knob_v;
-//static knob knob_c;
+static knob knob_c;
 
 static iomon_event rot_tick;
 
@@ -133,13 +133,24 @@ void init_lcd(void)
 PROCESS_THREAD(inputs_process)
 {
   PROCESS_BEGIN();
-  
+  static knob* k = &knob_v;
+
   while (true) {
     PROCESS_WAIT_EVENT_UNTIL(ev == EVENT_ROTARY_TICK);
 
+    if (DEBOUNCED(data) & _BV(GET_BIT(ROTV_PUSH)) &&
+	TOGGLED(data) & _BV(GET_BIT(ROTV_PUSH))) {
+      // ROTV push button pressed
+      if (k == &knob_v) {
+	k = &knob_c;
+      } else {
+	k = &knob_v;
+      }
+    }
+
     uint8_t input_v = rot_input(DEBOUNCED(data), GET_BIT(ROTV_A),
 				GET_BIT(ROTV_B));
-    knob_update(&knob_v, input_v);
+    knob_update(k, input_v);
 
     //uint8_t input_c = rot_input(DEBOUNCED(data), GET_BIT(ROTC_A), GET_BIT(ROTC_B));
     //knob_update(&knob_c, input_c);
@@ -170,7 +181,7 @@ PROCESS_THREAD(spi_handler)
 
     response.set_flags = 0;
     response.set_voltage = knob_get_value(&knob_v);
-    response.set_current = knob_get_value(&knob_v);
+    response.set_current = knob_get_value(&knob_c);
     spis_send_response(IOPANEL_RESPONSE_TYPE, (uint8_t*)&response,
 		       sizeof(struct iopanel_response));
 
@@ -258,8 +269,8 @@ int main(void)
   process_init();
   knob_init(&knob_v, VOLTAGE_MIN, VOLTAGE_MAX, VOLTAGE_SMALL_STEP,
 	    VOLTAGE_BIG_STEP);
-  //  knob_init(&knob_c, CURRENT_MIN, CURRENT_MAX, CURRENT_SMALL_STEP,
-  //            CURRENT_BIG_STEP);
+  knob_init(&knob_c, CURRENT_MIN, CURRENT_MAX, CURRENT_SMALL_STEP,
+	    CURRENT_BIG_STEP);
   iomon_init();
   init_lcd();
 
