@@ -112,6 +112,18 @@ int16_t get_current_reading(void)
   return cal_adc_to_mamp(adc_get_value(&psu_status.current));
 }
 
+static inline
+uint16_t mvolt_to_dac(int16_t mvolt)
+{
+  return cal_mvolt_to_dac(mvolt);
+}
+
+static inline
+uint16_t mamp_to_dac(int16_t mamp)
+{
+  return cal_mamp_to_dac(mamp);
+}
+
 
 PROCESS_THREAD(iopanel_update_process)
 {
@@ -154,7 +166,7 @@ PROCESS_THREAD(iopanel_update_process)
       if (ev == SPIM_TRX_ERROR) {
 	// Error occurred while communicating with IO panel. We will exit the
 	// loop and try to communicate again.
-	TGL_DEBUG_LED(0);
+	//	TGL_DEBUG_LED(0);
 	spim_trx_error_type err = spim_trx_llp_get_error_type(&trx);
 	if (err == SPIM_TRX_ERR_RESPONSE_TOO_LARGE) {
 	} else if (err == SPIM_TRX_ERR_RESPONSE_CRC_ERROR) {
@@ -180,14 +192,14 @@ PROCESS_THREAD(iopanel_update_process)
       // TODO: refactor this into a separate process?
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
       mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_VOLTAGE_CHANNEL, psu_status.set_voltage >> 4);
+		      DAC_VOLTAGE_CHANNEL, mvolt_to_dac(psu_status.set_voltage));
       mcp4922_pkt_queue(&voltage_pkt);
       
       PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
       // TODO: change mcp4922 interface so we don't have to repeat all
       // information whenever we want to transmit a packet
       mcp4922_pkt_set(&current_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_CURRENT_CHANNEL, psu_status.set_current >> 4);
+		      DAC_CURRENT_CHANNEL, mamp_to_dac(psu_status.set_current));
       mcp4922_pkt_queue(&current_pkt);
     }
   }
