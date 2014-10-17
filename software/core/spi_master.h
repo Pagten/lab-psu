@@ -204,6 +204,7 @@ typedef struct {
   uint8_t tx_size;
   uint8_t* tx_buf;
   uint8_t rx_type;
+  uint8_t rx_max;
   uint8_t rx_size;
   uint8_t* rx_buf;
   spim_trx_error_type error;
