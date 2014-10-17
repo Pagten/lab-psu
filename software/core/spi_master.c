@@ -92,10 +92,10 @@ spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
 		    process* p)
 {
   if (tx_buf == NULL && tx_size > 0) {
-    return SPIM_TRX_SIMPLE_TX_BUF_IS_NULL;
+    return SPIM_TRX_SIMPLE_SET_TX_BUF_IS_NULL;
   }
   if (rx_buf == NULL && rx_size > 0) {
-    return SPIM_TRX_SIMPLE_RX_BUF_IS_NULL;
+    return SPIM_TRX_SIMPLE_SET_RX_BUF_IS_NULL;
   }
 
   trx->flags = 0;
@@ -106,7 +106,7 @@ spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
   trx->rx_size = rx_size;
   trx->rx_buf = rx_buf;
   trx->p = p;
-  return SPIM_TRX_SIMPLE_OK;
+  return SPIM_TRX_SIMPLE_SET_OK;
 }
 
 
