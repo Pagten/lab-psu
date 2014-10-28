@@ -1,5 +1,4 @@
 # The Lab PSU Project
-======================
 
 
 ## About
