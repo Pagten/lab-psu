@@ -6,7 +6,7 @@ The lab PSU project consists of electronic schematics and software for a basic c
 
 The project is still in development, and at the moment is just barely useable!
 
-## Harware characteristics
+## Hardware characteristics
 The PSU's hardware characteristics are:
 * Max voltage: 15V, in 5mV steps
 * Max current: 3A, in 1mA steps
