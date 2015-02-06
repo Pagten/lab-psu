@@ -1,5 +1,5 @@
 /*
- * eeprom.h
+ * crc16.c
  *
  * Copyright 2014 Pieter Agten
  *
@@ -20,41 +20,22 @@
  */
 
 /**
- * @file eeprom.c
+ * @file crc16.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 11 Oct 2014
+ * @date 17 Oct 2014
  */
 
+#include "crc16.h"
 
-#include "eeprom.h"
-
-#include "core/crc16.h"
-#include "hal/eeprom.h"
-
-void
-eeprom_read_block_crc(void* dst, const void* src, size_t size, crc16* crc)
+uint16_t _crc16_update(uint16_t crc, uint8_t data)
 {
-  uint8_t* _dst = dst;
-  const uint8_t* _src = src;
-  while (size > 0) {
-    *_dst = eeprom_read_byte(_src);
-    crc16_update(crc, *_dst);
-    _dst += 1;
-    _src += 1;
-    size -= 1;
+  int i;
+  crc ^= data;
+  for (i = 0; i < 8; ++i) {
+    if (crc & 1)
+      crc = (crc >> 1) ^ 0xA001;
+    else
+      crc = (crc >> 1);
   }
-}
-
-void
-eeprom_update_block_crc(const void* src, void* dst, size_t size, crc16* crc)
-{
-  const uint8_t* _src = src;
-  uint8_t* _dst = dst;
-  while (size > 0) {
-    eeprom_update_byte(_dst, *_src);
-    crc16_update(crc, *_src);
-    _src += 1;
-    _dst += 1;
-    size -= 1;
-  }
+  return crc;
 }

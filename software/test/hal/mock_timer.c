@@ -162,6 +162,12 @@ uint16_t mock_timer_get_cntr16(mock_timer* tmr)
   return tmr->cntr;
 }
 
+// TODO: implement
+bool mock_timer_is_interrupt_flag_set(mock_timer* tmr, tmr_interrupt i)
+{
+  return false;
+}
+
 
 static void fire_interrupts(mock_timer* tmr)
 {

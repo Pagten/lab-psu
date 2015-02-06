@@ -46,4 +46,18 @@ void p_set_val(port_ptr p, uint8_t value);
 #define P_SET_PINS_DIR_INPUT(port, mask)
 
 
+//TODO: implement
+#define GET_PIN(pb)            0  
+#define SET_PIN(pb)              
+#define CLR_PIN(pb)              
+#define TGL_PIN(pb)              
+
+
+
+// TODO: implement
+#define PC_INTERRUPT_VECT(pb)     void pc_interrupt(void)  
+#define PC_INTERRUPT_ENABLE(pb)	 
+#define PC_INTERRUPT_DISABLE(pb) 
+
+
 #endif

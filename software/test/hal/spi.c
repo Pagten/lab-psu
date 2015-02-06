@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "util/ring_buffer.h"
+#include "test/util/ring_buffer.h"
 #include "spi.h"
 
 struct {
@@ -51,6 +51,11 @@ void spi_mock_set_pin_dirs_master()
  // Not yet implemented
 }
 
+void spi_mock_set_pin_dirs_slave(void)
+{
+ // Not yet implemented
+}
+
 void spi_mock_set_role(spi_role role)
 {
   // Not yet implemented
@@ -58,6 +63,12 @@ void spi_mock_set_role(spi_role role)
 
 void spi_mock_set_data_order(spi_data_order data_order)
 { }
+
+void spi_mock_set_interrupt_enabled(spi_interrupt i, bool v)
+{
+  // Not yet implemented
+}
+
 
 void spi_mock_set_mode(uint8_t cpol, uint8_t cpha)
 { }

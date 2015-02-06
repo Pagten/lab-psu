@@ -138,6 +138,11 @@ PROCESS_THREAD(iopanel_update_process)
 
   etimer_set(&tmr, IOPANEL_UPDATE_RATE, PROCESS_CURRENT());
   spim_trx_init((spim_trx*)&trx);
+  spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
+		   IOPANEL_REQUEST_TYPE, sizeof(struct iopanel_request),
+		   (uint8_t*)&request, sizeof(struct iopanel_response),
+		   (uint8_t*)&response, PROCESS_CURRENT());
+ 
   mcp4922_pkt_init(&voltage_pkt);
   mcp4922_pkt_init(&current_pkt);
 
@@ -153,12 +158,6 @@ PROCESS_THREAD(iopanel_update_process)
       request.voltage = get_voltage_reading();
       request.current = get_current_reading();
 
-  // TODO: change SPI interface so that we don't have to enter all this
-  // data each time
-      spim_trx_llp_set(&trx, GET_BIT(IOPANEL_CS), &GET_PORT(IOPANEL_CS),
-		       IOPANEL_REQUEST_TYPE, sizeof(struct iopanel_request),
-		       (uint8_t*)&request, sizeof(struct iopanel_response),
-		       (uint8_t*)&response, PROCESS_CURRENT());
       spim_trx_queue((spim_trx*)&trx);
 
       PROCESS_WAIT_EVENT_UNTIL(ev == SPIM_TRX_COMPLETED_SUCCESSFULLY ||

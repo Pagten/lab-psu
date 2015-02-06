@@ -22,10 +22,11 @@
 #ifndef EEPROM_H
 #define EEPROM_H
 
-#include <avr/eeprom.h>
 #include <stddef.h>
 
 #include "core/crc16.h"
+#include "hal/eeprom.h"
+
 
 /**
  * @file eeprom.h
