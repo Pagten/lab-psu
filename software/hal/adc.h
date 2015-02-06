@@ -195,6 +195,8 @@ void ADC_SET_AUTO_TRIGGER_SRC(adc_trigger_src src)
   ADCSRB |= (src & 0x07);
 }
 
+#define ADC_GET_VALUE() ADCW
+
 #define IS_ADC_INTERRUPT_FLAG_SET()       (ADCSRAR & _BV(ADIF))
 
 // Transfer complete interrupt

@@ -92,10 +92,10 @@ spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
 		    process* p)
 {
   if (tx_buf == NULL && tx_size > 0) {
-    return SPIM_TRX_SIMPLE_TX_BUF_IS_NULL;
+    return SPIM_TRX_SIMPLE_SET_TX_BUF_IS_NULL;
   }
   if (rx_buf == NULL && rx_size > 0) {
-    return SPIM_TRX_SIMPLE_RX_BUF_IS_NULL;
+    return SPIM_TRX_SIMPLE_SET_RX_BUF_IS_NULL;
   }
 
   trx->flags = 0;
@@ -106,7 +106,7 @@ spim_trx_simple_set(spim_trx_simple* trx, uint8_t ss_pin,
   trx->rx_size = rx_size;
   trx->rx_buf = rx_buf;
   trx->p = p;
-  return SPIM_TRX_SIMPLE_OK;
+  return SPIM_TRX_SIMPLE_SET_OK;
 }
 
 
@@ -128,7 +128,7 @@ spim_trx_llp_set(spim_trx_llp* trx, uint8_t ss_pin, volatile uint8_t* ss_port,
   trx->tx_type = tx_type;
   trx->tx_size = tx_size;
   trx->tx_buf = tx_buf;
-  trx->rx_size = rx_max;
+  trx->rx_max = rx_max;
   trx->rx_buf = rx_buf;
   trx->p = p;
   trx->error = SPIM_TRX_ERR_NONE;
@@ -397,7 +397,7 @@ PROCESS_THREAD(spim_trx_process)
       uint8_t size = read_response_byte();
       tx_dummy_byte(); // for the first payload or footer byte
       etimer_restart(&trx_etimer); 
-      if (size > trx_q_hd_llp->rx_size) {
+      if (size > trx_q_hd_llp->rx_max) {
 	// rx_buf is too small for the response, abort the transfer
 	LOG_COUNTER_INC(SPIM_RESPONSE_TOO_LARGE);
 	trx_q_hd_llp->error = SPIM_TRX_ERR_RESPONSE_TOO_LARGE;

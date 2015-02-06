@@ -31,7 +31,8 @@
 #include "log.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <avr/pgmspace.h>
+
+#include "hal/pgmspace.h"
 
 #define STRINGIFY(s) #s
 

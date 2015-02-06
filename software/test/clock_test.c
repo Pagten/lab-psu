@@ -32,7 +32,7 @@
 
 #include <check.h>
 #include "core/clock.h"
-#include "hal/mock_timer.h"
+#include "test/hal/mock_timer.h"
 
 static void setup(void)
 {

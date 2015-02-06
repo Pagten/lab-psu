@@ -32,9 +32,9 @@
 #include <check.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "core/pwlf.h"
-#include "util/math.h"
 
 static void setup(void)
 {
@@ -50,17 +50,6 @@ expected(float x, float x1, float x2, float y1, float y2)
 {
   return y1 + (x - x1) * (y2 - y1)/(x2 - x1);
 }
-
-// ****************************************************************************
-// test_pwlf_itou
-// ****************************************************************************
-START_TEST(test_pwlf_itou)
-{
-  ck_assert_uint_eq(pwlf_itou(16000), 48768);
-  ck_assert_uint_eq(pwlf_itou(-742), 32026);
-}
-END_TEST
-
 
 // ****************************************************************************
 // test_pwlf_init
@@ -136,22 +125,17 @@ END_TEST
 START_TEST(test_pwlf_2point_signed)
 {
   static pwlf f = PWLF_INIT(8);
-  pwlf_add_node(&f, 0, pwlf_itou(16000));
-  pwlf_add_node(&f, UINT16_MAX, pwlf_itou(-742));
+  pwlf_add_node(&f, 0, 16000);
+  pwlf_add_node(&f, UINT16_MAX, -742);
   ck_assert_uint_eq(pwlf_get_size(&f), 8);
   ck_assert_uint_eq(pwlf_get_count(&f), 2);
 
-
-  ck_assert_int_eq(pwlf_utoi(pwlf_value(&f, 0)), 16000);
-  ck_assert_int_eq(pwlf_utoi(pwlf_value(&f, UINT16_MAX)), -742);
-
   uint16_t i;
   for (i = 0; i < UINT16_MAX - 16; i += 16) {
-    int16_t value = pwlf_utoi(pwlf_value(&f, i));
-    int16_t expected_value = UROUND(expected(i, 0, UINT16_MAX, 16000, -742));
+    int16_t value = pwlf_value(&f, i);
+    int16_t expected_value = round(expected(i, 0, UINT16_MAX, 16000, -742));
     ck_assert(value >= expected_value - 1);
     ck_assert(value <= expected_value + 1);
-    printf("i: %u, v: %d\n", i, value);
   }
 }
 END_TEST
@@ -162,11 +146,6 @@ END_TEST
 Suite *pwlf_suite(void)
 {
   Suite *s = suite_create("PWLF");
-
-  TCase *tc_pwlf_itou = tcase_create("itou");
-  tcase_add_checked_fixture(tc_pwlf_itou, setup, teardown);
-  tcase_add_test(tc_pwlf_itou, test_pwlf_itou);
-  suite_add_tcase(s, tc_pwlf_itou);
 
   TCase *tc_pwlf_init = tcase_create("Init");
   tcase_add_checked_fixture(tc_pwlf_init, setup, teardown);

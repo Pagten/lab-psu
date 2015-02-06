@@ -34,6 +34,7 @@
 #include "hal/cpufunc.h"
 #include "util/bit.h"
 #include "util/def.h"
+#include "util/fdev_stream.h"
 
 static int hd44780_putchar(char c, FILE* stream);
 

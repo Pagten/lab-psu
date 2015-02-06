@@ -144,9 +144,9 @@ typedef enum {
 } spim_trx_llp_set_status;
 
 typedef enum {
-  SPIM_TRX_SIMPLE_OK,
-  SPIM_TRX_SIMPLE_TX_BUF_IS_NULL,
-  SPIM_TRX_SIMPLE_RX_BUF_IS_NULL,
+  SPIM_TRX_SIMPLE_SET_OK,
+  SPIM_TRX_SIMPLE_SET_TX_BUF_IS_NULL,
+  SPIM_TRX_SIMPLE_SET_RX_BUF_IS_NULL,
 } spim_trx_simple_set_status;
 
 typedef enum {
@@ -204,6 +204,7 @@ typedef struct {
   uint8_t tx_size;
   uint8_t* tx_buf;
   uint8_t rx_type;
+  uint8_t rx_max;
   uint8_t rx_size;
   uint8_t* rx_buf;
   spim_trx_error_type error;

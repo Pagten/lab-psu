@@ -355,7 +355,7 @@ INTERRUPT(ADC_CONVERSION_COMPLETE_VECT)
   adc* current_adc = sample_buffer[current];
   if (current_adc != NULL) {
     if (current_adc->samples_remaining > 0) {
-      uint16_t sample = ADCW;
+      uint16_t sample = ADC_GET_VALUE();
       current_adc->next_value += sample;
       current_adc->samples_remaining -= 1;      
     } else {

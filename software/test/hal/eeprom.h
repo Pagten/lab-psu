@@ -19,42 +19,17 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef HAL_EEPROM_H
+#define HAL_EEPROM_H
+
 /**
- * @file eeprom.c
- * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 11 Oct 2014
+ * @file eeprom.h
+ * @author Pieter Agten <pieter.agten@gmail.com>
+ * @date 17 Oct 2014
  */
 
+// TODO: implement
+#define eeprom_read_byte(addr) 0
+#define eeprom_update_byte(dst, src)
 
-#include "eeprom.h"
-
-#include "core/crc16.h"
-#include "hal/eeprom.h"
-
-void
-eeprom_read_block_crc(void* dst, const void* src, size_t size, crc16* crc)
-{
-  uint8_t* _dst = dst;
-  const uint8_t* _src = src;
-  while (size > 0) {
-    *_dst = eeprom_read_byte(_src);
-    crc16_update(crc, *_dst);
-    _dst += 1;
-    _src += 1;
-    size -= 1;
-  }
-}
-
-void
-eeprom_update_block_crc(const void* src, void* dst, size_t size, crc16* crc)
-{
-  const uint8_t* _src = src;
-  uint8_t* _dst = dst;
-  while (size > 0) {
-    eeprom_update_byte(_dst, *_src);
-    crc16_update(crc, *_src);
-    _src += 1;
-    _dst += 1;
-    size -= 1;
-  }
-}
+#endif

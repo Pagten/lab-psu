@@ -1,5 +1,5 @@
 /*
- * eeprom.h
+ * pgmspace.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -19,42 +19,15 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef PGMSPACE_H
+#define PGMSPACE_H
+
 /**
- * @file eeprom.c
+ * @file pgmspace.h
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 11 Oct 2014
+ * @date 17 Oct 2014
  */
 
+#include <avr/pgmspace.h>
 
-#include "eeprom.h"
-
-#include "core/crc16.h"
-#include "hal/eeprom.h"
-
-void
-eeprom_read_block_crc(void* dst, const void* src, size_t size, crc16* crc)
-{
-  uint8_t* _dst = dst;
-  const uint8_t* _src = src;
-  while (size > 0) {
-    *_dst = eeprom_read_byte(_src);
-    crc16_update(crc, *_dst);
-    _dst += 1;
-    _src += 1;
-    size -= 1;
-  }
-}
-
-void
-eeprom_update_block_crc(const void* src, void* dst, size_t size, crc16* crc)
-{
-  const uint8_t* _src = src;
-  uint8_t* _dst = dst;
-  while (size > 0) {
-    eeprom_update_byte(_dst, *_src);
-    crc16_update(crc, *_src);
-    _src += 1;
-    _dst += 1;
-    size -= 1;
-  }
-}
+#endif
