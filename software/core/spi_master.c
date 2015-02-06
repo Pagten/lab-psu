@@ -473,6 +473,12 @@ spim_trx_llp_get_tx_buf(spim_trx_llp* trx)
 }
 
 uint8_t
+spim_trx_llp_get_rx_type(spim_trx_llp* trx)
+{
+  return trx->rx_type;
+}
+
+uint8_t
 spim_trx_llp_get_rx_size(spim_trx_llp* trx)
 {
   return trx->rx_size;

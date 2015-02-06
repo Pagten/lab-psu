@@ -341,6 +341,17 @@ uint8_t*
 spim_trx_llp_get_tx_buf(spim_trx_llp* trx);
 
 /**
+ * Return the type of the received message. This function should only be called
+ * after the given transfer has been completed successfully.
+ *
+ * @param trx The transfer of which to return the received message type.
+ * @return The received message type.
+ */
+uint8_t
+spim_trx_llp_get_rx_type(spim_trx_llp* trx);
+
+
+/**
  * Return the size of the receive buffer or the number of bytes received of a
  * given SPI transfer. If the given transfer has been completed successfully,
  * the return value indicates the number of bytes received, otherwise the
