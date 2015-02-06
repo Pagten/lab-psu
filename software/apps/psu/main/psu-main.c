@@ -53,10 +53,8 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
-#define IOPANEL_UPDATE_RATE  (50 * CLOCK_MSEC)
 
 #define DAC_CS      B,1
-#define IOPANEL_CS  B,2
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
@@ -70,6 +68,15 @@ FUSES =
 PROCESS(iopanel_update_process);
 
 #define PSU_FLAG_OUTPUT_ENABLED  0x01
+
+
+// TODO:
+// Create separate "control" module for controlling voltage and current with separate process for
+// sending packets to the DAC. This module will also provide functions for reading the ADCs
+// The PSU main module will only store the current mode of the PSU and will act like a sort of facade
+// for other modules. E.g: iopanel should not communicate with the control module, but only with the
+// facade. The calibration module CAN communicate with the control module directly, because it needs
+// to set the values of the DACs directly without passing through the mvolts or mamps conversion.
 
 static struct {
   uint8_t flags;
