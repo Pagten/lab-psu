@@ -39,121 +39,147 @@
 #include "util/debug.h"
 #include <math.h>
 
-#define ADC_TO_VOLTAGE_NODES 16
-#define ADC_TO_CURRENT_NODES 16
-#define VOLTAGE_TO_DAC_NODES 16
-#define CURRENT_TO_DAC_NODES 16
-
+#define CALIBRATION_NODES 16
+#define CAL_PROCESS_NB_STEPS CALIBRATION_NODES
 
 /********* EEPROM *********/
 static uint8_t EEMEM EE_adc_to_mvolt_count;
-static pwlf_pair EEMEM EE_adc_to_mvolt_pairs[ADC_TO_VOLTAGE_NODES];
+static pwlf_pair EEMEM EE_adc_to_mvolt_pairs[CALIBRATION_NODES];
 static uint8_t EEMEM EE_adc_to_mamp_count;
-static pwlf_pair EEMEM EE_adc_to_mamp_pairs[ADC_TO_CURRENT_NODES];
+static pwlf_pair EEMEM EE_adc_to_mamp_pairs[CALIBRATION_NODES];
 static crc16 EEMEM EE_checksum;
 /**************************/
 
-static pwlf adc_to_mvolt = PWLF_INIT(ADC_TO_VOLTAGE_NODES);
-static pwlf adc_to_mamp  = PWLF_INIT(ADC_TO_CURRENT_NODES);
-static pwlf mvolt_to_dac = PWLF_INIT(VOLTAGE_TO_DAC_NODES);
-static pwlf mamp_to_dac  = PWLF_INIT(CURRENT_TO_DAC_NODES);
-
-//static pwlf cal_tmp = PWLF_INIT(MAX4(ADC_TO_VOLTAGE_NODES,
-//				     ADC_TO_CURRENT_NODES,
-//				     VOLTAGE_TO_DAC_NODES,
-//				     CURRENT_TO_DAC_NODES));
+static pwlf adc_to_mvolt = PWLF_INIT(CALIBRATION_NODES);
+static pwlf adc_to_mamp  = PWLF_INIT(CALIBRATION_NODES);
+static pwlf mvolt_to_dac = PWLF_INIT(CALIBRATION_NODES);
+static pwlf mamp_to_dac  = PWLF_INIT(CALIBRATION_NODES);
 
 
-/**
- * Initialize a calibration process structure. This function
- * should only be called once for any calibration process 
- * structure.
- *
- * @param p The calibration process structure to initialize.
- */
-void cal_process_init(cal_process* p);
+static bool calibration_running = false;
 
-/**
- * Start a new calibration process.
- *
- * @param p    The calibration process structure to use.
- * @param type The type of calibration process to start.
- * @return CAL_PROCESS_OK if the calibration process was started successfuly,
- *         or CAL_PROCESS_ALREADY_RUNNING if another calibration process is
- *         already running.
- */
 cal_process_status
-cal_process_start(cal_process* p, cal_process_type type);
+cal_process_start(cal_process* p, cal_process_type type)
+{
+  if (cal_is_process_running()) {
+    return CAL_PROCESS_ALREADY_RUNNING;
+  }
+  if (type >= CAL_PROCESS_TYPE_COUNT) {
+    return CAL_PROCESS_INVALID_TYPE;
+  }
+  if (p->state != CAL_PROCESS_IDLE) {
+    return CAL_PROCESS_INVALID_STATE;
+  }
 
-/**
- * Move to the next calibration point in a given ADC calibration process.
- *
- * @param p   The ADC calibration process in which to move to the next point.
- * @param val The output value in the current step.
- * @result CAL_PROCESS_OK if the given value is valid and the calibration 
- *         process has been moved to the next step, CAL_PROCESS_INVALID_STATE
- *         if the process is not in a valid state to move to the next step, or
- *         CAL_PROCESS_INVALID_VALUE if the given value is invalid.
- */
+  p->type = type;
+  p->state = CAL_PROCESS_RUNNING;
+  pwlf_clear(&(p->table));
+  calibration_running = true;
+  return CAL_PROCESS_OK;
+}
+
+
 cal_process_status
-cal_process_adc_next(cal_process* p, uint16_t val);
+cal_process_adc_next(cal_process* p, uint16_t val)
+{
+  if (p->type != CAL_PROCESS_VOLTAGE_ADC &&
+      p->type != CAL_PROCESS_CURRENT_ADC) {
+    return CAL_PROCESS_INVALID_TYPE;
+  }
+  if (p->state != CAL_PROCESS_RUNNING ||
+      p->step >= CAL_PROCESS_NB_STEPS) {
+    return CAL_PROCESS_INVALID_STATE;
+  }
 
-/**
- * Cancel an ongoing calibration process.
- *
- * @param p The calibration process to cancel.
- * @result CAL_PROCESS_OK if the process was cancelled successfully, or 
- *         CAL_PROCESS_INVALID_STATE if the process is not in a valid state to
- *         be cancelled.
- */
+
+  uint8_t step = cal_process_get_step_number(p);
+  uin16_t adc_val = 0; //TODO: read adc value
+  if (step > 0) {
+    uint16_t prev_val = pwlf_get_y(&(p->table), step - 1);
+    if (val <= prev_val) {
+      return CAL_PROCESS_INVALID_VALUE;
+    }
+
+    uint16_t prev_adc_val = pwlf_get_x(&(p->table), step - 1);
+    if (adc_val <= prev_adc_val) {
+      return CAL_PROCESS_OUTPUT_ERROR;
+    }
+  }
+
+  pwlf_add_node(&(p->table), adc_value, val);
+  //TODO: set DAC for next step
+
+  return CAL_PROCESS_OK;
+}
+
+
 cal_process_status
-cal_process_cancel(cal_process* p);
+cal_process_cancel(cal_process* p)
+{
+  if (p->state == CAL_PROCESS_IDLE) {
+    return CAL_PROCESS_INVALID_STATE;
+  }
 
-/**
- * Commit a finished calibration process. After calling this function, the
- * calibration process' values will be used when converting ADC/DAC readings,
- * but they will not be saved to EEPROM (for this, see cal_save_to_eeprom()).
- *
- * @param p The calibration process to commit.
- * @result CAL_PROCESS_OK if the process' values were committed successfully,
- *         or CAL_PROCESS_INVALID_STATE if the given process is not in a valid
- *         state to be committed.
- */
+  p->state = CAL_PROCESS_IDLE;
+  pwlf_clear(&(p->table));
+  calibration_running = false;
+  return CAL_PROCESS_OK;
+}
+
+
 cal_process_status
-cal_process_commit(cal_process* p);
+cal_process_commit(cal_process* p)
+{
+  if (p->state != CAL_PROCESS_RUNNING ||
+      cal_process_get_step_number(p) != CAL_PROCESS_NB_STEPS) {
+    return CAL_PROCESS_INVALID_STATE;
+  }
+  
+  pwlf* dst;
+  switch (p->type) {
+  case CAL_PROCESS_VOLTAGE_ADC:
+    dst = &adc_to_mvolt;
+    break;
+  case CAL_PROCESS_CURRENT_ADC:
+    dst = &adc_to_mamps;
+    break;
+  case CAL_PROCESS_VOLTAGE_DAC:
+    dst = &mvolt_to_dac;
+    break;
+  case CAL_PROCESS_CURRENT_DAC:
+    dst = &mamps_to_dac;
+    break;
+  default:
+    p->state = CAL_PROCESS_ERROR;
+    return CAL_PROCESS_INVALID_STATE;
+  }
+  pwlf_copy(&(p->table), dst);
+  pwlf_clear(&(p->table));
+  p->state = CAL_PROCESS_IDLE;
+  calibration_running = false;
+  return CAL_PROCESS_OK;
+}
 
-/**
- * Return the current state of a given calibration process.
- *
- * @param p The calibration process of which to return the current state.
- * @result The current state of the given calibration process.
- */
-cal_process_state
-cal_process_get_state(cal_process* p);
 
-/**
- * Return the number of the step that a given calibration process is in.
- *
- * @param p The calibration process for which to get the current step number.
- * @result The number of the step the given process is in.
- */
-uint8_t cal_process_get_step_number(cal_process* p);
+inline cal_process_state
+cal_process_get_state(cal_process* p)
+{
+  return p->state;
+}
 
-/**
- * Return the output value of the step that a given calibration process is in.
- *
- * @param p The calibration process for which to get the current step value.
- * @result The output value of the step the given process is in.
- */
-uint16_t cal_process_get_step_value(cal_process* p);
 
-/**
- * Return whether there is some calibration process running.
- *
- * @result True if any calibration process is running, or false otherwise.
- */
-bool cal_is_process_running();
+inline uint8_t
+cal_process_get_step_number(cal_process* p)
+{
+  return pwlf_get_count(&(p->table));
+}
 
+
+inline bool
+cal_is_process_running()
+{
+  return calibration_running;
+}
 
 
 
@@ -271,6 +297,3 @@ uint16_t cal_mamp_to_dac(uint16_t mamp)
 {
   return pwlf_value(&mamp_to_dac, mamp);
 }
-
-
-

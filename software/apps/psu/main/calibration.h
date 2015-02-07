@@ -25,6 +25,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "core/pwlf.h"
+
 /**
  * @file calibration.h
  * @author Pieter Agten (pieter.agten@gmail.com)
@@ -41,6 +43,7 @@ typedef enum {
   CAL_PROCESS_CURRENT_ADC,
   CAL_PROCESS_VOLTAGE_DAC,
   CAL_PROCESS_CURRENT_DAC,
+  CAL_PROCESS_TYPE_COUNT,
 } cal_process_type;
 
 typedef enum {
@@ -48,31 +51,30 @@ typedef enum {
   CAL_PROCESS_ALREADY_RUNNING,
   CAL_PROCESS_INVALID_STATE,
   CAL_PROCESS_INVALID_VALUE,
+  CAL_PROCESS_INVALID_TYPE,
+  CAL_PROCESS_OUTPUT_ERROR,
 } cal_process_status;
 
 typedef enum {
   CAL_PROCESS_IDLE,
   CAL_PROCESS_RUNNING,
-  CAL_PROCESS_ERROR_OVERVOLTAGE,
-  CAL_PROCESS_ERROR_UNDERVOLTAGE,
-  CAL_PROCESS_ERROR_OVERCURRENT,
-  CAL_PROCESS_ERROR_UNDERCURRENT,
+  CAL_PROCESS_ERROR,
 } cal_process_state;
+
 
 typedef struct {
   cal_process_type type;
   cal_process_state state;
   uint8_t step;
+  pwlf table;
 } cal_process;
 
 /**
- * Initialize a calibration process structure. This function
- * should only be called once for any calibration process 
- * structure.
- *
- * @param p The calibration process structure to initialize.
+ * Statically initialize a calibration process structure.
  */
-void cal_process_init(cal_process* p);
+#define CAL_PROCESS_INIT()						\
+  { .state = CAL_PROCESS_IDLE, .table = PWLF_INIT(CALIBRATION_NODES) }
+
 
 /**
  * Start a new calibration process.
@@ -80,8 +82,10 @@ void cal_process_init(cal_process* p);
  * @param p    The calibration process structure to use.
  * @param type The type of calibration process to start.
  * @return CAL_PROCESS_OK if the calibration process was started successfuly,
- *         or CAL_PROCESS_ALREADY_RUNNING if another calibration process is
- *         already running.
+ *         CAL_PROCESS_INVALID_TYPE if the given type is invalid,
+ *         CAL_PROCESS_ALREADY_RUNNING if another calibration process is
+ *         already running, or CAL_PROCESS_INVALID_STATE if the process is in an
+ *         error state.
  */
 cal_process_status
 cal_process_start(cal_process* p, cal_process_type type);
@@ -92,9 +96,12 @@ cal_process_start(cal_process* p, cal_process_type type);
  * @param p   The ADC calibration process in which to move to the next point.
  * @param val The output value in the current step.
  * @result CAL_PROCESS_OK if the given value is valid and the calibration 
- *         process has been moved to the next step, CAL_PROCESS_INVALID_STATE
- *         if the process is not in a valid state to move to the next step, or
- *         CAL_PROCESS_INVALID_VALUE if the given value is invalid.
+ *         process has been moved to the next step, CAL_PROCESS_INVALID_TYPE if
+ *         the process is not an ADC calibration process,
+ *         CAL_PROCESS_INVALID_STATE if the process is not in a valid state to
+ *         move to the next step, CAL_PROCESS_INVALID_VALUE if the given
+ *         value is invalid, or CAL_PROCESS_OUTPUT_ERROR if the measured ADC
+ *         value is invalid.
  */
 cal_process_status
 cal_process_adc_next(cal_process* p, uint16_t val);
@@ -139,14 +146,6 @@ cal_process_get_state(cal_process* p);
  * @result The number of the step the given process is in.
  */
 uint8_t cal_process_get_step_number(cal_process* p);
-
-/**
- * Return the output value of the step that a given calibration process is in.
- *
- * @param p The calibration process for which to get the current step value.
- * @result The output value of the step the given process is in.
- */
-uint16_t cal_process_get_step_value(cal_process* p);
 
 /**
  * Return whether there is some calibration process running.
