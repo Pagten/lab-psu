@@ -44,6 +44,7 @@ typedef enum {
   CAL_PROCESS_VOLTAGE_DAC,
   CAL_PROCESS_CURRENT_DAC,
   CAL_PROCESS_TYPE_COUNT,
+  CAL_PROCESS_ADC_INIT_ERROR,
 } cal_process_type;
 
 typedef enum {
@@ -53,6 +54,7 @@ typedef enum {
   CAL_PROCESS_INVALID_VALUE,
   CAL_PROCESS_INVALID_TYPE,
   CAL_PROCESS_OUTPUT_ERROR,
+  CAL_PROCESS_EVENT_ERROR,
 } cal_process_status;
 
 typedef enum {
@@ -67,6 +69,7 @@ typedef struct {
   cal_process_state state;
   uint8_t step;
   pwlf table;
+  adc adc;
 } cal_process;
 
 /**
@@ -84,8 +87,10 @@ typedef struct {
  * @return CAL_PROCESS_OK if the calibration process was started successfuly,
  *         CAL_PROCESS_INVALID_TYPE if the given type is invalid,
  *         CAL_PROCESS_ALREADY_RUNNING if another calibration process is
- *         already running, or CAL_PROCESS_INVALID_STATE if the process is in an
- *         error state.
+ *         already running, CAL_PROCESS_INVALID_STATE if the process is in an
+ *         error state, CAL_PROCESS_EVENT_ERROR if the calibration process
+ *         could not be started, or CAL_PROCESS_ADC_INIT_ERROR if the ADC could
+ *         not be successfully initialized.
  */
 cal_process_status
 cal_process_start(cal_process* p, cal_process_type type);
@@ -100,8 +105,9 @@ cal_process_start(cal_process* p, cal_process_type type);
  *         the process is not an ADC calibration process,
  *         CAL_PROCESS_INVALID_STATE if the process is not in a valid state to
  *         move to the next step, CAL_PROCESS_INVALID_VALUE if the given
- *         value is invalid, or CAL_PROCESS_OUTPUT_ERROR if the measured ADC
- *         value is invalid.
+ *         value is invalid, CAL_PROCESS_OUTPUT_ERROR if the measured ADC
+ *         value is invalid, or CAL_PROCESS_NOT_READY if not enough time has
+ *         passed to make a new ADC measurement since the last step.
  */
 cal_process_status
 cal_process_adc_next(cal_process* p, uint16_t val);

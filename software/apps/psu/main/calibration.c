@@ -42,6 +42,8 @@
 #define CALIBRATION_NODES 16
 #define CAL_PROCESS_NB_STEPS CALIBRATION_NODES
 
+#define CAL_EVENT_PROCESS_STARTED 0
+
 /********* EEPROM *********/
 static uint8_t EEMEM EE_adc_to_mvolt_count;
 static pwlf_pair EEMEM EE_adc_to_mvolt_pairs[CALIBRATION_NODES];
@@ -54,9 +56,10 @@ static pwlf adc_to_mvolt = PWLF_INIT(CALIBRATION_NODES);
 static pwlf adc_to_mamp  = PWLF_INIT(CALIBRATION_NODES);
 static pwlf mvolt_to_dac = PWLF_INIT(CALIBRATION_NODES);
 static pwlf mamp_to_dac  = PWLF_INIT(CALIBRATION_NODES);
+static cal_process* current_process = NULL;
 
+PROCESS(dac_calibration_process);
 
-static bool calibration_running = false;
 
 cal_process_status
 cal_process_start(cal_process* p, cal_process_type type)
@@ -64,17 +67,40 @@ cal_process_start(cal_process* p, cal_process_type type)
   if (cal_is_process_running()) {
     return CAL_PROCESS_ALREADY_RUNNING;
   }
-  if (type >= CAL_PROCESS_TYPE_COUNT) {
-    return CAL_PROCESS_INVALID_TYPE;
-  }
+
   if (p->state != CAL_PROCESS_IDLE) {
     return CAL_PROCESS_INVALID_STATE;
   }
-
+  adc_channel channel;
+  switch (type) {
+  case CAL_PROCESS_VOLTAGE_ADC:
+  case CAL_PROCESS_VOLTAGE_DAC:
+    channel = ADC_VOLTAGE_CHANNEL;
+    break;
+  case CAL_PROCESS_CURRENT_ADC:
+  case CAL_PROCESS_CURRENT_DAC:
+    channel = ADC_CURRENT_CHANNEL;
+    break;
+  default:
+   return CAL_PROCESS_INVALID_TYPE; 
+  }
+  adc_init_status adc_stat = 
+    adc_init(&(p->adc), channel, ADC_RESOLUTION_16BIT, ADC_SKIP_15, NULL);
+  if (adc_stat != ADC_INIT_OK) {
+    return CAL_PROCESS_ADC_INIT_ERROR;
+  }
+  process_post_event_status proc_stat =
+    process_post_event(&calibration_process, CAL_EVENT_PROCESS_STARTED, NULL);
+  if (proc_stat != PROCESS_POST_EVENT_OK) {
+    return CAL_PROCESS_EVENT_ERROR;
+  }
   p->type = type;
   p->state = CAL_PROCESS_RUNNING;
   pwlf_clear(&(p->table));
-  calibration_running = true;
+  adc_enable(&(p->adc));
+  
+  current_process = p;
+
   return CAL_PROCESS_OK;
 }
 
@@ -91,9 +117,8 @@ cal_process_adc_next(cal_process* p, uint16_t val)
     return CAL_PROCESS_INVALID_STATE;
   }
 
-
   uint8_t step = cal_process_get_step_number(p);
-  uin16_t adc_val = 0; //TODO: read adc value
+  uin16_t adc_val = adc_get_value(&(p->adc));
   if (step > 0) {
     uint16_t prev_val = pwlf_get_y(&(p->table), step - 1);
     if (val <= prev_val) {
@@ -122,7 +147,8 @@ cal_process_cancel(cal_process* p)
 
   p->state = CAL_PROCESS_IDLE;
   pwlf_clear(&(p->table));
-  calibration_running = false;
+  adc_disable(&(p->adc))
+  current_process = NULL;
   return CAL_PROCESS_OK;
 }
 
@@ -155,8 +181,9 @@ cal_process_commit(cal_process* p)
   }
   pwlf_copy(&(p->table), dst);
   pwlf_clear(&(p->table));
+  adc_disable(&(p->adc));
   p->state = CAL_PROCESS_IDLE;
-  calibration_running = false;
+  current_process = NULL;
   return CAL_PROCESS_OK;
 }
 
@@ -178,7 +205,17 @@ cal_process_get_step_number(cal_process* p)
 inline bool
 cal_is_process_running()
 {
-  return calibration_running;
+  return current_process != NULL;
+}
+
+
+PROCESS_THREAD(dac_calibration_process)
+{
+  PROCESS_BEGIN();
+
+  // TODO: implement
+
+  PROCESS_END();
 }
 
 
