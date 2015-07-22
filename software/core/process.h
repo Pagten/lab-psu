@@ -140,16 +140,37 @@ typedef struct process {
   PT_YIELD(&(pc->pt))
 
 
+///**
+// * Wait until an event is received and a condition is met.
+// *
+// * This macro yields the current process until an event is received and a given
+// * condition is met. Other processes execute in the mean time. The condition is
+// * checked whenever the current process receives an event. A yield is performed
+// * even if the condition holds immediately when the macro is called.
+// */
+//#define PROCESS_WAIT_EVENT_UNTIL(cond)	\
+//  PT_YIELD_UNTIL(&(pc->pt), cond)
+
+
 /**
- * Wait until an event is received and a condition is met.
+ * Wait until an event is received and a condition is met. If an event is
+ * received and the condition is not met, then that event is resubmitted.
  *
  * This macro yields the current process until an event is received and a given
- * condition is met. Other processes execute in the mean time. The condition is
+ * condition is met. If an event is received and the condition is not met, that
+ * event is resubmitted, so the process can respond to it at a later time.
+ * Other processes can execute while the process is yielded. The condition is
  * checked whenever the current process receives an event. A yield is performed
  * even if the condition holds immediately when the macro is called.
  */
 #define PROCESS_WAIT_EVENT_UNTIL(cond)   \
-  PT_YIELD_UNTIL(&(pc->pt), cond)
+  do {						  \
+    PT_YIELD(&(pc->pt));			  \
+    while (! (cond)) {				  \
+      process_post_event(pc, ev, data);		  \
+      PT_YIELD(&(pc->pt));			  \
+    }						  \
+  } while (0)
 
 
 /**

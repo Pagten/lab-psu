@@ -78,6 +78,11 @@ typedef struct {
 #define CAL_PROCESS_INIT()						\
   { .state = CAL_PROCESS_IDLE, .table = PWLF_INIT(CALIBRATION_NODES) }
 
+/**
+ * Initialize the calibration module.
+ */
+void cal_init(void);
+
 
 /**
  * Start a new calibration process.

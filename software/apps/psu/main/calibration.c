@@ -219,6 +219,12 @@ PROCESS_THREAD(dac_calibration_process)
 }
 
 
+void cal_init(void)
+{
+  if (! cal_load_from_eeprom()) {
+    cal_load_defaults();
+  }
+}
 
 void cal_load_defaults(void)
 {
