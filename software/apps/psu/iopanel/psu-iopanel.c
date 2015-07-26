@@ -53,14 +53,18 @@ FUSES =
 };
 
 
-// ****************** Pins ******************
+// ****************** LCD ******************
 #define LCD_DATA_PORT       PORTD
 #define LCD_CTRL_PORT       PORTD
 #define LCD_FIRST_DATA_PIN  0
 #define LCD_E_PIN           4
 #define LCD_RS_PIN          7
 #define LCD_RW_PIN          6
+#define LCD_INSTR_BUF_SIZE  128
+// ******************************************
 
+
+// ************** Rotary encoders ***********
 #define ROTV_A    C,0
 #define ROTV_B    C,1
 #define ROTV_PUSH C,2
@@ -85,6 +89,7 @@ PROCESS(spi_handler);
 PROCESS(lcd_process);
 
 static hd44780_lcd lcd;
+static uint8_t lcd_instr_buf[LCD_INSTR_BUF_SIZE];
 
 static knob knob_v;
 static knob knob_c;
@@ -122,7 +127,8 @@ void init_lcd(void)
 {
   hd44780_init();
   hd44780_lcd_setup(&lcd, &LCD_DATA_PORT, &LCD_CTRL_PORT, LCD_FIRST_DATA_PIN,
-		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN);
+		    LCD_E_PIN, LCD_RS_PIN, LCD_RW_PIN, lcd_instr_buf,
+		    LCD_INSTR_BUF_SIZE);
   hd44780_lcd_init(&lcd, HD44780_TWO_ROWS);
   hd44780_lcd_set_entry_mode(&lcd, HD44780_RIGHT, NO_SHIFT_DISPLAY);
   hd44780_lcd_set_display(&lcd, ENABLE_DISPLAY, DISABLE_CURSOR,
