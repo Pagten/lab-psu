@@ -1,7 +1,7 @@
 /*
- * hd44780.h
+ * hd44780_async.h
  *
- * Copyright 2014 Pieter Agten
+ * Copyright 2015 Pieter Agten
  *
  * This file is part of the lab-psu firmware.
  *
@@ -19,18 +19,19 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HD44780_H
-#define HD44780_H
+#ifndef HD44780_ASYNC_H
+#define HD44780_ASYNC_H
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include "hal/gpio.h"
+#include "util/ring_buffer.h"
 
 /**
- * @file hd44780.h
+ * @file hd44780_async.h
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 13 Mar 2014
+ * @date 24 Jul 2015
  *
  * Driver for Hitachi HD44780 compatible dot matrix LCD controllers. The driver
  * operates the LCD in read/write 4-bit mode and assumes 5x8 dot characters.
@@ -47,7 +48,7 @@
 #define HD44780_20X4_LINE2 0x14
 #define HD44780_20X4_LINE3 0x54
 
-typedef struct {
+typedef struct hd44780_lcd {
   port_ptr data_port;
   port_ptr ctrl_port;
   uint8_t data_shift;
@@ -55,7 +56,9 @@ typedef struct {
   uint8_t e_mask;
   uint8_t rs_mask;
   uint8_t rw_mask;
-  FILE stream;
+  bool tx_pending;
+  ring_buffer instr_buf;
+  FILE stream;  
 } hd44780_lcd;
 
 typedef enum {
@@ -74,16 +77,30 @@ typedef enum {
   HD44780_SETUP_E_PIN_INVALID,
   HD44780_SETUP_RS_PIN_INVALID,
   HD44780_SETUP_RW_PIN_INVALID,
+  HD44780_SETUP_INSTR_BUF_TOO_SMALL,
 } hd44780_setup_status;
+
 
 /**
  * Initialize the HD44780 driver module.
  *
  * Modules that must be initialized first:
- *  (none)
+ *  * process
  */
 void hd44780_init(void);
 
+
+/*#define HD44780_SETUP(HNIBBLE_PORT, CTRL_PORT, HNIBBLE_PIN, E_PIN, RS_PIN, RW_PIN, INSTR_BUF_SIZE) \
+  { .data_port = HNIBBLE_PORT, \
+    .ctrl_port = CTRL_PORT, \
+    .data_shift = HNIBBLE_PIN, \
+    .data_mask = (0x0F << HNIBBLE_PIN),	\
+    .e_mask = _BV(E_PIN),		\
+    .rs_mask = _BV(RS_PIN),		\
+    .rw_mask = _BV(RW_PIN),		\
+    .tx_pending = false,		\
+    .instr_buf = RINGBUF_INIT(INSTR_BUF_SIZE) \
+    }*/
 
 /**
  * Set up a HD44780 LCD driver structure.
@@ -92,24 +109,25 @@ void hd44780_init(void);
  * configure the actual LCD device. To configure the LCD device, use the 
  * hd44780_lcd_init() function.
  *
- * @param lcd          The driver structure to set up
- * @param hnibble_port Address of the IO port connected to the four upper data
+ * @param data_port    Address of the IO port connected to the four upper data
  *                     lines of the LCD.
  * @param ctrl_port    Address of the control port, connected to the E, RS and
  *                     RW lines of the LCD.
  * @param hnibble_pin  Pin of the hnibble port connected to D4. The next three
  *                     pins are assumed to be connected to the next three data
  *                     lines.
+ * @param e_pin        Control port pin connected to the E line.
  * @param rs_pin       Control port pin connected to the RS line.
  * @param rw_pin       Control port pin connected to the RW line.
- * @return HD44780_SETUP_OK if the data structure was set up successfully, or
- *         any other return value if one of the specified pin values was out
- *         of range.
+ * @param instr_buf    Pointer to the buffer for the instruction queue.
+ * @param instr_buf_sz Size of the instruction queue.
+ * @return HD44780_SETUP_OK if the initializion was successful, or a different
+ *         value indicating an error otherwise.
  */
 hd44780_setup_status
-hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
+hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr data_port, port_ptr ctrl_port,
 		  uint8_t hnibble_pin, uint8_t e_pin, uint8_t rs_pin,
-		  uint8_t rw_pin);
+		  uint8_t rw_pin, uint8_t* instr_buf, size_t instr_buf_sz);
 
 
 /**
@@ -127,6 +145,14 @@ hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
  */
 void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows);
 
+
+///**
+// * Disable a given HD44780 LCD, so that it won't further consume CPU cycles. It
+// * can be re-enabled by calling hd44780_lcd_init().
+// *
+// * @param lcd The LCD device to disable.
+// */
+//void hd44780_lcd_disable(hd44780_lcd* lcd);
 
 /**
  * Clear the display of an HD44780 LCD.
@@ -258,48 +284,15 @@ void hd44780_lcd_set_cgram_address(hd44780_lcd* lcd, uint8_t address);
  */
 void hd44780_lcd_write(hd44780_lcd* lcd, uint8_t data);
 
-
 /**
- * Return whether an HD44780 LCD is currently busy.
- *
- * No commands may be sent to the LCD device when it is busy.
+ * Return whether an HD44780 LCD is currently busy. Note that, unlike most
+ * other functions of this module, this function is synchronous (i.e., it
+ * immediately communicates with the LCD device to check if it is busy).
  *
  * @param lcd  The LCD device of which to query the busy flag.
  * @return true if the LCD is busy, false otherwise.
  */
 bool hd44780_lcd_busy(hd44780_lcd* lcd);
-
-
-/**
- * Read the current address counter of an HD44780 LCD.
- *
- * Whether the CGRAM or DDRAM address counter is returned depends on whether
- * the last executed set_address function was hd44780_lcd_set_ddram_address()
- * or hd44780_lcd_set_cgram_address().
- *
- * @param lcd  The LCD device of which to read the address counter.
- * @return The current value of the address counter. The MSB is always zero.
- */
-uint8_t hd44780_lcd_read_address(hd44780_lcd* lcd);
-
-
-/**
- * Read a value from the DDRAM or CGRAM of an HD44780 LCD.
- *
- * The DDRAM or CGRAM address that will be read is the one selected previously
- * using the hd44780_lcd_set_ddram_address() or hd44780_lcd_set_cgram_address()
- * functions. If the previous command was not one of these two functions, the
- * read data will be invalid, unless the previous command was an lcd_read
- * command itself.
- *
- * This command will increment or decrement the address counter according to
- * the entry mode configured using the hd44780_lcd_set_entry_mode() function.
- *
- * @param lcd  The LCD device of which to read data.
- * @return The data read from the DDRAM or CGRAM.
- */
-uint8_t hd44780_lcd_read(hd44780_lcd* lcd);
-
 
 /**
  * Return a file stream that can be used to write to the DDRAM or CGRAM of an
