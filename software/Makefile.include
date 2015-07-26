@@ -31,7 +31,7 @@ OBJECTDIR = build
 SOURCEDIRS  += ${addprefix $(FW_ROOT)/, core drivers hal util}
 SOURCEFILES += clock.c timer.c process.c spi_master.c spi_slave.c mcp4922.c \
                hd44780.c rotary.c io_monitor.c log.c adc.c knob.c etimer.c \
-               pwlf.c eeprom.c
+               pwlf.c eeprom.c ring_buffer.c
 OBJECTFILES += ${addprefix $(OBJECTDIR)/,$(patsubst %.c, %.o, $(SOURCEFILES))}
 
 vpath %.c $(SOURCEDIRS)
