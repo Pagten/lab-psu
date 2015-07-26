@@ -148,7 +148,7 @@ typedef struct process {
 // * checked whenever the current process receives an event. A yield is performed
 // * even if the condition holds immediately when the macro is called.
 // */
-//#define PROCESS_WAIT_EVENT_UNTIL(cond)	\
+//#define PROCESS_WAIT_EVENT_UNTIL(cond)	
 //  PT_YIELD_UNTIL(&(pc->pt), cond)
 
 
@@ -163,15 +163,14 @@ typedef struct process {
  * checked whenever the current process receives an event. A yield is performed
  * even if the condition holds immediately when the macro is called.
  */
-#define PROCESS_WAIT_EVENT_UNTIL(cond)   \
+#define PROCESS_WAIT_EVENT_UNTIL(cond)		  \
   do {						  \
     PT_YIELD(&(pc->pt));			  \
-    while (! (cond)) {				  \
+    if (! (cond)) {				  \
       process_post_event(pc, ev, data);		  \
-      PT_YIELD(&(pc->pt));			  \
     }						  \
-  } while (0)
-
+  } while (! (cond))
+  
 
 /**
  * Yield the current process.
