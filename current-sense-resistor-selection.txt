@@ -1,0 +1,11 @@
+Ohmite 15FR200E
+0.2 ohms 5W 1%
+
+Temperature coefficient is about 50ppm/C and 40C/Watt
+Max power dissipated is 0.2*3*3 = 1.8W
+==> Max temp rise in free air = 1.8 * 40 = 72 degrees
+==> resistor will be about 100C max
+==> 50000 ppm = 0.5% diff ==> OK
+
+Performance will be better if using fan to cool resistor
+
