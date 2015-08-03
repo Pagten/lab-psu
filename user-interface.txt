@@ -1,0 +1,46 @@
+20x4 character LCD
+----------------------
+|                    |
+|                    |
+|                    |
+|                    |
+----------------------
+
+3 Buttons:
+1) Output on/off
+2) Display
+3) Menu
+
+2 Rotary encoders (including buttons):
+1) Voltage
+2) Current
+
+
+Normal mode - view 1
+----------------------
+|   Voltage  Current |
+|CV  12.18V   2.485A |
+|CC  10.89V   2.485A |
+|ON      27.06W      |
+----------------------
+Set values can be locked/unlocked by pressing and holding the corresponding
+rotary encoder. A lock symbol is displayed below V/A when the voltage/current
+is locked.
+
+
+
+Normal mode - view 2
+----------------------
+|   /| /|  /| /| \ / |
+|CV  |  | . |  |  \  |
+|CC /| /|  /| /|  /  |
+|ON  |  | . |  | / \ |
+----------------------
+Normally displays measured V/A, switches to set values in blinking font when
+corresponding rotary encoder is rotated. Set values can be locked/unlocked by
+pressing and holding the corresponding rotary encoder. A lock symbol is
+displayed to the right of the V/A when the voltage/current is locked.
+
+
+
+
