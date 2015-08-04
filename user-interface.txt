@@ -18,10 +18,10 @@
 
 Normal mode - view 1
 ----------------------
-|   Voltage  Current |
-|CV  12.18V   2.485A |
-|CC  10.89V   2.485A |
-|ON      27.06W      |
+|  | Voltage Current |
+|CV|  12.18V  2.485A |
+|CC|  10.89V  2.485A |
+|ON|     27.06W      |
 ----------------------
 Set values can be locked/unlocked by pressing and holding the corresponding
 rotary encoder. A lock symbol is displayed below V/A when the voltage/current
@@ -31,10 +31,10 @@ is locked.
 
 Normal mode - view 2
 ----------------------
-|   /| /|  /| /| \ / |
-|CV  |  | . |  |  \  |
-|CC /| /|  /| /|  /  |
-|ON  |  | . |  | / \ |
+|  |/| /|  /| /| \ / |
+|CV| |  | . |  |  \  |
+|CC|/| /|  /| /|  /  |
+|ON| |  | . |  | / \ |
 ----------------------
 Normally displays measured V/A, switches to set values in blinking font when
 corresponding rotary encoder is rotated. Set values can be locked/unlocked by
@@ -42,5 +42,49 @@ pressing and holding the corresponding rotary encoder. A lock symbol is
 displayed to the right of the V/A when the voltage/current is locked.
 
 
+Menu
+----------------------
+|  | Status          |
+|CV| ADC calibration |
+|CC| DAC calibration |
+|ON| Message log     |
+----------------------
+Can scroll through rows using either rotary encoder. Highlighted row is in
+inverted font. Can select row by clicking either rotary encoder. Set voltage or
+current does not change while in the main menu. Pressing menu or view button
+will exit the main menu.
 
+
+Menu --> ADC calibration confirmation
+----------------------
+|  |ADC calibration  | (inverted font)
+|CV|Voltage: OK  Cal |
+|CC|Current: OK  Cal |
+|ON|             Back|
+----------------------
+Back is highlighted by default, either Cal can be highlighted by rotating either
+rotary encoder. Pressing the menu button will return to the main menu (same as
+back). Pressing the view button will exit the menu and go back to the previous
+view. V/A Cal or Back can be selected by pressing either rotary encoder.
+Selecting V/A Cal will start the corresponding V/A ADC calibration process.
+
+
+
+Menu --> ADC calibration step 0
+TODO
+
+
+
+Menu --> DAC calibration confirmation
+----------------------
+|  |DAC calibration  | (inverted font)
+|CV|Voltage: OK  Cal |
+|CC|Current: OK  Cal |
+|ON|             Back|
+----------------------
+Back is highlighted by default, either Cal can be highlighted by rotating either
+rotary encoder. Pressing the menu button will return to the main menu (same as
+back). Pressing the view button will exit the menu and go back to the previous
+view. V/A Cal or Back can be selected by pressing either rotary encoder.
+Selecting V/A Cal will start the corresponding V/A DAC calibration process.
 
