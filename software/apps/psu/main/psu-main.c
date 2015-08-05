@@ -53,10 +53,8 @@ FUSES =
   .low = FUSE_CKSEL0, // Full swing crystal oscillator, slowly rising power
 };
 
-#define IOPANEL_UPDATE_RATE  (50 * CLOCK_MSEC)
 
 #define DAC_CS      B,1
-#define IOPANEL_CS  B,2
 
 #define DAC_MIN 0x0000
 #define DAC_MAX 0x0FFF
@@ -71,12 +69,19 @@ PROCESS(iopanel_update_process);
 
 #define PSU_FLAG_OUTPUT_ENABLED  0x01
 
+
+// TODO:
+// Create separate "control" module for controlling voltage and current with separate process for
+// sending packets to the DAC. This module will also provide functions for reading the ADCs
+// The PSU main module will only store the current mode of the PSU and will act like a sort of facade
+// for other modules. E.g: iopanel should not communicate with the control module, but only with the
+// facade. The calibration module CAN communicate with the control module directly, because it needs
+// to set the values of the DACs directly without passing through the mvolts or mamps conversion.
+
 static struct {
   uint8_t flags;
   uint16_t set_voltage;
   uint16_t set_current;
-  adc voltage;
-  adc current;
   adc line_voltage;
   adc temperature;
 } psu_status;
@@ -91,25 +96,17 @@ void init_pins(void)
 }
 
 
-static inline
-void init_calibration(void)
-{
-  if (! cal_load_from_eeprom()) {
-    cal_load_defaults();
-  }
-}
-
 
 static inline
 int16_t get_voltage_reading(void)
 {
-  return cal_adc_to_mvolt(adc_get_value(&psu_status.voltage));
+  return cal_adc_to_mvolt(ctrl_get_value(CTRL_CH_VOLTAGE0));
 }
 
 static inline
 int16_t get_current_reading(void)
 {
-  return cal_adc_to_mamp(adc_get_value(&psu_status.current));
+  return cal_adc_to_mamp(ctrl_get_value(CTRL_CH_CURRENT0));
 }
 
 static inline
@@ -181,25 +178,14 @@ PROCESS_THREAD(iopanel_update_process)
 	//SET_DEBUG_LED(0);
       }
 
-
       // Data exchanged successfully with IO panel. Now we will update the
-      // psu state according to the values received from the IO panel.
+      // psu state according to the values received from the IO panel.      
       psu_status.set_voltage = response.set_voltage;
       psu_status.set_current = response.set_current;
 
       // Immediately update the DAC values according to the psu status
-      // TODO: refactor this into a separate process?
-      PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&voltage_pkt));
-      mcp4922_pkt_set(&voltage_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_VOLTAGE_CHANNEL, mvolt_to_dac(psu_status.set_voltage));
-      mcp4922_pkt_queue(&voltage_pkt);
-      
-      PROCESS_WAIT_UNTIL(! mcp4922_pkt_is_in_transmission(&current_pkt));
-      // TODO: change mcp4922 interface so we don't have to repeat all
-      // information whenever we want to transmit a packet
-      mcp4922_pkt_set(&current_pkt, GET_BIT(DAC_CS), &GET_PORT(DAC_CS),
-		      DAC_CURRENT_CHANNEL, mamp_to_dac(psu_status.set_current));
-      mcp4922_pkt_queue(&current_pkt);
+      ctrl_set_output(CTRL_CH_VOLTAGE0, mvolt_to_dac(psu_status.set_voltage));
+      ctrl_set_output(CTRL_CH_CURRENT0, mamp_to_dac(psu_status.set_current));
     }
   }
 
@@ -213,23 +199,13 @@ int main(void)
   debug_init();
   init_pins();
   clock_init();
-  init_calibration();
+  cal_init();
   process_init();
   init_etimer();
   spim_init();
   init_adc();
   mcp4922_init();
-
-  //SET_DEBUG_LED(0);
-
-  // Enable ADC measurements
-  adc_init(&psu_status.voltage, ADC_VOLTAGE_CHANNEL, ADC_RESOLUTION_15BIT,
-	   ADC_SKIP_0, NULL);
-  adc_init(&psu_status.current, ADC_CURRENT_CHANNEL, ADC_RESOLUTION_15BIT,
-	   ADC_SKIP_0, NULL);
-  adc_enable(&psu_status.voltage);
-  adc_enable(&psu_status.current);
-  //CLR_DEBUG_LED(0);
+  ctrl_init();
 
   ENABLE_INTERRUPTS();
 

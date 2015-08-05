@@ -1,5 +1,5 @@
 /*
- * packets.c
+ * packets.h
  *
  * Copyright 2014 Pieter Agten
  *
@@ -33,21 +33,60 @@
 
 #include <stdint.h>
 
-#define IOPANEL_REQUEST_TYPE  0x01
-#define IOPANEL_RESPONSE_TYPE 0x02
+#define IOPANEL_REQUEST_TYPE       0x01
+#define IOPANEL_RESPONSE_TYPE      0x81
 
-struct iopanel_request {
-  uint8_t flags;
+
+struct iopanel_request_normal {
+  uint8_t mode_flags;
   uint16_t set_voltage;
   uint16_t set_current;
   uint16_t voltage;
   uint16_t current;
 };
 
-struct iopanel_response {
-  uint8_t set_flags;
+struct iopanel_request_calibrating {
+  uint8_t mode_flags;
+  uint8_t type_step;
+  uint16_t value;
+};
+
+struct iopanel_request_error {
+  uint8_t mode_flags;
+  uint8_t error;
+};
+
+struct iopanel_request {
+  union {
+    struct iopanel_request_normal normal;
+    struct iopanel_request_calibrating calibrating;
+    struct iopanel_request_error error;
+  } d;
+};
+
+struct iopanel_response_normal {
+  uint8_t mode_flags;
   uint16_t set_voltage;
   uint16_t set_current;
+};
+
+struct iopanel_response_calibrating {
+  uint8_t mode_flags;
+  uint8_t type_step;
+  uint16_t value;
+};
+
+struct iopanel_response_error {
+  uint8_t mode_flags;
+  uint8_t error_code;
+};
+
+struct iopanel_response {
+  union {
+    struct iopanel_response_normal normal;
+    struct iopanel_response_calibrating calibrating;
+    struct iopanel_response_error error;
+  } d;
 };
 
 #endif

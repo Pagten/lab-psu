@@ -1,7 +1,7 @@
 /*
- * hd44780.c
+ * hd44780_async.c
  *
- * Copyright 2014 Pieter Agten
+ * Copyright 2015 Pieter Agten
  *
  * This file is part of the lab-psu firmware.
  *
@@ -21,52 +21,45 @@
 
 
 /**
- * @file hd44780.c
+ * @file hd44780_async.c
  * @author Pieter Agten (pieter.agten@gmail.com)
- * @date 13 Mar 2014
+ * @date 24 Jul 2015
  */
 
 #include "hd44780.h"
 
-#include <stdio.h>
-#include <stddef.h>
+//#include <stdio.h>
+//#include <stddef.h>
 #include <util/delay.h>
+#include "core/process.h"
 #include "hal/cpufunc.h"
 #include "util/bit.h"
 #include "util/def.h"
 #include "util/fdev_stream.h"
+#include "util/ring_buffer.h"
+
+enum instr_type {
+  INSTR_TYPE_COMMAND = 0,
+  INSTR_TYPE_DATA    = 1,
+};
+
+#define EVENT_INSTR_SUBMITTED 0x00
+
+#define SENTINEL 0x11 /* Sentinel value to indicate that the next instruction
+		       * in the command buffer is a command instead of data.
+		       * This value can never occur as normal data in the
+		       * command buffer, because it is a non-printable ASCII
+		       * control character.
+		       */
+PROCESS(hd44780_process);
 
 static int hd44780_putchar(char c, FILE* stream);
 
-
 void hd44780_init(void)
-{ }
-
-
-hd44780_setup_status
-hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr hnibble_port, port_ptr ctrl_port,
-		  uint8_t hnibble_pin, uint8_t e_pin, uint8_t rs_pin,
-		  uint8_t rw_pin)
 {
-  if (hnibble_pin > 4)
-    return HD44780_SETUP_HNIBBLE_PIN_INVALID;
-  if (e_pin > 7)
-    return HD44780_SETUP_E_PIN_INVALID;
-  if (rs_pin > 7)
-    return HD44780_SETUP_RS_PIN_INVALID;
-  if (rw_pin > 7)
-    return HD44780_SETUP_RW_PIN_INVALID;
-
-  lcd->data_port = hnibble_port;
-  lcd->ctrl_port = ctrl_port;
-  lcd->data_shift = hnibble_pin;
-  lcd->data_mask = (0x0F << hnibble_pin);
-  lcd->e_mask = bv8(e_pin);
-  lcd->rs_mask = bv8(rs_pin);
-  lcd->rw_mask = bv8(rw_pin);
-  fdev_setup_stream(&(lcd->stream), hd44780_putchar, NULL, _FDEV_SETUP_WRITE);
-  return HD44780_SETUP_OK;
+  process_start(&hd44780_process);
 }
+
 
 /**
  * Send half of an 8-bit instruction: only the upper nibble will be sent.
@@ -131,9 +124,39 @@ uint8_t read(hd44780_lcd* lcd)
   return bf_addr;
 }
 
+hd44780_setup_status
+hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr data_port, port_ptr ctrl_port,
+		  uint8_t hnibble_pin, uint8_t e_pin, uint8_t rs_pin,
+		  uint8_t rw_pin, uint8_t* instr_buf, size_t instr_buf_sz)
+{
+  if (hnibble_pin > 4)
+    return HD44780_SETUP_HNIBBLE_PIN_INVALID;
+  if (e_pin > 7)
+    return HD44780_SETUP_E_PIN_INVALID;
+  if (rs_pin > 7)
+    return HD44780_SETUP_RS_PIN_INVALID;
+  if (rw_pin > 7)
+    return HD44780_SETUP_RW_PIN_INVALID;
+  if (instr_buf_sz < 2) 
+    return HD44780_SETUP_INSTR_BUF_TOO_SMALL;
+
+  lcd->data_port = data_port;
+  lcd->ctrl_port = ctrl_port;
+  lcd->data_shift = hnibble_pin;
+  lcd->data_mask = bv8(hnibble_pin);
+  lcd->e_mask = bv8(e_pin);
+  lcd->rs_mask = bv8(rs_pin);
+  lcd->rw_mask = bv8(rw_pin);
+  lcd->tx_pending = false;
+  ringbuf_init(&(lcd->instr_buf), instr_buf, instr_buf_sz);
+  fdev_setup_stream(&(lcd->stream), hd44780_putchar, NULL, _FDEV_SETUP_WRITE);
+  return HD44780_SETUP_OK;
+}
+
 
 void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows)
 {
+ 
   P_SET_PINS_DIR_OUTPUT(lcd->ctrl_port, lcd->e_mask|lcd->rs_mask|lcd->rw_mask);
   P_CLR_PINS(lcd->ctrl_port, lcd->rs_mask | lcd->rw_mask);
 
@@ -160,96 +183,131 @@ void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows)
 
   // Initialization done, busy flag can now be checked instead of waiting
   // between commands
+
+  // Create stream
+}
+
+/**
+ * Send the instruction at the tail of the queue to the LCD device. The queue
+ * must not be empty when calling this function!
+ */
+static void
+send_queued_instruction(hd44780_lcd* lcd)
+{
+  ring_buffer* const instr_buf = &(lcd->instr_buf);
+  const uint8_t instr = ringbuf_get_byte(instr_buf);
+  if (instr == SENTINEL) {
+    // Sentinel value means the instruction is a command instead of data, so
+    // we need to clear the RS line.
+    P_CLR_PINS(lcd->ctrl_port, lcd->rs_mask);
+    if (ringbuf_empty(instr_buf)) {
+      // This should never happen, because it means a sentinel value was
+      // placed in the instruction buffer, without a subsequent command!
+      // TODO: log!
+    }
+    const uint8_t cmd = ringbuf_get_byte(instr_buf);
+    write(lcd, cmd);
+  } else {
+    // Any value other than the sentinel means the instruction is data, so we
+    // need to set the RS line.
+    P_SET_PINS(lcd->ctrl_port, lcd->rs_mask);
+    write(lcd, instr);
+  }
+}
+
+
+/**
+ * Push an instruction onto the queue of instructions to be sent to the LCD.
+ */
+static void
+push_instruction(hd44780_lcd* lcd, enum instr_type type, uint8_t data)
+{
+  while (ringbuf_free_space(&(lcd->instr_buf)) < 2) {
+    send_queued_instruction(lcd);
+  }
+
+  if (type == INSTR_TYPE_COMMAND) {
+    ringbuf_put_byte(&(lcd->instr_buf), SENTINEL);
+    ringbuf_put_byte(&(lcd->instr_buf), data);
+  } else {
+    if (data == SENTINEL) {
+      // Should not happen because the sentinel value is an unprintable ASCII
+      // control character.
+      // TODO: log!
+      return;
+    }
+    ringbuf_put_byte(&(lcd->instr_buf), data);
+  }
+
+  if (! lcd->tx_pending) {
+    process_post_event(&hd44780_process, EVENT_INSTR_SUBMITTED,
+		       (process_data_t)lcd);
+    lcd->tx_pending = true;
+  }
 }
 
 
 void hd44780_lcd_clear(hd44780_lcd* lcd)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x01);
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x01); 
 }
 
 
 void hd44780_lcd_home(hd44780_lcd* lcd)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x02);
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x02); 
 }
 
 
 void hd44780_lcd_set_entry_mode(hd44780_lcd* lcd, hd44780_direction cursor_dir,
 				bool shift_display)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x04 | cursor_dir | shift_display);
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x04 | cursor_dir | shift_display); 
 }
 
 
 void hd44780_lcd_set_display(hd44780_lcd* lcd, bool display, bool cursor,
 			     bool cursor_blink)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x08 | (display << 2) | (cursor << 1) | cursor_blink);
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x08 | (display << 2) | (cursor << 1) | cursor_blink);
 }
 
 
 void hd44780_lcd_move_cursor(hd44780_lcd* lcd, hd44780_direction dir)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x18 | (dir << 1));
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x18 | (dir << 1));
 }
 
 
 void hd44780_lcd_shift_display(hd44780_lcd* lcd, hd44780_direction dir)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x10 | (dir << 1));
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x10 | (dir << 1));
 }
 
 
 void hd44780_lcd_set_ddram_address(hd44780_lcd* lcd, uint8_t address)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x80 | address);
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x80 | address);
 }
 
 
 void hd44780_lcd_set_cgram_address(hd44780_lcd* lcd, uint8_t address)
 {
-  while (hd44780_lcd_busy(lcd));
-  write(lcd, 0x40 | (address & 0x3F));
+  push_instruction(lcd, INSTR_TYPE_COMMAND, 0x40 | (address & 0x3F));
 }
 
 
 void hd44780_lcd_write(hd44780_lcd* lcd, uint8_t data)
 {
-  while (hd44780_lcd_busy(lcd));
-  P_SET_PINS(lcd->ctrl_port, lcd->rs_mask);
-  write(lcd, data);
+  push_instruction(lcd, INSTR_TYPE_DATA, data);
 }
 
 
-// Calling this function makes the RS signal low
-bool hd44780_lcd_busy(hd44780_lcd* lcd)
+inline bool
+hd44780_lcd_busy(hd44780_lcd* lcd)
 {
   P_CLR_PINS(lcd->ctrl_port, lcd->rs_mask);
   return !!(read(lcd) & 0x80);
-}
-
-
-uint8_t hd44780_lcd_read_address(hd44780_lcd* lcd)
-{
-  while (hd44780_lcd_busy(lcd));
-  _delay_us(4.0); // Wait 4us for the address to be updated
-  return read(lcd) & 0x07F;
-}
-
-
-uint8_t hd44780_lcd_read(hd44780_lcd* lcd)
-{
-  while (hd44780_lcd_busy(lcd));
-  P_SET_PINS(lcd->ctrl_port, lcd->rs_mask);
-  return read(lcd);
 }
 
 
@@ -264,4 +322,23 @@ hd44780_putchar(char c, FILE* stream)
   hd44780_lcd* lcd = container_of(stream, hd44780_lcd, stream);
   hd44780_lcd_write(lcd, (uint8_t)c);
   return 0;
+}
+
+
+PROCESS_THREAD(hd44780_process)
+{
+  PROCESS_BEGIN();
+
+  while(true) {
+    PROCESS_WAIT_EVENT_UNTIL(ev = EVENT_INSTR_SUBMITTED &&
+			     ! hd44780_lcd_busy((hd44780_lcd*)data));
+
+    hd44780_lcd* const lcd = (hd44780_lcd*)data;
+    while (! ringbuf_empty(&(lcd->instr_buf))) {
+      send_queued_instruction(lcd);
+    }
+    lcd->tx_pending = false;
+  }
+
+  PROCESS_END();
 }
