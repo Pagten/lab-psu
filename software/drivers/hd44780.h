@@ -1,5 +1,5 @@
 /*
- * hd44780_async.h
+ * hd44780.h
  *
  * Copyright 2015 Pieter Agten
  *
@@ -19,8 +19,8 @@
  * along with the firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HD44780_ASYNC_H
-#define HD44780_ASYNC_H
+#ifndef HD44780_H
+#define HD44780_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,7 +29,7 @@
 #include "util/ring_buffer.h"
 
 /**
- * @file hd44780_async.h
+ * @file hd44780.h
  * @author Pieter Agten (pieter.agten@gmail.com)
  * @date 24 Jul 2015
  *
