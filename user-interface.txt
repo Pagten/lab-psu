@@ -16,11 +16,11 @@
 2) Current
 
 
-Normal mode - view 1
+Normal mode - default view
 ----------------------
-|  | Voltage Current |
-|CV|  12.18V  2.485A |
-|CC|  10.89V  2.485A |
+|  |Voltage   Current|
+|CV|12.182V    2.485A|
+|CC|10.891V    2.485A|
 |ON|     27.06W      |
 ----------------------
 Set values can be locked/unlocked by pressing and holding the corresponding
@@ -29,7 +29,7 @@ is locked.
 
 
 
-Normal mode - view 2
+Normal mode - big font view
 ----------------------
 |  |/| /|  /| /| \ / |
 |CV| |  | . |  |  \  |
@@ -49,15 +49,15 @@ Menu
 |CC| DAC calibration |
 |ON| Message log     |
 ----------------------
-Can scroll through rows using either rotary encoder. Highlighted row is in
-inverted font. Can select row by clicking either rotary encoder. Set voltage or
-current does not change while in the main menu. Pressing menu or view button
-will exit the main menu.
+Can scroll through rows using either rotary encoder. Highlighted row has arrows
+to the left and right of it. Can select row by clicking either rotary encoder.
+Set voltage or current does not change while in the main menu. Pressing menu or
+view button will exit the main menu.
 
 
-Menu --> ADC calibration confirmation
+Menu --> ADC calibration status
 ----------------------
-|  |ADC calibration  | (inverted font)
+|  |ADC calibration  |
 |CV|Voltage: OK  Cal |
 |CC|Current: OK  Cal |
 |ON|             Back|
@@ -70,14 +70,35 @@ Selecting V/A Cal will start the corresponding V/A ADC calibration process.
 
 
 
-Menu --> ADC calibration step 0
-TODO
+Menu --> ADC calibration confirmation
+----------------------    ----------------------
+|ADC calibration (V) |    |ADC calibration (A) |
+|  PLEASE DISCONNECT |    |    PLEASE SHORT    |
+|     OUTPUT NOW     |    |     OUTPUT NOW     |
+|       Start  Cancel|    |       Start  Cancel|
+----------------------    ----------------------
+Cancel is highlighted by default, Start can be highlighted by rotating either
+rotary encoder. Selecting Next will move on to the next step. Pressing menu or
+view button does nothing.
+
+
+Menu --> ADC calibration step 1-15
+----------------------    ----------------------
+|ADC calibration (V) |    |ADC calibration (A) |
+|Step 10/15          |    |Step 10/15          |
+| Measured V: 10.158 |    | Measured A: 2.032  |
+|  Next  Back  Cancel|    |  Next  Back  Cancel|
+----------------------    ----------------------
+User can enter measured V/A by rotating left rotary encoder. Pressing rotary
+encoder switches from leftmost 2/3 characters to rightmost 2 characters. Right
+rotary encoder can be used to switch between OK/Cancel. Next is selected by
+default. Pressing menu or view button does nothing.
 
 
 
-Menu --> DAC calibration confirmation
+Menu --> DAC calibration status
 ----------------------
-|  |DAC calibration  | (inverted font)
+|  |DAC calibration  | 
 |CV|Voltage: OK  Cal |
 |CC|Current: OK  Cal |
 |ON|             Back|
@@ -88,3 +109,27 @@ back). Pressing the view button will exit the menu and go back to the previous
 view. V/A Cal or Back can be selected by pressing either rotary encoder.
 Selecting V/A Cal will start the corresponding V/A DAC calibration process.
 
+
+Menu --> DAC calibration confirmation
+----------------------    ----------------------
+|DAC calibration (V) |    |DAC calibration (A) |
+|  PLEASE DISCONNECT |    |    PLEASE SHORT    |
+|     OUTPUT NOW     |    |     OUTPUT NOW     |
+|       Start  Cancel|    |       Start  Cancel|
+----------------------    ----------------------
+Cancel is highlighted by default, Start can be highlighted by rotating either
+rotary encoder. Selecting Next will move on to the next step. Pressing menu or
+view button does nothing.
+
+
+Menu --> DAC calibration step 1-15
+----------------------    ----------------------
+|DAC calibration (V) |    |DAC calibration (A) |
+|Step 10/15          |    |Step 10/15          |
+|      Set: 10.000V  |    |     Set A: 2.000A  |
+| Measured: 10.158V  |    |  Measured: 2.032A  |
+----------------------    ----------------------
+User can enter measured V/A by rotating left rotary encoder. Pressing rotary
+encoder switches from leftmost 2/3 characters to rightmost 2 characters. Right
+rotary encoder can be used to switch between OK/Cancel. Next is selected by
+default. Pressing menu or view button does nothing.
