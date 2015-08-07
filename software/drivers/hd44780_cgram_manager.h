@@ -29,26 +29,41 @@
  *
  */
 
+#define NB_CGRAM_ENTRIES 8
+
+// Forward declaration:
+typedef struct hd44780_lcd hd44780_lcd;
 
 typedef struct {
-  uint8_t pattern[8];
+  uint8_t pattern[5];
 } hd44780_cgram_pattern;
 
-typedef struct {
+struct cgram_entry {
   hd44780_cgram_pattern* p;
   uint8_t refcount;
-} hd44780_cgram_pattern_ref;
+};
+
+typedef struct {
+  struct cgram_entry entries[NB_CGRAM_ENTRIES];
+} hd44780_cgram;
 
 typedef struct {
   hd44780_lcd* lcd;
-  hd44780_cgram_pattern* c;
-  uint8_t index;
-} hd44780_cgram_pattern_lock;
-
-void hd44780_cgram_acquire(cgram_lock* l);
+  hd44780_cgram_pattern* p;
+  char index;
+} hd44780_cgram_char;
 
 
-void hd44780_cgram_release(cgram_lock* l);
+void hd44780_cgram_init(hd44780_cgram* cgram);
+
+void hd44780_cgram_char_init(hd44780_cgram_char* c, hd44780_lcd* lcd,
+			     hd44780_cgram_pattern* pattern);
+
+char hd44780_cgram_char_acquire(hd44780_cgram_char* c);
+
+char hd44780_cgram_char_get(hd44780_cgram_char* c);
+
+void hd44780_cgram_char_release(hd44780_cgram_char* c);
 
 
 #endif

@@ -25,3 +25,69 @@
  * @date 07 Aug 2015
  */
 
+#define INDEX_NOT_IN_USE 0xFF
+
+void hd44780_cgram_init(hd44780_cgram* cgram)
+{
+  for (uint8_t i = 0; i < NB_CGRAM_ENTRIES; ++i) {
+    cgram->entries[i] = 0;
+  }
+}
+
+void hd44780_cgram_char_init(hd44780_cgram_char* c, hd44780_lcd* lcd,
+			     hd44780_cgram_pattern* pattern)
+{
+  c->lcd = lcd;
+  c->p = pattern;
+  c->index = INDEX_NOT_IN_USE;
+
+}
+
+static void
+upload_to_cgram(hd44780_cgram_char* c)
+{
+  // TODO: upload to CGRAM and then restore previous DDRAM address
+  
+}
+
+char hd44780_cgram_char_acquire(hd44780_cgram_char* c)
+{
+  if (c->index == INDEX_NOT_IN_USE) {
+    // Char not yet acquired, so first check if pattern is already present in
+    // the LCD's CGRAM
+    char i = 0;
+    char free = INDEX_NOT_IN_USE;
+    struct cgram_entry entries[] = c->lcd->cgram->entries;
+    while (i < NB_CGRAM_ENTRIES && entries[i].p != pattern) {
+      if (free == INDEX_NOT_IN_USE && entries[i].p == NULL) {
+	free = i;
+      }
+      i += 1;
+    }
+
+    if (i < NB_CGRAM_ENTRIES) {
+      // Pattern already present, so just increase the refcount
+      if (entries[i].refcount < UINT8_MAX) {
+	entries[i].refcount += 1;
+	c->index = i;
+      } else {
+	// Refcount overflow!
+	// TODO: LOG!
+      }
+    } else if (free < NB_CGRAM_ENTRIES) {
+      // Pattern not yet present, so upload the pattern to a free spot
+      upload_to_cgram(c);
+      entries[i].refcount = 1;
+      c->index = free;
+    } else {
+      // Pattern not yet present and no free CGRAM spots left...
+      // TODO: LOG!
+    }
+  }
+
+  return c->index;
+}
+
+char hd44780_cgram_char_get(hd44780_cgram_char* c);
+
+void hd44780_cgram_char_release(hd44780_cgram_char* c);
