@@ -48,6 +48,12 @@
 #define HD44780_20X4_LINE2 0x14
 #define HD44780_20X4_LINE3 0x54
 
+typedef enum {
+  HD44780_DDRAM,
+  HD44780_CGRAM,
+} hd44780_ram_type;
+
+
 typedef struct hd44780_lcd {
   port_ptr data_port;
   port_ptr ctrl_port;
@@ -56,10 +62,16 @@ typedef struct hd44780_lcd {
   uint8_t e_mask;
   uint8_t rs_mask;
   uint8_t rw_mask;
-  bool tx_pending;
+  bool has_stored_addr : 1;
+  uint8_t stored_addr : 7;
+  hd44780_ram_type stored_addr_type : 1;
+  hd44780_ram_type current_addr_type : 1;
+  bool tx_pending : 1;
   ring_buffer instr_buf;
-  FILE stream;  
+  FILE stream;
+  hd44780_cgram cgram;
 } hd44780_lcd;
+
 
 typedef enum {
   HD44780_ONE_ROW  = 0,
@@ -90,18 +102,6 @@ typedef enum {
 void hd44780_init(void);
 
 
-/*#define HD44780_SETUP(HNIBBLE_PORT, CTRL_PORT, HNIBBLE_PIN, E_PIN, RS_PIN, RW_PIN, INSTR_BUF_SIZE) \
-  { .data_port = HNIBBLE_PORT, \
-    .ctrl_port = CTRL_PORT, \
-    .data_shift = HNIBBLE_PIN, \
-    .data_mask = (0x0F << HNIBBLE_PIN),	\
-    .e_mask = _BV(E_PIN),		\
-    .rs_mask = _BV(RS_PIN),		\
-    .rw_mask = _BV(RW_PIN),		\
-    .tx_pending = false,		\
-    .instr_buf = RINGBUF_INIT(INSTR_BUF_SIZE) \
-    }*/
-
 /**
  * Set up a HD44780 LCD driver structure.
  *
@@ -121,13 +121,16 @@ void hd44780_init(void);
  * @param rw_pin       Control port pin connected to the RW line.
  * @param instr_buf    Pointer to the buffer for the instruction queue.
  * @param instr_buf_sz Size of the instruction queue.
+ * @param cgram        CGRAM data structure for the LCD, or NULL if CGRAM will
+ *                     not be used.
  * @return HD44780_SETUP_OK if the initializion was successful, or a different
  *         value indicating an error otherwise.
  */
 hd44780_setup_status
 hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr data_port, port_ptr ctrl_port,
 		  uint8_t hnibble_pin, uint8_t e_pin, uint8_t rs_pin,
-		  uint8_t rw_pin, uint8_t* instr_buf, size_t instr_buf_sz);
+		  uint8_t rw_pin, uint8_t* instr_buf, size_t instr_buf_sz,
+		  hd44780_cgram* cgram);
 
 
 /**
@@ -284,15 +287,27 @@ void hd44780_lcd_set_cgram_address(hd44780_lcd* lcd, uint8_t address);
  */
 void hd44780_lcd_write(hd44780_lcd* lcd, uint8_t data);
 
+
 /**
- * Return whether an HD44780 LCD is currently busy. Note that, unlike most
- * other functions of this module, this function is synchronous (i.e., it
- * immediately communicates with the LCD device to check if it is busy).
+ * Read the busy flag and the address counter from an HD44780 LCD. Note that,
+ * unlike most other functions of this module, this function is synchronous
+ * (i.e., it immediately communicates with the LCD device).
  *
- * @param lcd  The LCD device of which to query the busy flag.
+ * @param lcd  The LCD device to read.
+ * @return The value read from the LCD device. The highest bit is the busy
+ *         flag and the other bits make up the current DDRAM or CGRAM address.
+ */
+uint8_t hd44780_lcd_read(hd44780_lcd* lcd);
+
+
+/**
+ * Return whether an HD44780 LCD is busy, based on a value read from the LCD.
+ *
+ * @param readout The status value read from the LCD device, using the
+ *                hd44780_lcd_read() function.
  * @return true if the LCD is busy, false otherwise.
  */
-bool hd44780_lcd_busy(hd44780_lcd* lcd);
+bool hd44780_lcd_busy(uint8_t readout);
 
 /**
  * Return a file stream that can be used to write to the DDRAM or CGRAM of an
