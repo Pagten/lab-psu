@@ -200,6 +200,12 @@ typedef struct process {
 #define PROCESS_CURRENT()  pc
 
 
+/**
+ * Resubmit the event that was received to the event queue.
+ */
+#define PROCESS_RESUBMIT_EVENT() \
+  process_post_event(PROCESS_CURRENT(), ev, data)
+
 typedef enum {
   PROCESS_POST_EVENT_OK,
   PROCESS_POST_EVENT_QUEUE_FULL,
