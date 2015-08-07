@@ -1,7 +1,7 @@
 /*
  * screen_default.c
  *
- * Copyright 2014 Pieter Agten
+ * Copyright 2015 Pieter Agten
  *
  * This file is part of the lab-psu firmware.
  *
@@ -52,9 +52,19 @@ static hd44780_lcd* lcd;
  * will always be 7 characters long (+ a string delimiter) and will be
  * right aligned.
  */
-static void sprint_fixp(char buf[8], int16_t voltage)
+static void sprint_fixp(char buf[8], int16_t v)
 {
   sprintf(buf, "% 6.4d", v);
+  buf[7] = 0;
+  buf[6] = buf[5];
+  buf[5] = buf[4];
+  buf[4] = buf[3];
+  buf[3] = '.';
+}
+
+static void sprint_ufixp(char buf[8], uint16_t v)
+{
+  sprintf(buf, "% 6.4u", v);
   buf[7] = 0;
   buf[6] = buf[5];
   buf[5] = buf[4];
@@ -75,11 +85,17 @@ static void draw_voltage(void)
   sprint_fixp(strbuf, psu_get_set_voltage());
   hd44780_lcd_set_ddram_address(lcd, ADDR_SET_VOLTAGE);
   fprintf(flcd, "%sV", strbuf);
+
+  // Line 3: Measured value
+  sprint_fixp(strbuf, psu_get_measured_voltage());
+  hd44780_lcd_set_ddram_address(lcd, ADDR_MEASURED_VOLTAGE);
+  fprintf(flcd, "%sV", strbuf);
 }
 
 static void draw_current(void)
 {
   FILE* flcd = hd44780_lcd_stream(lcd);
+  char strbuf[8];
 
   // Line 1: Title
   hd44780_lcd_set_ddram_address(lcd, ADDR_CURRENT_TITLE);
@@ -89,26 +105,28 @@ static void draw_current(void)
   sprint_fixp(strbuf, psu_get_set_current());
   hd44780_lcd_set_ddram_address(lcd, ADDR_SET_CURRENT);
   fprintf(flcd, "%sA", strbuf);
+
+  // Line 3: Measured value
+  sprint_fixp(strbuf, psu_get_measured_current());
+  hd44780_lcd_set_ddram_address(lcd, ADDR_MEASURED_CURRENT);
+  fprintf(flcd, "%sA", strbuf);
+}
+
+static void draw_power(void)
+{
+  FILE* flcd = hd44780_lcd_stream(lcd);
+  char strbuf[8];
+
+  sprint_ufixp(strbuf, psu_get_measured_power());
+  hd44780_lcd_set_ddram_address(lcd, ADDR_MEASURED_POWER);
+  fprintf(flcd, "%sW", strbuf);
 }
 
 static void draw(void)
 {
-  FILE* flcd = hd44780_lcd_stream(lcd);
-
-  // Line 1
-  // Voltage title
-  hd44780_lcd_set_ddram_address(lcd, ADDR_VOLTAGE_TITLE);
-  fputs(flcd, "Voltage");
-
-  // Current title
-  hd44780_lcd_set_ddram_address(lcd, ADDR_CURRENT_TITLE);
-  fputs(flcd, "Current");
-
-  // Line 2
-  // Set voltage
-  hd44780_lcd_set_ddram_address(lcd, ADDR_SET_VOLTAGE);
-  int16_t set_voltage = psu_get_set_voltage();
-  fprintf(flcd, "%7.4dV", );
+  draw_voltage();
+  draw_current();
+  draw_power();
 }
 
 PROCESS_THREAD(screen_default_process)

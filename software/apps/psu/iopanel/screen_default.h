@@ -1,7 +1,7 @@
 /*
  * screen_default.h
  *
- * Copyright 2014 Pieter Agten
+ * Copyright 2015 Pieter Agten
  *
  * This file is part of the lab-psu firmware.
  *
