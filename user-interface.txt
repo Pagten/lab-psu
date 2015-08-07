@@ -21,7 +21,7 @@ Normal mode - default view
 |  |Voltage   Current|
 |CV|12.182V    2.485A|
 |CC|10.891V    2.485A|
-|ON|     27.06W      |
+|ON|     27.061W     |
 ----------------------
 Set values can be locked/unlocked by pressing and holding the corresponding
 rotary encoder. A lock symbol is displayed below V/A when the voltage/current
