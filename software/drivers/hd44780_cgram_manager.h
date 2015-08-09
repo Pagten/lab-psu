@@ -29,7 +29,16 @@
  *
  */
 
-#define NB_CGRAM_ENTRIES 8
+#define HD44780_NB_CGRAM_ENTRIES 8
+
+#define CGRAM_PATTERN(name, l0,l1,l2,l3,l4,l5,l6,l7) \
+  hd44780_cgram_pattern name PROGMEM = { . pattern = {			\
+    ((l0 & 0x1F) << 3) | ((l1 & 0x1F) >> 2),				\
+    ((l1 & 0x1F) << 6) | ((l2 & 0x1F) << 1) | ((l3 & 0x1F) >> 4),	\
+    ((l3 & 0x1F) << 4) | ((l4 & 0x1F) >> 1),				\
+    ((l4 & 0x1F) << 7) | ((l5 & 0x1F) << 2) | ((l6 & 0x1F) >> 3),	\
+    ((l6 & 0x1F) << 5) | ((l7 & 0x1F) }}
+
 
 // Forward declaration:
 typedef struct hd44780_lcd hd44780_lcd;
@@ -44,7 +53,7 @@ struct cgram_entry {
 };
 
 typedef struct {
-  struct cgram_entry entries[NB_CGRAM_ENTRIES];
+  struct cgram_entry entries[HD44780_NB_CGRAM_ENTRIES];
 } hd44780_cgram;
 
 typedef struct {

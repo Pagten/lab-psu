@@ -39,8 +39,8 @@
 #include "util/ring_buffer.h"
 
 enum instr_type {
-  INSTR_TYPE_COMMAND = 0,
-  INSTR_TYPE_DATA    = 1,
+  INSTR_TYPE_COMMAND,
+  INSTR_TYPE_DATA,
 };
 
 #define EVENT_INSTR_SUBMITTED 0x00
@@ -51,14 +51,17 @@ enum instr_type {
  * the instruction queue, because they are non-printable ASCII control
  * characters.
  */
-#define SENTINEL_CMD                0x11 /** Next val is command, not data */
-#define SENTINEL_SAVE_RESTORE_ADDR  0x12 /** Save/restore current address */
+#define SENTINEL_CMD              0x11 /** Next val is command, not data */
+#define SENTINEL_ENTER_CGRAM_MODE 0x12 /** Save DDRAM address */
+#define SENTINEL_EXIT_CGRAM_MODE  0x20 /** Restore DDRAM address */
 
 
-#define HD44780_SET_DDRAM_BIT  7
-#define HD44780_SET_CGRAM_BIT  6
-#define HD44780_BUSY_FLAG      7
-#define HD44780_ADDR_MASK      (~_BV(HD44780_BUSY_FLAG))
+
+#define HD44780_SET_DDRAM_BIT       7
+#define HD44780_SET_CGRAM_BIT       6
+#define HD44780_DIRECTION_RIGHT_BIT 1
+#define HD44780_BUSY_FLAG           7
+#define HD44780_ADDR_MASK           (~_BV(HD44780_BUSY_FLAG))
 
 PROCESS(hd44780_process);
 
@@ -196,6 +199,7 @@ void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows)
   write(lcd, 0x06);
 
   lcd->current_addr_type = HD44780_DDRAM;
+  lcd->direction = HD44780_RIGHT;
   // Initialization done, busy flag can now be checked instead of waiting
   // between commands
 }
@@ -209,7 +213,7 @@ send_queued_instruction(hd44780_lcd* lcd, uint8_t readout)
 {
   ring_buffer* const instr_buf = &(lcd->instr_buf);
   const uint8_t instr = ringbuf_get_byte(instr_buf);
-  if (instr == SENTINEL_CMD) {
+  if (! lcd->in_cgram_mode && instr == SENTINEL_CMD) {
     // This sentinel value means the instruction is a command instead of data,
     // so we need to clear the RS line.
     P_CLR_PINS(lcd->ctrl_port, lcd->rs_mask);
@@ -220,31 +224,41 @@ send_queued_instruction(hd44780_lcd* lcd, uint8_t readout)
     }
     const uint8_t cmd = ringbuf_get_byte(instr_buf);
     if (bit_is_set(cmd, HD44780_SET_DDRAM_BIT)) {
+      // Set DDRAM address command
       lcd->current_addr_type = HD44780_DDRAM;
     } else if (bit_is_set(cmd, HD44780_SET_CGRAM_BIT)) {
+      // Set CGRAM address command
       lcd->current_addr_type = HD44780_CGRAM;
     }
-    write(lcd, cmd);
-  } else if (instr == SENTINEL_SAVE_RESTORE_ADDR) {
-    if (lcd->has_addr_stored) {
-      // Restore
-      uint8_t cmd;
-      if (lcd->stored_addr_type == HD44780_DDRAM) {
-	// DDRAM address
-	cmd = _BV(HD44780_SET_DDRAM_BIT) | lcd->stored_addr;
+    if ((cmd & ~0b11) = 0x04) {
+      // Set entry mode command
+      if (bit_is_set(cmd, HD44780_DIRECTION_RIGHT_BIT)) {
+	lcd->direction = HD44780_RIGHT;
       } else {
-	// CGRAM address
-	cmd = _BV(HD44780_SET_CGRAM_BIT) | (lcd->stored_addr & 
-					    ~_BV(HD44780_SET_DDRAM_BIT));
+	lcd->direction = HD44780_LEFT;
       }
-      lcd->has_addr_stored = false;
-      write(lcd, cmd);
-    } else {
-      // Save
-      lcd->stored_addr_type = lcd->current_addr_type;
-      lcd->stored_addr = readout & HD44780_ADDR_MASK;
-      lcd->has_addr_stored = true;
     }
+
+    // Write command to LCD
+    write(lcd, cmd);
+  } else if (! lcd->in_cgram_mode && instr == SENTINEL_ENTER_CGRAM_MODE) {
+    // Save current address
+    lcd->stored_addr_type = lcd->current_addr_type;
+    lcd->stored_addr = readout & HD44780_ADDR_MASK;
+    lcd->in_cgram_mode = true;
+  } else if (lcd->in_cgram_mode && instr == SENTINEL_EXIT_CGRAM_MODE) {
+    // Restore saved address
+    uint8_t cmd;
+    if (lcd->stored_addr_type == HD44780_DDRAM) {
+      // DDRAM address
+      cmd = _BV(HD44780_SET_DDRAM_BIT) | lcd->stored_addr;
+    } else {
+      // CGRAM address
+      cmd = _BV(HD44780_SET_CGRAM_BIT) | (lcd->stored_addr & 
+					  ~_BV(HD44780_SET_DDRAM_BIT));
+    }
+    lcd->in_cgram_mode = false;
+    write(lcd, cmd);
   } else {
     // Any non-sentinel value means the instruction is data, so we need to set
     // the RS line.
@@ -277,7 +291,7 @@ push_instruction(hd44780_lcd* lcd, enum instr_type type, uint8_t data)
     ringbuf_put_byte(&(lcd->instr_buf), SENTINEL_CMD);
     ringbuf_put_byte(&(lcd->instr_buf), data);
   } else {
-    if (data == SENTINEL_CMD || SENTINEL_SAVE_RESTORE_ADDR) {
+    if (! lcd->in_cgram_mode && data == SENTINEL_CMD) {
       // Should not happen because the sentinel value is an unprintable ASCII
       // control character.
       // TODO: log!
@@ -337,6 +351,39 @@ void hd44780_lcd_set_ddram_address(hd44780_lcd* lcd, uint8_t address)
   push_instruction(lcd, INSTR_TYPE_COMMAND, 0x80 | address);
 }
 
+
+void hd44780_cgram_write(hd44780_lcd* lcd, uint8_t index,
+			 uint8_t pattern[8])
+{
+  if (index >= HD44780_NB_CGRAM_ENTRIES) {
+    return;
+  }
+
+  // Save current address
+  push_instruction(lcd, INSTR_TYPE_DATA, SENTINEL_ENTER_CGRAM_MODE); 
+
+  if (lcd->direction == HD44780_RIGHT) {
+    // Set CGRAM address
+    const uint8_t addr = index << 3;
+    push_instruction(lcd, INSTR_TYPE_COMMAND, 0x40 | addr);
+
+    // Write each pattern line
+    for (uint8_t i = 0; i < 8; ++i) {
+      push_instruction(lcd, INSTR_TYPE_DATA, (pattern[i] & 0x1F)); 
+    }
+  } else {
+    const uint8_t addr = (index << 3) + 8;
+    push_instruction(lcd, INSTR_TYPE_COMMAND, 0x40 | addr);
+
+    // Write each pattern line
+    for (uint8_t i = 8; i > 0; --i) {
+      push_instruction(lcd, INSTR_TYPE_DATA, (pattern[i] & 0x1F)); 
+    }
+  }
+
+  // Restore saved address
+  push_instruction(lcd, INSTR_TYPE_DATA, SENTINEL_EXIT_CGRAM_MODE); 
+}
 
 void hd44780_lcd_set_cgram_address(hd44780_lcd* lcd, uint8_t address)
 {

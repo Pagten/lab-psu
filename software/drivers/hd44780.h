@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include "hal/gpio.h"
 #include "util/ring_buffer.h"
+#include "hd44780_cgram_manager.h"
 
 /**
  * @file hd44780.h
@@ -62,11 +63,12 @@ typedef struct hd44780_lcd {
   uint8_t e_mask;
   uint8_t rs_mask;
   uint8_t rw_mask;
-  bool has_stored_addr : 1;
+  bool in_cgram_mode : 1;
   uint8_t stored_addr : 7;
   hd44780_ram_type stored_addr_type : 1;
   hd44780_ram_type current_addr_type : 1;
   bool tx_pending : 1;
+  hd44780_direction direction : 1;
   ring_buffer instr_buf;
   FILE stream;
   hd44780_cgram cgram;
@@ -148,14 +150,6 @@ hd44780_lcd_setup(hd44780_lcd* lcd, port_ptr data_port, port_ptr ctrl_port,
  */
 void hd44780_lcd_init(hd44780_lcd* lcd, hd44780_nb_rows nb_rows);
 
-
-///**
-// * Disable a given HD44780 LCD, so that it won't further consume CPU cycles. It
-// * can be re-enabled by calling hd44780_lcd_init().
-// *
-// * @param lcd The LCD device to disable.
-// */
-//void hd44780_lcd_disable(hd44780_lcd* lcd);
 
 /**
  * Clear the display of an HD44780 LCD.
@@ -243,6 +237,21 @@ void hd44780_lcd_shift_display(hd44780_lcd* lcd, hd44780_direction dir);
  *                most significant address bit is ignored.
  */
 void hd44780_lcd_set_ddram_address(hd44780_lcd* lcd, uint8_t address);
+
+
+/**
+ * Write a custom character pattern to the Character Generator RAM (CGRAM) of
+ * an HD44780 LCD.
+ *
+ * The character pattern can then be printed to the screen by writing the
+ * corresponding index to DDRAM.
+ *
+ * @param lcd     The LCD device into which to write the character pattern.
+ * @param index   The index of the pattern to write (must be less than
+ *                HD44780_NB_CGRAM_ENTRIES).
+ * @param pattern The 5x8 character pattern to write.
+ */
+void hd44780_cgram_write(hd44780_lcd* lcd, uint8_t index, uint8_t pattern[8])
 
 
 /**

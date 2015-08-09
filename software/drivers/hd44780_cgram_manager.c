@@ -40,14 +40,44 @@ void hd44780_cgram_char_init(hd44780_cgram_char* c, hd44780_lcd* lcd,
   c->lcd = lcd;
   c->p = pattern;
   c->index = INDEX_NOT_IN_USE;
+}
 
+static void decode_pattern(hd44780_cgram_char* c, uint8_t dst[8])
+{
+  uint8_t line;
+  line = pgm_read_byte(&(c->p.pattern[0]));
+  dst[0] = line >> 3;
+  
+  dst[1] = (line << 2) & 0x1F;
+  line = pgm_read_byte(&(c->p.pattern[1]));
+  dst[1] |= line >> 6;
+
+  dst[2] = (line >> 1) & 0x1F;
+
+  dst[3] = (line << 4) & 0x1F
+  line = pgm_read_byte(&(c->p.pattern[2]));
+  dst[3] |= line >> 4;
+ 
+  dst[4] = (line << 1) & 0x1F;
+  line = pgm_read_byte(&(c->p.pattern[3]));
+  dst[4] |= line >> 7;
+
+  dst[5] = line >> 2;
+
+  dst[6] = (line << 3) & 0x1F;
+  line = pgm_read_byte(&(c->p.pattern[4]));
+  dst[6] |= line >> 5;
+
+  dst[7] = line & 0x1F;
 }
 
 static void
 upload_to_cgram(hd44780_cgram_char* c)
 {
-  // TODO: upload to CGRAM and then restore previous DDRAM address
-  
+  uint8_t pattern[8];
+  decode_pattern(pattern);
+
+  hd44780_cgram_write(c->lcd, c->index, pattern);
 }
 
 char hd44780_cgram_char_acquire(hd44780_cgram_char* c)
@@ -59,7 +89,7 @@ char hd44780_cgram_char_acquire(hd44780_cgram_char* c)
     char free = INDEX_NOT_IN_USE;
     struct cgram_entry entries[] = c->lcd->cgram->entries;
     while (i < NB_CGRAM_ENTRIES && entries[i].p != pattern) {
-      if (free == INDEX_NOT_IN_USE && entries[i].p == NULL) {
+      if (free == INDEX_NOT_IN_USE && entries[i].refcount == 0) {
 	free = i;
       }
       i += 1;
@@ -68,17 +98,17 @@ char hd44780_cgram_char_acquire(hd44780_cgram_char* c)
     if (i < NB_CGRAM_ENTRIES) {
       // Pattern already present, so just increase the refcount
       if (entries[i].refcount < UINT8_MAX) {
-	entries[i].refcount += 1;
 	c->index = i;
+	entries[i].refcount += 1;
       } else {
 	// Refcount overflow!
 	// TODO: LOG!
       }
     } else if (free < NB_CGRAM_ENTRIES) {
       // Pattern not yet present, so upload the pattern to a free spot
-      upload_to_cgram(c);
-      entries[i].refcount = 1;
       c->index = free;
+      entries[i].refcount = 1;
+      upload_to_cgram(c);
     } else {
       // Pattern not yet present and no free CGRAM spots left...
       // TODO: LOG!
@@ -88,6 +118,14 @@ char hd44780_cgram_char_acquire(hd44780_cgram_char* c)
   return c->index;
 }
 
-char hd44780_cgram_char_get(hd44780_cgram_char* c);
+char hd44780_cgram_char_get(hd44780_cgram_char* c)
+{
+  return c->index;
+}
 
-void hd44780_cgram_char_release(hd44780_cgram_char* c);
+void hd44780_cgram_char_release(hd44780_cgram_char* c)
+{
+  c->lcd->cgram->entries[c->index].refcount -= 1;
+  c->index = INDEX_NOT_IN_USE;
+}
+
